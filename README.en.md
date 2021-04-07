@@ -4,7 +4,7 @@
 Eggo is a tool built to provide standard multi-ways for creating Kubernetes clusters.
 
 #### Software Architecture
-Software architecture description
+[Software architecture description](./docs/design.md)
 
 #### Installation
 
