@@ -222,12 +222,15 @@ for i in "${!MASTER_IPS[@]}"; do
 	fi
 done
 
+firewall-cmd --zone=public --add-port=6443/tcp
 echo "-------set_apiserver_configs $API_SERVER_IP $etcd_servers $SERVICE_CLUSTER_IP_RANGE-------"
 set_apiserver_configs "$API_SERVER_IP" "$etcd_servers" "$SERVICE_CLUSTER_IP_RANGE"
 
+firewall-cmd --zone=public --add-port=10252/tcp
 echo "-------set_controller_manager_configs $CLUSTER_IP_RANGE $SERVICE_CLUSTER_IP_RANGE ------------"
 set_controller_manager_configs "$CLUSTER_IP_RANGE" "$SERVICE_CLUSTER_IP_RANGE"
 
+firewall-cmd --zone=public --add-port=10251/tcp
 echo "-------set_scheduler_configs----------"
 set_scheduler_configs
 

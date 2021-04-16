@@ -126,6 +126,10 @@ function test_etcd() {
 	done
 }
 
+firewall-cmd --zone=public --add-port=2379/tcp
+firewall-cmd --zone=public --add-port=2380/tcp
+firewall-cmd --zone=public --add-port=2381/tcp
+
 if [ x"$1" == x"config" ] || [ x"$1" == x"deploy" ]; then
 	if [ x"$2" == "x" ] || [ x"$3" == "x" ] || [ x"$4" == "x" ]; then
 		usage

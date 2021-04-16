@@ -382,7 +382,7 @@ function remote_run_use_password() {
 
 	/usr/bin/expect <<-EOF
 		set time 30
-		spawn ssh -o StrictHostKeyChecking=no $user@$remote_ip \"$cmd\"
+		spawn ssh -o StrictHostKeyChecking=no $user@$remote_ip $cmd
 		expect {
 		"*password:" { send "$passwd\r" }
 		}
@@ -460,6 +460,9 @@ function cleanup_node() {
 			rm -rf $fdir
 		fi
 	done
+
+	firewall-cmd --zone=public --remove-port=10250/tcp
+	firewall-cmd --zone=public --remove-port=10256/tcp
 }
 
 function apply_system_resources() {
@@ -503,4 +506,16 @@ function cleanup_master() {
 			rm -rf $fdir
 		fi
 	done
+
+	# etcd
+	firewall-cmd --zone=public --remove-port=2379/tcp
+	firewall-cmd --zone=public --remove-port=2380/tcp
+	firewall-cmd --zone=public --remove-port=2381/tcp
+
+	# kube-apiserver 
+	firewall-cmd --zone=public --remove-port=6443/tcp
+	# kube-controller-manager
+	firewall-cmd --zone=public --remove-port=10252/tcp
+	# kube-scheduler
+	firewall-cmd --zone=public --remove-port=10251/tcp
 }

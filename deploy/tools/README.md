@@ -33,7 +33,8 @@ $ ./deploy.sh all
 $ ./deploy.sh clean-cluster
 ```
 
-注意：当前openeuler的20.09版本，暂时没有k8s,etcd,coredns等组件，所以需要手动从[社区的repo](https://repo.openeuler.org/openEuler-21.03/everything/)下载这些组件的rpm包放到$MODULE_SAVE_PATH。
+注意：
+1. 当前openeuler的20.09版本，暂时没有k8s,etcd,coredns等组件，所以需要手动从[社区的repo](https://repo.openeuler.org/openEuler-21.03/everything/)下载这些组件的rpm包放到$MODULE_SAVE_PATH。
 
 在$MODULE_SAVE_PATH目录下面应该存在如下rpm包：
 ```bash
@@ -43,6 +44,8 @@ etcd-3.4.14-2.aarch64.rpm kubernetes-kubelet-1.20.2-3.oe1.aarch64.rpm
 kubernetes-client-1.20.2-3.oe1.aarch64.rpm kubernetes-master-1.20.2-3.oe1.aarch64.rpm
 kubernetes-help-1.20.2-3.oe1.aarch64.rpm kubernetes-node-1.20.2-3.oe1.aarch64.rpm
 ```
+
+2. 部署过程中关闭所以节点的代理，或者将机器ip加入环境变量no_proxy中
 
 # 节点的dnf软件包源
 
@@ -60,3 +63,6 @@ baseurl=file:///mnt/cdrom
 enable=1
 gpgcheck=0
 ```
+
+# 故障排查
+1. 生成的日志文件位于执行脚本机器的`/tmp/.k8s`目录下，如部署过程中遇到错误，可以在该目录下查看日志，进行定位。

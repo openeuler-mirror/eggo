@@ -137,9 +137,11 @@ if [ x"$hostname_override" == x"" ]; then
 	hostname_override=$(hostname)
 fi
 
+firewall-cmd --zone=public --add-port=10250/tcp
 echo "-------set_kubelet $NODE_SERVICE_CLUSTER_DNS $hostname_override-------"
 set_kubelet "$NODE_SERVICE_CLUSTER_DNS" "$hostname_override"
 
+firewall-cmd --zone=public --add-port=10256/tcp
 echo "-------set_kube_proxy $NODE_KUBE_CLUSTER_CIDR $hostname_override------------"
 set_kube_proxy "$NODE_KUBE_CLUSTER_CIDR" "$hostname_override"
 
