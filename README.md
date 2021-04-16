@@ -1,10 +1,10 @@
 # eggo
 
 #### 介绍
-Eggo is a tool built to provide standard multi-ways for creating Kubernetes clusters.
+Eggo项目旨在解决大规模生产环境K8S集群自动化部署问题、部署流程跟踪以及提供高度的灵活性。通过结合GitOps管理、跟踪部署配置，通过云原生的方式实现集群的部署，实现集群部署集群的能力。
 
 #### 软件架构
-软件架构说明
+[软件架构说明](./docs/design.md)
 
 
 #### 安装教程
