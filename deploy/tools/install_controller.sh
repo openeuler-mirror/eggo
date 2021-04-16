@@ -122,7 +122,7 @@ function set_controller_manager_configs() {
 	fi
 
 	cat >$result_dir/controller-manager <<EOF
-KUBE_BIND_ADDRESS="--bind-address=127.0.0.1"
+KUBE_BIND_ADDRESS="--bind-address=0.0.0.0"
 KUBE_CLUSTER_CIDR="--cluster-cidr=$1"
 KUBE_CLUSTER_NAME="--cluster-name=kubernetes"
 KUBE_CLUSTER_SIGNING_CERT_FILE="--cluster-signing-cert-file=/etc/kubernetes/pki/ca.crt"
@@ -181,7 +181,6 @@ function set_scheduler_configs() {
 KUBE_CONFIG="--kubeconfig=/etc/kubernetes/scheduler.conf"
 KUBE_AUTHENTICATION_KUBE_CONF="--authentication-kubeconfig=/etc/kubernetes/scheduler.conf"
 KUBE_AUTHORIZATION_KUBE_CONF="--authorization-kubeconfig=/etc/kubernetes/scheduler.conf"
-KUBE_BIND_ADDR="--bind-address=127.0.0.1"
 KUBE_LEADER_ELECT="--leader-elect=true"
 KUBE_SCHEDULER_ARGS=""
 EOF
