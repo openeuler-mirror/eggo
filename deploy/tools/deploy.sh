@@ -156,6 +156,7 @@ function deploy_all() {
 			do_first_controller_install ${MASTER_IPS[$i]} ${MASTER_NAMES[$i]} >$log_dir/first_controller.log 2>&1
 		else
 			# copy id_rsa.pub into remote authorized_keys, ensure unpasword ssh and scp can working
+			remote_run_use_password ${MASTER_IPS[$i]} $BOOTSTRAP_NODE_USER $BOOTSTRAP_NODE_PASSWORD "mkdir -p ~/.ssh"
 			copy_file_to_remote_use_password ${MASTER_IPS[$i]} $BOOTSTRAP_NODE_USER $BOOTSTRAP_NODE_PASSWORD ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys
 
 			join_new_controller ${MASTER_IPS[$i]} ${MASTER_NAMES[$i]} >$log_dir/${MASTER_NAMES[$i]}.log 2>&1 &
@@ -169,6 +170,7 @@ function deploy_all() {
 	for i in "${!NODE_IPS[@]}"; do
 
 		# copy id_rsa.pub into remote authorized_keys, ensure unpasword ssh and scp can working
+		remote_run_use_password ${NODE_IPS[$i]} $BOOTSTRAP_NODE_USER $BOOTSTRAP_NODE_PASSWORD "mkdir -p ~/.ssh"
 		copy_file_to_remote_use_password ${NODE_IPS[$i]} $BOOTSTRAP_NODE_USER $BOOTSTRAP_NODE_PASSWORD ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys
 
 		join_new_node ${NODE_IPS[$i]} ${NODE_NAMES[$i]} >$log_dir/${NODE_NAMES[$i]}.log 2>&1 &
@@ -179,6 +181,20 @@ function deploy_all() {
 	echo "----begin test k8s cluster----"
 	sleep 5
 	kubectl get --kubeconfig $result_dir/admin.conf nodes
+
+	echo "
+Your Kubernetes control-plane has initialized successfully!
+
+To start using your cluster, you need to run the following as a regular user:
+
+	mkdir -p $HOME/.kube
+	sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+	sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+Or add KUBECONFIG ENV
+
+	export KUBECONFIG=/etc/kubernetes/admin.conf
+"
 }
 
 function do_clean_first_master() {
