@@ -222,7 +222,6 @@ function deploy_coredns() {
     kubernetes cluster.local in-addr.arpa ip6.arpa {
       pods insecure
       endpoint https://$ip:6443
-      tls $cas_dir/ca.crt $cas_dir/admin.key $cas_dir/admin.crt
       kubeconfig $result_dir/admin.conf default-system
       fallthrough in-addr.arpa ip6.arpa
     }
