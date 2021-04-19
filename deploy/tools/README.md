@@ -47,7 +47,8 @@ kubernetes-help-1.20.2-3.oe1.aarch64.rpm kubernetes-node-1.20.2-3.oe1.aarch64.rp
 
 2. 部署过程中关闭所以节点的代理，或者将机器ip加入环境变量no_proxy中
 
-# 节点的dnf软件包源
+# 辅助信息
+## 节点的dnf软件包源
 
 如果使用的虚拟机，有挂载openeuler的ISO文件的话，可以直接使用cdrom作为dnf的软件源。
 
@@ -64,5 +65,20 @@ enable=1
 gpgcheck=0
 ```
 
-# 故障排查
-1. 生成的日志文件位于执行脚本机器的`/tmp/.k8s`目录下，如部署过程中遇到错误，可以在该目录下查看日志，进行定位。
+## 部署calico网络
+
+通过pod的方式部署calico的网络插件，具体方案如下：
+
+```bash
+$ wget --no-check-certificate https://docs.projectcalico.org/manifests/calico.yaml
+# 开始部署
+kubectl apply -f calico.yaml
+```
+
+## 故障排查
+- 生成的日志文件位于执行脚本机器的`/tmp/.k8s`目录下，如部署过程中遇到错误，可以在该目录下查看日志，进行定位。
+- 如果部署calico网络，calico-node网络报`BGP not establised...`，需要打开calico相关的端口：
+    ```bash
+    firewall-cmd --zone=public --add-port=111/tcp
+    firewall-cmd --zone=public --add-port=179/tcp
+    ```

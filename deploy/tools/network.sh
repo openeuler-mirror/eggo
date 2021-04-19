@@ -19,10 +19,11 @@ source ./configs
 function do_pre() {
   mkdir -p /etc/cni/net.d
   mkdir -p /opt/cni
+  ln -s /usr/libexec/cni/ /opt/cni/bin
 }
 
 function add_default_cni_configs() {
-  cat >/etc/cni/net.d/10-bridge.conf <<EOF
+  cat >/etc/cni/net.d/99-bridge.conf <<EOF
 {
   "cniVersion": "0.3.1",
   "name": "bridge",
