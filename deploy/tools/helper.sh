@@ -149,19 +149,20 @@ function gen_cert_and_key_with_ca() {
 }
 
 function new_kube_config() {
-	if [ $# -ne 6 ]; then
+	if [ $# -ne 7 ]; then
 		echo "Usage: "
-		echo "new_kube_config filename ca-path host-ip cred-name key-path cert-path"
+		echo "new_kube_config filename ca-path expose-ip expose-port cred-name key-path cert-path"
 		exit 1
 	fi
 	local fname=$1
 	local ca_path=$2
-	local host_ip=$3
-	local cred_name=$4
-	local key_path=$5
-	local cert_path=$6
+	local expose_ip=$3
+	local expose_port=$4
+	local cred_name=$5
+	local key_path=$6
+	local cert_path=$7
 
-	KUBECONFIG=$fname kubectl config set-cluster default-cluster --server=https://$host_ip:6443 --certificate-authority $ca_path --embed-certs
+	KUBECONFIG=$fname kubectl config set-cluster default-cluster --server=https://${expose_ip}:${expose_port} --certificate-authority $ca_path --embed-certs
 	KUBECONFIG=$fname kubectl config set-credentials $cred_name --client-key $key_path --client-certificate $cert_path --embed-certs
 	KUBECONFIG=$fname kubectl config set-context default-system --cluster default-cluster --user $cred_name
 	KUBECONFIG=$fname kubectl config use-context default-system
@@ -190,6 +191,11 @@ function install_controller_modules() {
 		dnf update -y
 		dnf install -y kubernetes-client kubernetes-master etcd
 	fi
+}
+
+function install_loadbalancer_modules() {
+	dnf update -y
+	dnf install -y nginx
 }
 
 function generate_encryption() {
@@ -462,6 +468,35 @@ function cleanup_node() {
 
 	firewall-cmd --zone=public --remove-port=10250/tcp
 	firewall-cmd --zone=public --remove-port=10256/tcp
+}
+
+function cleanup_loadbalancer() {
+	echo "---clean nginx service---"
+	stop_services=(nginx)
+	for ss in ${stop_services[*]}; do
+		systemctl stop $ss
+	done
+
+	echo "---clean nginx softwares---"
+	dnf remove -y nginx
+
+	echo "---clean nginx systemd configs---"
+	remove_files=(/usr/lib/systemd/system/nginx.service)
+	for fname in ${remove_files[*]}; do
+		if [ -f $fname ]; then
+			rm -f $fname
+		fi
+	done
+
+	echo "---clean nginx related dirs---"
+	remove_dirs=(/etc/kubernetes)
+	for fdir in ${remove_dirs[*]}; do
+		if [ -d $fdir ]; then
+			rm -rf $fdir
+		fi
+	done
+
+	firewall-cmd --zone=public --remove-port=${API_SERVER_EXPOSE_PORT}/tcp
 }
 
 function apply_system_resources() {
