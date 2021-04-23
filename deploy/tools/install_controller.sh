@@ -19,7 +19,7 @@ source ./helper.sh
 function set_apiserver_configs() {
 	if [ $# -ne 3 ]; then
 		echo "Usage:"
-		echo "set_apiserver_configs api-server-ip etcd-server-ips service-cluster-ip-cidr"
+		echo "set_apiserver_configs current-ip etcd-server-ips service-cluster-ip-cidr"
 		exit 1
 	fi
 
@@ -117,7 +117,7 @@ EOF
 function set_controller_manager_configs() {
 	if [ $# -ne 2 ]; then
 		echo "Usage:"
-		echo "set_apiserver_configs cluster-ip-cidr service-cluster-ip-cidr"
+		echo "set_controller_manager_configs cluster-ip-cidr service-cluster-ip-cidr"
 		exit 1
 	fi
 
@@ -212,6 +212,7 @@ EOF
 	systemctl enable kube-scheduler
 }
 
+current_ip=$1
 etcd_servers=''
 for i in "${!MASTER_IPS[@]}"; do
 	if [ $i -eq 0 ]; then
@@ -222,8 +223,8 @@ for i in "${!MASTER_IPS[@]}"; do
 done
 
 firewall-cmd --zone=public --add-port=6443/tcp
-echo "-------set_apiserver_configs $API_SERVER_IP $etcd_servers $SERVICE_CLUSTER_IP_RANGE-------"
-set_apiserver_configs "$API_SERVER_IP" "$etcd_servers" "$SERVICE_CLUSTER_IP_RANGE"
+echo "-------set_apiserver_configs $current_ip $etcd_servers $SERVICE_CLUSTER_IP_RANGE-------"
+set_apiserver_configs "$current_ip" "$etcd_servers" "$SERVICE_CLUSTER_IP_RANGE"
 
 firewall-cmd --zone=public --add-port=10252/tcp
 echo "-------set_controller_manager_configs $CLUSTER_IP_RANGE $SERVICE_CLUSTER_IP_RANGE ------------"

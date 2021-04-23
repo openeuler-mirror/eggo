@@ -38,7 +38,7 @@ function do_first_controller_start_services() {
 	do_install_etcd $1
 
 	# install kube-apiserver, controller-manager, scheduler and so on.
-	./install_controller.sh
+	./install_controller.sh $1
 
 	add_admin_cluster_role
 
@@ -89,7 +89,7 @@ function do_join_controller_install() {
 	do_install_etcd $current_ip
 
 	# install kube-apiserver, controller-manager, scheduler and so on.
-	./install_controller.sh
+	./install_controller.sh $current_ip
 }
 
 function do_join_node_install() {
@@ -97,6 +97,13 @@ function do_join_node_install() {
 
 	# install kubelet, kube-proxy, cni configs and so on.
 	./node.sh $1
+}
+
+function do_join_loadbalancer_install() {
+	install_loadbalancer_modules $MODULE_SAVE_PATH
+
+	# install nginx
+	./loadbalancer.sh
 }
 
 function join_new_controller() {
@@ -150,7 +157,16 @@ function join_new_node() {
 	remote_run $ip $BOOTSTRAP_NODE_USER "cd ~/tools/ && ./deploy.sh install-node $name"
 }
 
-function deploy_all() {
+function join_loadbalancer_install() {
+	ip=$1
+
+	remote_run $ip $BOOTSTRAP_NODE_USER "mkdir -p $MODULE_SAVE_PATH"
+	copy_file_to_remote $ip $BOOTSTRAP_NODE_USER $MODULE_SAVE_PATH $MODULE_SAVE_PATH/..
+	copy_file_to_remote $ip $BOOTSTRAP_NODE_USER "$current_dir" ~
+	remote_run $ip $BOOTSTRAP_NODE_USER "cd ~/tools/ && ./deploy.sh install-lb"
+}
+
+function deploy_cluster() {
 	for i in "${!MASTER_IPS[@]}"; do
 		if [ $i -eq 0 ]; then
 			do_first_controller_install ${MASTER_IPS[$i]} ${MASTER_NAMES[$i]} >$log_dir/first_controller.log 2>&1
@@ -197,6 +213,16 @@ Or add KUBECONFIG ENV
 "
 }
 
+function deploy_cluster_with_loadbalancer() {
+	# copy id_rsa.pub into remote authorized_keys, ensure unpasword ssh and scp can working
+	remote_run_use_password $API_SERVER_EXPOSE_IP $BOOTSTRAP_NODE_USER $BOOTSTRAP_NODE_PASSWORD "mkdir -p ~/.ssh"
+	copy_file_to_remote_use_password $API_SERVER_EXPOSE_IP $BOOTSTRAP_NODE_USER $BOOTSTRAP_NODE_PASSWORD ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys
+
+	join_loadbalancer_install $API_SERVER_EXPOSE_IP >$log_dir/loadbalancer.log 2>&1 &
+
+	deploy_cluster
+}
+
 function do_clean_first_master() {
 	cleanup_master
 }
@@ -208,6 +234,11 @@ function do_clean_master() {
 
 function do_clean_node() {
 	cleanup_node
+	rm ~/.ssh/authorized_keys
+}
+
+function do_clean_loadbalancer() {
+	cleanup_loadbalancer
 	rm ~/.ssh/authorized_keys
 }
 
@@ -236,14 +267,24 @@ function clean_cluster() {
 	do_clean_first_master
 }
 
+function clean_cluster_with_loadbalancer() {
+	clean_cluster
+
+	remote_run ${API_SERVER_EXPOSE_IP} $BOOTSTRAP_NODE_USER "cd ~/tools/ && ./deploy.sh clean-lb"
+}
+
 function usage() {
-	echo "usage: deploy.sh all"
+	echo "usage: deploy.sh install-cluster"
+	echo "usage: deploy.sh install-cluster-with-lb"
 	echo "usage: deploy.sh init-controller controller-host-ip [hostname]"
 	echo "usage: deploy.sh install-controller controller-host-ip"
 	echo "usage: deploy.sh install-node [hostname]"
+	echo "usage: deploy.sh install-lb"
 	echo "usage: deploy.sh clean-cluster"
+	echo "usage: deploy.sh clean-cluster-with-lb"
 	echo "usage: deploy.sh clean-master"
 	echo "usage: deploy.sh clean-node"
+	echo "usage: deploy.sh clean-lb"
 	echo ""
 	echo "example: deploy.sh init-controller 192.168.1.1"
 	echo "example: deploy.sh install-controller 192.168.1.2"
@@ -256,14 +297,22 @@ elif [ x"$1" == x"install-controller" ]; then
 	do_join_controller_install $2
 elif [ x"$1" == x"install-node" ]; then
 	do_join_node_install $2
-elif [ x"$1" == x"all" ]; then
-	deploy_all
+elif [ x"$1" == x"install-lb" ]; then
+	do_join_loadbalancer_install
+elif [ x"$1" == x"install-cluster" ]; then
+	deploy_cluster
+elif [ x"$1" == x"install-cluster-with-lb" ]; then
+	deploy_cluster_with_loadbalancer
 elif [ x"$1" == x"clean-cluster" ]; then
 	clean_cluster
+elif [ x"$1" == x"clean-cluster-with-lb" ]; then
+	clean_cluster_with_loadbalancer
 elif [ x"$1" == x"clean-master" ]; then
 	do_clean_master
 elif [ x"$1" == x"clean-node" ]; then
 	do_clean_node
+elif [ x"$1" == x"clean-lb" ]; then
+	do_clean_loadbalancer
 else
 	usage
 	exit 1

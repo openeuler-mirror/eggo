@@ -22,7 +22,8 @@ if [ $? -ne 0 ]; then
 	exit 1
 fi
 
-api_ip="$API_SERVER_IP"
+api_expose_ip="$API_SERVER_EXPOSE_IP"
+api_expose_port="$API_SERVER_EXPOSE_PORT"
 
 function create_admin_conf() {
 	pushd $result_dir
@@ -52,8 +53,8 @@ EOF
 	openssl_gen_cert_and_key_with_ca admin $tmp_dir/admin-csr.conf ./pki/ca.crt ./pki/ca.key
 
 	# create kube config
-	echo "---- new_kube_config admin.conf ./pki/ca.crt $api_ip default-admin admin.key admin.crt ----"
-	new_kube_config admin.conf ./pki/ca.crt $api_ip default-admin admin.key admin.crt
+	echo "---- new_kube_config admin.conf ./pki/ca.crt $api_expose_ip $api_expose_port default-admin admin.key admin.crt ----"
+	new_kube_config admin.conf ./pki/ca.crt $api_expose_ip $api_expose_port default-admin admin.key admin.crt
 
 	rm -f admin.key admin.crt admin.csr
 	popd
@@ -86,8 +87,8 @@ EOF
 	openssl_gen_cert_and_key_with_ca controller-manager $tmp_dir/controller-manager-csr.conf ./pki/ca.crt ./pki/ca.key
 
 	# create kube config
-	echo "---- new_kube_config controller-manager.conf ./pki/ca.crt $api_ip default-controller-manager controller-manager.key controller-manager.crt ----"
-	new_kube_config controller-manager.conf ./pki/ca.crt $api_ip default-controller-manager controller-manager.key controller-manager.crt
+	echo "---- new_kube_config controller-manager.conf ./pki/ca.crt $api_expose_ip $api_expose_port default-controller-manager controller-manager.key controller-manager.crt ----"
+	new_kube_config controller-manager.conf ./pki/ca.crt $api_expose_ip $api_expose_port default-controller-manager controller-manager.key controller-manager.crt
 	rm -f controller-manager.key controller-manager.crt controller-manager.csr
 	popd
 }
@@ -119,8 +120,8 @@ EOF
 	openssl_gen_cert_and_key_with_ca scheduler $tmp_dir/scheduler-csr.conf ./pki/ca.crt ./pki/ca.key
 
 	# create kube config
-	echo "---- new_kube_config scheduler.conf ./pki/ca.crt $api_ip default-scheduler scheduler.key scheduler.crt ----"
-	new_kube_config scheduler.conf ./pki/ca.crt $api_ip default-scheduler scheduler.key scheduler.crt
+	echo "---- new_kube_config scheduler.conf ./pki/ca.crt $api_expose_ip $api_expose_port default-scheduler scheduler.key scheduler.crt ----"
+	new_kube_config scheduler.conf ./pki/ca.crt $api_expose_ip $api_expose_port default-scheduler scheduler.key scheduler.crt
 	rm -f scheduler.key scheduler.crt scheduler.csr
 	popd
 }
@@ -152,8 +153,8 @@ EOF
 	openssl_gen_cert_and_key_with_ca kube-proxy $tmp_dir/kube-proxy-csr.conf ./pki/ca.crt ./pki/ca.key
 
 	# create kube-proxy config
-	echo "---- new_kube_config kube-proxy.conf ./pki/ca.crt $api_ip default-scheduler kube-proxy.key kube-proxy.crt ----"
-	new_kube_config kube-proxy.conf ./pki/ca.crt $api_ip default-kube-proxy kube-proxy.key kube-proxy.crt
+	echo "---- new_kube_config kube-proxy.conf ./pki/ca.crt $api_expose_ip $api_expose_port default-scheduler kube-proxy.key kube-proxy.crt ----"
+	new_kube_config kube-proxy.conf ./pki/ca.crt $api_expose_ip $api_expose_port default-kube-proxy kube-proxy.key kube-proxy.crt
 	rm -f scheduler.key scheduler.crt scheduler.csr
 	popd
 }
@@ -190,8 +191,8 @@ EOF
 	openssl_gen_cert_and_key_with_ca kubelet $tmp_dir/kubelet-csr.conf ./pki/ca.crt ./pki/ca.key
 
 	# create kube config
-	echo "---- new_kube_config "$1-kubelet.conf" ./pki/ca.crt $api_ip default-auth kubelet.key kubelet.crt ----"
-	new_kube_config "$1-kubelet.conf" ./pki/ca.crt $api_ip default-auth kubelet.key kubelet.crt
+	echo "---- new_kube_config "$1-kubelet.conf" ./pki/ca.crt $api_expose_ip $api_expose_port default-auth kubelet.key kubelet.crt ----"
+	new_kube_config "$1-kubelet.conf" ./pki/ca.crt $api_expose_ip $api_expose_port default-auth kubelet.key kubelet.crt
 	rm -rf kubelet.key kubelet.crt kubelet.csr
 	popd
 }
