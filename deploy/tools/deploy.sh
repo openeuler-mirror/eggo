@@ -223,6 +223,94 @@ function deploy_cluster_with_loadbalancer() {
 	deploy_cluster
 }
 
+function install_kubetest() {
+	mkdir -p $GOPATH/src/k8s.io
+
+	if [ -d "$GOPATH/src/k8s.io/test-infra" ];then
+		echo "$GOPATH/src/k8s.io/test-infra exist, remove it to continue prepare kubetest enviorment"
+		exit 1
+	fi
+
+	if [ -d "$GOPATH/src/k8s.io/kubernetes" ];then
+		echo "$GOPATH/src/k8s.io/test-infra exist, remove it to continue prepare kubetest enviorment"
+		exit 1
+	fi
+
+	git clone https://github.com/kubernetes/test-infra.git $GOPATH/src/k8s.io/test-infra
+	if [ $? != 0 ];then
+		echo "git clone https://github.com/kubernetes/test-infra.git failed"
+		exit 1
+	fi
+
+	cd $GOPATH/src/k8s.io/test-infra/kubetest
+	go install .
+	if [ $? != 0 ];then
+		echo "install kubetest failed"
+		exit 1
+	fi
+}
+
+function build_kubernetes_ete() {
+	rm -rf $GOPATH/src/k8s.io/kubernetes.tmp
+	git clone https://gitee.com/src-openeuler/kubernetes.git $GOPATH/src/k8s.io/kubernetes.tmp
+	if [ $? != 0 ];then
+		echo "git clone https://gitee.com/src-openeuler/kubernetes.git failed"
+		exit 1
+	fi
+
+	cd $GOPATH/src/k8s.io/kubernetes.tmp
+	git checkout -b openEuler-21.03-20210330 origin/openEuler-21.03-20210330
+	cd $GOPATH/src/k8s.io/
+
+	tar -zxvf $GOPATH/src/k8s.io/kubernetes.tmp/v1.20.2.tar.gz -C $GOPATH/src/k8s.io/
+	rm -rf $GOPATH/src/k8s.io/kubernetes.tmp/
+	mv $GOPATH/src/k8s.io/kubernetes-1.20.2 $GOPATH/src/k8s.io/kubernetes
+
+	cd $GOPATH/src/k8s.io/kubernetes
+	kubetest --build
+	if [ $? != 0 ];then
+		echo "build kubetest failed"
+		exit 1
+	fi
+
+	cd $GOPATH/src/k8s.io/kubernetes/test/e2e
+	go install .
+	if [ $? != 0 ];then
+		echo "go install e2e failed"
+		exit 1
+	fi
+}
+
+function kube_test_prepare() {
+	install_kubetest_modules $MODULE_SAVE_PATH
+
+	install_kubetest
+
+	build_kubernetes_ete
+
+	echo "parpare ete test environment success"
+}
+
+function kube_test_config_env() {
+	unset http_proxy
+	unset https_proxy
+	unset HTTP_PROXY
+	unset HTTPS_PROXY
+	export GOPATH=/root/gopath
+	export GOROOT=/usr/lib/golang
+	export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
+	export KUBECONFIG=/etc/kubernetes/admin.conf
+}
+
+function kube_test_conformance() {
+	kube_test_config_env
+
+	export KUBERNETES_CONFORMANCE_TEST=true
+
+	cd $GOPATH/src/k8s.io/kubernetes
+	kubetest --test --test_args="--host=https://$API_SERVER_EXPOSE_IP:$API_SERVER_EXPOSE_PORT --kubeconfig=/etc/kubernetes/admin.conf kubetest" --test_args="--ginkgo.focus=\[Conformance\]"  --provider=local --dump $HOME/kube-conformance-logs --timeout 24h
+}
+
 function do_clean_first_master() {
 	cleanup_master
 }
@@ -285,6 +373,8 @@ function usage() {
 	echo "usage: deploy.sh clean-master"
 	echo "usage: deploy.sh clean-node"
 	echo "usage: deploy.sh clean-lb"
+	echo "usage: deploy.sh test-prepare"
+	echo "usage: deploy.sh test-conformance"
 	echo ""
 	echo "example: deploy.sh init-controller 192.168.1.1"
 	echo "example: deploy.sh install-controller 192.168.1.2"
@@ -303,6 +393,10 @@ elif [ x"$1" == x"install-cluster" ]; then
 	deploy_cluster
 elif [ x"$1" == x"install-cluster-with-lb" ]; then
 	deploy_cluster_with_loadbalancer
+elif [ x"$1" == x"test-prepare" ]; then
+	kube_test_prepare
+elif [ x"$1" == x"test-conformance" ]; then
+	kube_test_conformance $2
 elif [ x"$1" == x"clean-cluster" ]; then
 	clean_cluster
 elif [ x"$1" == x"clean-cluster-with-lb" ]; then

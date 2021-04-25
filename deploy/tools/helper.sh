@@ -198,6 +198,37 @@ function install_loadbalancer_modules() {
 	dnf install -y nginx
 }
 
+function version_great() {
+	test "$(echo "$@" | tr " " "\n" | sort -V | head -n 1)" != "$1"
+}
+
+function install_kubetest_modules() {
+	dnf update -y
+	dnf install -y golang rsync git tar
+
+	mkdir -p /root/gopath
+	export GOPATH=/root/gopath
+	export GOROOT=/usr/lib/golang
+	export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
+
+	version=$(go version | awk '{print $3}')
+	if version_great go1.15.7 $version ;then
+		rpm -Uvh --force $1/golang*.rpm
+		version=$(go version | awk '{print $3}')
+		if version_great go1.15.7 $version ;then
+			echo "go version must at least go1.15.7, please update go version"
+			exit 1
+		fi
+	fi
+
+	if [ ! -d ~/.gitconfig ];then
+		cat > ~/.gitconfig << EOF
+[http]
+	sslVerify = false
+EOF
+	fi
+}
+
 function generate_encryption() {
 	local ENCRYPTION_KEY=$(head -c 32 /dev/urandom | base64)
 	cat >$result_dir/encryption-config.yaml <<EOF
