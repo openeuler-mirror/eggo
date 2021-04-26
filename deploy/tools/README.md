@@ -92,6 +92,8 @@ kubectl apply -f calico.yaml
     firewall-cmd --zone=public --add-port=111/tcp
     firewall-cmd --zone=public --add-port=179/tcp
     ```
+    为了保证重启之后端口仍然打开，将其持久化
+    firewall-cmd --runtime-to-permanent
 
 ### 符合性测试
 

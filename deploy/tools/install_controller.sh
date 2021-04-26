@@ -234,5 +234,7 @@ firewall-cmd --zone=public --add-port=10251/tcp
 echo "-------set_scheduler_configs----------"
 set_scheduler_configs
 
+firewall-cmd --runtime-to-permanent
+
 # start services
 systemctl start kube-apiserver kube-controller-manager kube-scheduler

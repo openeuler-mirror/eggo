@@ -50,7 +50,7 @@ EOF
     # insert server
     local insert_line=11
     for i in "${!MASTER_IPS[@]}"; do
-        sed -i "$insert_line a\\        server ${MASTER_IPS[$i]}:6443        max_fails=3 fail_timeout=30s;" $result_dir/kube-nginx.conf
+        sed -i "$insert_line a\\        server ${MASTER_IPS[$i]}:6443        max_fails=3 fail_timeout=30s;" /etc/kubernetes/kube-nginx.conf
         insert_line=$(($insert_line+1))
     done
 
@@ -63,9 +63,10 @@ Wants=network-online.target
 
 [Service]
 Type=forking
-ExecStartPre=/usr/sbin/nginx -c $result_dir/kube-nginx.conf -t
-ExecStart=/usr/sbin/nginx -c $result_dir/kube-nginx.conf
-ExecReload=/usr/sbin/nginx -c $result_dir/kube-nginx.conf -s reload
+ExecStartPre=setenforce 0
+ExecStartPre=/usr/sbin/nginx -c /etc/kubernetes/kube-nginx.conf -t
+ExecStart=/usr/sbin/nginx -c /etc/kubernetes/kube-nginx.conf
+ExecReload=/usr/sbin/nginx -c /etc/kubernetes/kube-nginx.conf -s reload
 PrivateTmp=true
 Restart=always
 RestartSec=5
@@ -91,6 +92,8 @@ lb_port=$API_SERVER_EXPOSE_PORT
 firewall-cmd --zone=public --add-port=${lb_port}/tcp
 echo "-------set_nginx_configs $lb_port-------"
 set_nginx_configs "$lb_port"
+
+firewall-cmd --runtime-to-permanent
 
 # start services
 systemctl start nginx

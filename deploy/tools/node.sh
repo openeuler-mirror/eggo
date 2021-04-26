@@ -146,6 +146,8 @@ firewall-cmd --zone=public --add-port=10256/tcp
 echo "-------set_kube_proxy $NODE_KUBE_CLUSTER_CIDR $hostname_override------------"
 set_kube_proxy "$NODE_KUBE_CLUSTER_CIDR" "$hostname_override"
 
+firewall-cmd --runtime-to-permanent
+
 # add cni configs
 ./network.sh default
 

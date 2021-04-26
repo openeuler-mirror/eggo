@@ -232,7 +232,7 @@ function install_kubetest() {
 	fi
 
 	if [ -d "$GOPATH/src/k8s.io/kubernetes" ];then
-		echo "$GOPATH/src/k8s.io/test-infra exist, remove it to continue prepare kubetest enviorment"
+		echo "$GOPATH/src/k8s.io/kubernetes, remove it to continue prepare kubetest enviorment"
 		exit 1
 	fi
 
