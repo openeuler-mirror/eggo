@@ -171,26 +171,30 @@ function new_kube_config() {
 function install_node_modules() {
 	dnf update -y
 	install_node_requires
-	if [ $# -eq 1 ]; then
-		local requires=(kubernetes-client kubernetes-node kubernetes-kubelet)
-		for i in "${!requires[@]}"; do
+
+	local requires=(kubernetes-client kubernetes-node kubernetes-kubelet)
+	for i in "${!requires[@]}"; do
+		find $1 -name "${requires[$i]}*"
+		if [ $? -eq 0 ]; then
 			rpm -ivh "$1/${requires[$i]}*"
-		done
-	else
-		dnf install -y kubernetes-client kubernetes-node kubernetes-kubelet
-	fi
+		else
+			dnf install -y ${requires[$i]}
+		fi
+	done
 }
 
 function install_controller_modules() {
-	if [ $# -eq 1 ]; then
-		local requires=(kubernetes-client kubernetes-master etcd coredns)
-		for i in "${!requires[@]}"; do
+	dnf update -y
+
+	local requires=(kubernetes-client kubernetes-master etcd coredns)
+	for i in "${!requires[@]}"; do
+		find $1 -name "${requires[$i]}*"
+		if [ $? -eq 0 ]; then
 			rpm -ivh "$1/${requires[$i]}*"
-		done
-	else
-		dnf update -y
-		dnf install -y kubernetes-client kubernetes-master etcd
-	fi
+		else
+			dnf install -y ${requires[$i]}
+		fi
+	done
 }
 
 function install_loadbalancer_modules() {
@@ -546,7 +550,7 @@ function cleanup_master() {
 	firewall-cmd --zone=public --remove-port=2380/tcp
 	firewall-cmd --zone=public --remove-port=2381/tcp
 
-	# kube-apiserver 
+	# kube-apiserver
 	firewall-cmd --zone=public --remove-port=6443/tcp
 	# kube-controller-manager
 	firewall-cmd --zone=public --remove-port=10252/tcp
