@@ -49,6 +49,7 @@ Wants=network-online.target
 After=network-online.target
 
 [Service]
+ExecStartPre=swapoff -a
 ExecStart=/usr/bin/kubelet \\
 	  --config=/etc/kubernetes/kubelet_config.yaml \\
 	  --network-plugin=cni \\
