@@ -92,3 +92,17 @@ kubectl apply -f calico.yaml
     firewall-cmd --zone=public --add-port=111/tcp
     firewall-cmd --zone=public --add-port=179/tcp
     ```
+
+### 符合性测试
+
+下载相关代码并配置执行环境：
+
+```
+# ./deploy.sh test-prepare
+```
+
+执行符合性测试：
+
+```
+# ./deploy.sh test-conformance
+```
