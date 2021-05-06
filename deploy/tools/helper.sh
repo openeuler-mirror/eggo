@@ -503,6 +503,7 @@ function cleanup_node() {
 
 	firewall-cmd --zone=public --remove-port=10250/tcp
 	firewall-cmd --zone=public --remove-port=10256/tcp
+	firewall-cmd --runtime-to-permanent
 }
 
 function cleanup_loadbalancer() {
@@ -532,6 +533,7 @@ function cleanup_loadbalancer() {
 	done
 
 	firewall-cmd --zone=public --remove-port=${API_SERVER_EXPOSE_PORT}/tcp
+	firewall-cmd --runtime-to-permanent
 }
 
 function apply_system_resources() {
@@ -587,4 +589,5 @@ function cleanup_master() {
 	firewall-cmd --zone=public --remove-port=10252/tcp
 	# kube-scheduler
 	firewall-cmd --zone=public --remove-port=10251/tcp
+	firewall-cmd --runtime-to-permanent
 }
