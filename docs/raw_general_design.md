@@ -37,34 +37,22 @@ Eggo支持三种部署方式：
 ```mermaid
 graph TD
 	A[(configs)] --> B{{EggoDeploy}}
-	B --> C(Infrastructure)
-	B --> D(etcd cluster)
-	B --> E(control plane)
-	B --> F(bootstrap)
-	B --> G(upgrade/clean)
-	C --> CA(interface)
-	CA --> CB[pod方式]
-	CA --> CC[二进制方式]
-	CB & CC --- CD>负责待部署节点的基础设施准备]
-	D --> DA(intreface)
-	DA --> DB[pod方式]
-	DA --> DC[二进制方式]
-	DB & DC --- DD>负责etcd集群的独立部署]
-	E --> EA(intreface)
-	EA --> EB[pod方式]
-	EA --> EC[二进制方式]
-	EB & EC --- ED>负责第一个控制面的部署]
-	F --> FA(interface)
-	FA --> FB[pod方式]
-	FA --> FC[二进制方式]
-	FB & FC --- FD>负责worker或者其他控制面节点加入K8S集群的部署]
-	G --> GA(interface)
-	GA --> GB[pod方式]
-	GA --> GC[二进制方式]
-	GB & GC --- GD>负责集群的升级或清理]
+	B --> C(intreface)
+	C --> D[pod方式]
+	C --> E[二进制方式]
+	D --> DA(Infrastructure)
+	D --> DB(etcd cluster)
+	D --> DC(control plane)
+	D --> DD(bootstrap)
+	D --> DE(upgrade/clean)
+	E --> EA(Infrastructure)
+	E --> EB(etcd cluster)
+	E --> EC(control plane)
+	E --> ED(bootstrap)
+	E --> EE(upgrade/clean)
 	style B fill:#fa3
 	classDef interfacestyle fill:#b1f,stroke:#f66,stroke-width:1px,color:#fff,stroke-dasharray:5 5
-	class CA,DA,EA,FA,GA interfacestyle
+	class C interfacestyle
 ```
 
 部署组件负责集群的实际部署工作，主要包括如下部分：
