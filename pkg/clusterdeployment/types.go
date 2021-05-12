@@ -16,14 +16,16 @@
 package clusterdeployment
 
 type HostConfig struct {
-	Arch      string   `json:"arch"`
-	Name      string   `json:"name"`
-	IP        string   `json:"ip"`
-	ExtraIPs  []string `json:"extra-ips"`
-	Port      int      `json:"port"`
-	OpenPorts []int    `json:"open-ports"`
-	UserName  string   `json:"username"`
-	Password  string   `json:"password"`
+	Arch           string   `json:"arch"`
+	Name           string   `json:"name"`
+	Address        string   `json:"address"`
+	Port           int      `json:"port"`
+	ExtraIPs       []string `json:"extra-ips"`
+	OpenPorts      []int    `json:"open-ports"`
+	UserName       string   `json:"username"`
+	Password       string   `json:"password"`
+	PrivateKey     string   `json:"private-key"`
+	PrivateKeyPath string   `json:"private-key-path"`
 
 	Type int `json:"type"`
 
@@ -52,7 +54,7 @@ type ControlPlaneConfig struct {
 
 type ClusterConfig struct {
 	ControlPlane *ControlPlaneConfig `json: "controlplane,omitempty"`
-	Nodes        []HostConfig        `json:"nodes,omitempty"`
+	Nodes        []*HostConfig       `json:"nodes,omitempty"`
 	// TODO: add other configurations at here
 }
 

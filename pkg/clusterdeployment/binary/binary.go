@@ -15,9 +15,13 @@
 package binary
 
 import (
+	"sync"
+
 	cp "gitee.com/openeuler/eggo/pkg/clusterdeployment"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/controlplane"
+	"gitee.com/openeuler/eggo/pkg/utils/runner"
 
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -33,11 +37,48 @@ func init() {
 
 func New(conf *cp.ClusterConfig) (cp.ClusterDeploymentAPI, error) {
 	// TODO: finish binary implements
-	return &BinaryClusterDeployment{config: conf}, nil
+	bcd := BinaryClusterDeployment{
+		config:      conf,
+		connections: make(map[string]runner.Runner),
+	}
+	// connect all node
+	bcd.initConnections()
+
+	return &bcd, nil
 }
 
 type BinaryClusterDeployment struct {
 	config *cp.ClusterConfig
+
+	connLock    sync.Mutex
+	connections map[string]runner.Runner
+}
+
+func (bcp *BinaryClusterDeployment) initConnections() error {
+	bcp.connLock.Lock()
+	defer bcp.connLock.Unlock()
+
+	for _, cfg := range bcp.config.Nodes {
+		if _, ok := bcp.connections[cfg.Address]; ok {
+			continue
+		}
+		r, err := runner.NewSSHRunner(cfg)
+		if err != nil {
+			logrus.Errorf("connect node: %s failed: %v\n", cfg.Address, err)
+			return err
+		}
+		bcp.connections[cfg.Address] = r
+	}
+	return nil
+}
+
+func (bcp *BinaryClusterDeployment) Finish() {
+	bcp.connLock.Lock()
+	defer bcp.connLock.Unlock()
+	for _, c := range bcp.connections {
+		c.Close()
+	}
+	bcp.connections = make(map[string]runner.Runner)
 }
 
 func (bcp *BinaryClusterDeployment) PrepareInfrastructure() error {
