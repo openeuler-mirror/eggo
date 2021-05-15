@@ -161,7 +161,7 @@ func (o *OpensshBinCertGenerator) CreateCertAndKey(caCertPath, caKeyPath string,
 		return err
 	}
 	csrBase64 := base64.StdEncoding.EncodeToString([]byte(csr))
-	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/%s-crs.conf", csrBase64, savePath, name))
+	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/%s-csr.conf", csrBase64, savePath, name))
 	sb.WriteString("\"")
 	_, err = o.r.RunCommand(sb.String())
 	if err != nil {
@@ -174,7 +174,7 @@ func (o *OpensshBinCertGenerator) CreateCertAndKey(caCertPath, caKeyPath string,
 	sb.WriteString(fmt.Sprintf("cd %s && openssl genrsa -out %s.key 4096", savePath, name))
 	sb.WriteString(fmt.Sprintf(" && openssl req -new -key %s.key -out %s.csr -config %s/%s-csr.conf", name, name, savePath, name))
 	sb.WriteString(fmt.Sprintf(" && openssl x509 -req -in %s.csr -CA %s -CAkey %s -CAcreateserial -out %s.crt -days 10000 -extensions v3_ext -extfile %s-csr.conf", name, caCertPath, caKeyPath, name, name))
-	sb.WriteString(fmt.Sprintf(" && rm %s/%s-crs.conf", savePath, name))
+	sb.WriteString(fmt.Sprintf(" && rm %s/%s-csr.conf", savePath, name))
 	sb.WriteString("\"")
 	_, err = o.r.RunCommand(sb.String())
 	if err != nil {
