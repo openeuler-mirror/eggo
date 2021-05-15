@@ -139,3 +139,89 @@ graph TD
 	E --> F[remove dependences/certs and so on]
 ```
 
+#### node-task任务管理机制
+
+旨在统一管理node上执行task，为节点部署集群，提供统一的命令和文件拷贝接口。
+
+模块时序如下：
+
+```mermaid
+sequenceDiagram
+	participant A as node-manager
+	participant B as nodeA
+	participant D as 节点A
+	participant C as nodeB
+	participant E as 节点B
+	rect rgba(0, 255, 0, .1)
+        A ->> B: register nodeA
+        B ->> D: connect节点
+        D --> B: return connection
+        B ->> B: goroutine wait task
+        A ->> C: register nodeB
+        C ->> E: connect节点
+        E --> C: return connection
+        C ->> C: goroutine wait task
+    end
+	rect rgba(255, 0, 255, .1)
+		par [push task to nodeA]
+		A ->> B: push task
+		B ->> D: use connection run command
+		D -->> B: return
+		B -->> A: add label to task
+		and [push task to nodeB]
+		A ->> C: push task
+		C ->> E: use connection run command
+		E -->> C: return
+		C -->> A: add label to task
+		end
+		A -->> A: wait task on nodes success
+	end
+    
+```
+
+类和接口关系如下：
+
+```mermaid
+classDiagram
+	class NodeManager
+	NodeManager : -nodes map
+	NodeManager : -lock RWMutex
+	NodeManager : +RegisterNode()
+	NodeManager : +UnRegisterNode()
+	NodeManager : +UnRegisterAllNodes()
+	NodeManager : +WaitTaskOnNodesFinished()
+	NodeManager : +WaitTaskOnAllFinished()
+	NodeManager : +RunTaskOnNodes()
+	NodeManager : +RunTaskOnAll()
+	class Node
+	Node : -host HostConfig
+	Node : -r Runner
+	Node : -stop chan
+	Node : -queue chan
+	Node : +PushTask()
+	Node : +Finish()
+	class Task{
+		<<interface>>
+		Name() string
+		Run(runner.Runner) error
+		AddLabels(key, lable string)
+		GetLable(key string) string
+	}
+	class Runner{
+		<<interface>>
+		Copy(src, dst string) error
+		RunCommand(cmd string) error
+		Close()
+	}
+	class SSHRunner{
+		Host *kkv1alpha1.HostCfg
+		Conn ssh.Connection
+	}
+	Runner <|-- SSHRunner : implements
+	NodeManager "1" -- "n" Node: contains
+	Task "1" -- "1" Runner: call
+	Node "n" .. "n" Task: bind
+	
+	
+```
+

@@ -5,6 +5,9 @@ Eggo is a tool built to provide standard multi-ways for creating Kubernetes clus
 
 #### Software Architecture
 [Software architecture description](./docs/design.md)
+#### Gratitude
+
+The design of Eggo was inspired by [Kubekey](https://github.com/kubesphere/kubekey), thanks to their great work.
 
 #### Contribution
 

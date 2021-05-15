@@ -27,7 +27,7 @@ type HostConfig struct {
 	PrivateKey     string   `json:"private-key"`
 	PrivateKeyPath string   `json:"private-key-path"`
 
-	Type int `json:"type"`
+	Type string `json:"type"`
 
 	Lables map[string]string `json:"lables"`
 }

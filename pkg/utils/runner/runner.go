@@ -71,6 +71,7 @@ func NewSSHRunner(hcfg *clusterdeployment.HostConfig) (Runner, error) {
 }
 
 func (ssh *SSHRunner) Close() {
+	// TODO: wait kubekey support close for Connection
 	logrus.Debugf("TODO: wait kubekey support close for Connection")
 }
 
