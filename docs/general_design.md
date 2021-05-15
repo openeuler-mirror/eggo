@@ -50,3 +50,14 @@ EggoDeploy组件交互关系图
 
 ![detailed_design_6](./imgs/detailed_design_6.png)
 
+#### node-task任务管理机制
+
+旨在统一管理node上执行task，为节点部署集群，提供统一的命令和文件拷贝接口。
+
+模块时序如下：
+
+![node-task时许图](./imgs/detailed_design_node_task_manager_1.png)
+
+类和接口关系如下：
+
+![node-task类关系图](./imgs/detailed_design_node_task_manager_2.png)
