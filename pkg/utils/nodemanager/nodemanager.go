@@ -111,7 +111,7 @@ func WaitTaskOnNodesFinished(t task.Task, nodes []string, timeout time.Duration)
 	for {
 		select {
 		case <-time.After(timeout):
-			return fmt.Errorf("Timeout for wait task: %s finish", t.Name())
+			return fmt.Errorf("timeout for wait task: %s finish", t.Name())
 		default:
 			f, err := checkFinished(t, nodes)
 			if err != nil {
@@ -129,7 +129,7 @@ func checkAllFinished(t task.Task) (bool, error) {
 	defer manager.lock.RUnlock()
 	finished := true
 	var err error
-	for id, _ := range manager.nodes {
+	for id := range manager.nodes {
 		lable := t.GetLable(id)
 		if lable == "" {
 			return false, nil
@@ -147,7 +147,7 @@ func WaitTaskOnAllFinished(t task.Task, timeout time.Duration) error {
 	for {
 		select {
 		case <-time.After(timeout):
-			return fmt.Errorf("Timeout for wait task: %s finish", t.Name())
+			return fmt.Errorf("timeout for wait task: %s finish", t.Name())
 		default:
 			f, err := checkAllFinished(t)
 			if err != nil {

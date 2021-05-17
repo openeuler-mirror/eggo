@@ -34,9 +34,9 @@ func (m *MockRunner) Copy(src, dst string) error {
 	return nil
 }
 
-func (m *MockRunner) RunCommand(cmd string) error {
+func (m *MockRunner) RunCommand(cmd string) (string, error) {
 	logrus.Infof("run command: %s", cmd)
-	return nil
+	return "", nil
 }
 
 func (m *MockRunner) Reconnect() error {
@@ -64,7 +64,7 @@ func (m *MockTask) Run(r runner.Runner, hcf *clusterdeployment.HostConfig) error
 	}
 	time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
 
-	err = r.RunCommand(m.name + " run 'top'")
+	_, err = r.RunCommand(m.name + " run 'top'")
 	if err != nil {
 		return err
 	}

@@ -16,15 +16,54 @@
 package controlplane
 
 import (
+	"fmt"
+
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/utils/runner"
+	"gitee.com/openeuler/eggo/pkg/utils/task"
+	"github.com/sirupsen/logrus"
 )
 
-func check() error {
-	// check
+const (
+	KubeSoftwares = []string{"kubectl", "kube-apiserver", "kube-controller-manager", "kube-scheduler"}
+)
+
+type ControlPlaneTask struct {
+	ccfg *clusterdeployment.ClusterConfig
+	task.Labels
+}
+
+var ctask *ControlPlaneTask
+
+func (ct *ControlPlaneTask) Name() string {
+	return "ControlplaneTask"
+}
+
+func (ct *ControlPlaneTask) Run(r runner.Runner, hcf *clusterdeployment.HostConfig) error {
+	// do precheck phase
+	err := check(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func check(r runner.Runner) error {
+	// check dependences softwares
+	for s := range KubeSoftwares {
+		_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"which %s\"", s))
+		if err != nil {
+			logrus.Errorf("chech kubernetes software: %s, failed: %v\n", s, err)
+			return err
+		}
+		logrus.Debugf("check kubernetes software: %s success\n", s)
+	}
 	return nil
 }
 
 func installDependences() error {
+	// TODO: maybe just do in infrastructure
 	return nil
 }
 
@@ -41,10 +80,10 @@ func runKubernetesServices() error {
 }
 
 func Init(conf *clusterdeployment.ClusterConfig) error {
-	check()
-	installDependences()
-	generateCerts()
-	generateKubeconfigs()
-	runKubernetesServices()
+	ctask = &ControlPlaneTask{
+		ccfg: conf,
+	}
+
+	// TODO: run task on every controlplane node
 	return nil
 }
