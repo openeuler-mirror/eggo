@@ -27,7 +27,7 @@ import (
 
 type Runner interface {
 	Copy(src, dst string) error
-	RunCommand(cmd string) error
+	RunCommand(cmd string) (string, error)
 	Reconnect() error
 	Close()
 }
@@ -97,16 +97,16 @@ func (ssh *SSHRunner) Copy(src, dst string) error {
 	return nil
 }
 
-func (ssh *SSHRunner) RunCommand(cmd string) error {
+func (ssh *SSHRunner) RunCommand(cmd string) (string, error) {
 	if ssh.Conn == nil {
-		return errors.New("SSH runner is not connected")
+		return "", errors.New("SSH runner is not connected")
 	}
 	output, err := ssh.Conn.Exec(cmd, ssh.Host)
 	if err != nil {
-		logrus.Errorf("run '%s' on %s failed: %v, output: %s\n", cmd, ssh.Host.Address, err, output)
-		return err
+		logrus.Errorf("run '%s' on %s failed: %v\n", cmd, ssh.Host.Address, err)
+		return "", err
 	}
 
 	logrus.Debugf("run '%s' on %s success, output: %s\n", cmd, ssh.Host.Address, output)
-	return nil
+	return output, nil
 }

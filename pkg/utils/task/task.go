@@ -17,6 +17,7 @@ package task
 
 import (
 	"strings"
+	"sync"
 
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
@@ -32,6 +33,29 @@ type Task interface {
 	Run(runner.Runner, *clusterdeployment.HostConfig) error
 	AddLabels(key, lable string)
 	GetLable(key string) string
+}
+
+type Labels struct {
+	data map[string]string
+	l    sync.RWMutex
+}
+
+func (l *Labels) AddLabels(key, lable string) {
+	l.l.Lock()
+	defer l.l.Unlock()
+	l.data[key] = lable
+}
+
+func (l *Labels) GetLabels(key string) string {
+	l.l.RLock()
+	defer l.l.RUnlock()
+
+	val, ok := l.data[key]
+	if ok {
+		return val
+	}
+
+	return ""
 }
 
 func IsSuccess(lable string) bool {
