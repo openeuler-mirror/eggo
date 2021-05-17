@@ -62,7 +62,7 @@ func NewNode(hcf *clusterdeployment.HostConfig, r runner.Runner) (*Node, error) 
 			case <-n.stop:
 				return
 			case t := <-n.queue:
-				err := t.Run(n.r)
+				err := t.Run(n.r, n.host)
 				if err != nil {
 					label := fmt.Sprintf("%s: run task: %s on node: %s fail", task.FAILED, t.Name(), n.host.Address)
 					t.AddLabels(n.host.Address, label)

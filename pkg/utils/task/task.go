@@ -18,6 +18,7 @@ package task
 import (
 	"strings"
 
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 )
 
@@ -28,7 +29,7 @@ const (
 
 type Task interface {
 	Name() string
-	Run(runner.Runner) error
+	Run(runner.Runner, *clusterdeployment.HostConfig) error
 	AddLabels(key, lable string)
 	GetLable(key string) string
 }
