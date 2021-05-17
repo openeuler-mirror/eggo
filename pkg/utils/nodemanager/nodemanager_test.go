@@ -55,7 +55,7 @@ type MockTask struct {
 	lables map[string]string
 }
 
-func (m *MockTask) Run(r runner.Runner) error {
+func (m *MockTask) Run(r runner.Runner, hcf *clusterdeployment.HostConfig) error {
 	rand.Seed(time.Now().UnixNano())
 
 	err := r.Copy("/home/data", "/data")
