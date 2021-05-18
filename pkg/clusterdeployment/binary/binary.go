@@ -22,7 +22,6 @@ import (
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -31,7 +30,7 @@ const (
 
 func init() {
 	if err := cp.RegisterClusterDeploymentDriver(name, New); err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 }
 
@@ -82,32 +81,32 @@ func (bcp *BinaryClusterDeployment) Finish() {
 }
 
 func (bcp *BinaryClusterDeployment) PrepareInfrastructure() error {
-	log.Info("do prepare infrastructure...")
+	logrus.Info("do prepare infrastructure...")
 	return nil
 }
 
 func (bcp *BinaryClusterDeployment) DeployEtcdCluster() error {
-	log.Info("do deploy etcd cluster...")
+	logrus.Info("do deploy etcd cluster...")
 	return nil
 }
 
 func (bcp *BinaryClusterDeployment) InitControlPlane() error {
-	log.Info("do init control plane...")
+	logrus.Info("do init control plane...")
 	controlplane.Init(bcp.config)
 	return nil
 }
 
 func (bcp *BinaryClusterDeployment) JoinBootstrap() error {
-	log.Info("do join new work or master...")
+	logrus.Info("do join new work or master...")
 	return nil
 }
 
 func (bcp *BinaryClusterDeployment) UpgradeCluster() error {
-	log.Info("do update cluster...")
+	logrus.Info("do update cluster...")
 	return nil
 }
 
 func (bcp *BinaryClusterDeployment) CleanupCluster() error {
-	log.Info("do clean cluster...")
+	logrus.Info("do clean cluster...")
 	return nil
 }
