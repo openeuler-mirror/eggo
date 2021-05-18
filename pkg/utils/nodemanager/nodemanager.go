@@ -94,12 +94,12 @@ func checkFinished(t task.Task, nodes []string) (bool, error) {
 	finished := true
 	var err error
 	for _, id := range nodes {
-		lable := t.GetLable(id)
-		if lable == "" {
+		label := t.GetLabel(id)
+		if label == "" {
 			return false, nil
 		}
-		if task.IsFailed(lable) {
-			err = fmt.Errorf("%s", lable)
+		if task.IsFailed(label) {
+			err = fmt.Errorf("%s", label)
 			break
 		}
 	}
@@ -130,12 +130,12 @@ func checkAllFinished(t task.Task) (bool, error) {
 	finished := true
 	var err error
 	for id := range manager.nodes {
-		lable := t.GetLable(id)
-		if lable == "" {
+		label := t.GetLabel(id)
+		if label == "" {
 			return false, nil
 		}
-		if task.IsFailed(lable) {
-			err = fmt.Errorf("%s", lable)
+		if task.IsFailed(label) {
+			err = fmt.Errorf("%s", label)
 			break
 		}
 	}

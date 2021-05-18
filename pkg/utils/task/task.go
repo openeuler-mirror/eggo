@@ -28,29 +28,41 @@ const (
 	FAILED  = "failed"
 )
 
-type Task interface {
+type TaskRun interface {
 	Name() string
 	Run(runner.Runner, *clusterdeployment.HostConfig) error
-	AddLabel(key, lable string)
-	GetLable(key string) string
 }
 
-type Labels struct {
+type Task interface {
+	AddLabel(key, label string)
+	GetLabel(key string) string
+	TaskRun
+}
+
+type TaskInstance struct {
 	data map[string]string
 	l    sync.RWMutex
+	TaskRun
 }
 
-func (l *Labels) AddLabel(key, lable string) {
-	l.l.Lock()
-	defer l.l.Unlock()
-	l.data[key] = lable
+func NewTaskInstance(t TaskRun) *TaskInstance {
+	return &TaskInstance{
+		data:    make(map[string]string),
+		TaskRun: t,
+	}
 }
 
-func (l *Labels) GetLabel(key string) string {
-	l.l.RLock()
-	defer l.l.RUnlock()
+func (t *TaskInstance) AddLabel(key, label string) {
+	t.l.Lock()
+	defer t.l.Unlock()
+	t.data[key] = label
+}
 
-	val, ok := l.data[key]
+func (t *TaskInstance) GetLabel(key string) string {
+	t.l.RLock()
+	defer t.l.RUnlock()
+
+	val, ok := t.data[key]
 	if ok {
 		return val
 	}
@@ -58,14 +70,10 @@ func (l *Labels) GetLabel(key string) string {
 	return ""
 }
 
-func NewLabel() *Labels {
-	return &Labels{data: make(map[string]string)}
+func IsSuccess(label string) bool {
+	return strings.HasPrefix(label, SUCCESS)
 }
 
-func IsSuccess(lable string) bool {
-	return strings.HasPrefix(lable, SUCCESS)
-}
-
-func IsFailed(lable string) bool {
-	return strings.HasPrefix(lable, FAILED)
+func IsFailed(label string) bool {
+	return strings.HasPrefix(label, FAILED)
 }
