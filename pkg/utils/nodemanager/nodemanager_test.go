@@ -17,12 +17,12 @@ package nodemanager
 
 import (
 	"math/rand"
-	"sync"
 	"testing"
 	"time"
 
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
+	"gitee.com/openeuler/eggo/pkg/utils/task"
 	"github.com/sirupsen/logrus"
 )
 
@@ -50,9 +50,8 @@ func (m *MockRunner) Close() {
 
 type MockTask struct {
 	// some need data
-	name   string
-	lock   sync.RWMutex
-	lables map[string]string
+	name string
+	l    *task.Labels
 }
 
 func (m *MockTask) Run(r runner.Runner, hcf *clusterdeployment.HostConfig) error {
@@ -79,21 +78,12 @@ func (m *MockTask) Name() string {
 	return m.name
 }
 
-func (m *MockTask) AddLabels(key, lable string) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.lables[key] = lable
+func (m *MockTask) AddLabel(key, lable string) {
+	m.l.AddLabel(key, lable)
 }
 
 func (m *MockTask) GetLable(key string) string {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
-	l, ok := m.lables[key]
-	if ok {
-		return l
-	}
-
-	return ""
+	return m.l.GetLabel(key)
 }
 
 func addNodes() {
@@ -128,7 +118,7 @@ func releaseNodes(nodes []string) {
 
 func TestRunTaskOnNodes(t *testing.T) {
 	addNodes()
-	tt := &MockTask{name: "precheck", lables: make(map[string]string)}
+	tt := &MockTask{name: "precheck", l: task.NewLabel()}
 	nodes := []string{"192.168.0.1", "192.168.0.2"}
 	err := RunTaskOnNodes(tt, nodes)
 	if err != nil {
@@ -144,7 +134,7 @@ func TestRunTaskOnNodes(t *testing.T) {
 
 func TestRunTaskOnAll(t *testing.T) {
 	addNodes()
-	tt := &MockTask{name: "precheck", lables: make(map[string]string)}
+	tt := &MockTask{name: "precheck", l: task.NewLabel()}
 	err := RunTaskOnAll(tt)
 	if err != nil {
 		t.Fatalf("run task on all node failed: %v\n", err)

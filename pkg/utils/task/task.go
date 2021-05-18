@@ -31,7 +31,7 @@ const (
 type Task interface {
 	Name() string
 	Run(runner.Runner, *clusterdeployment.HostConfig) error
-	AddLabels(key, lable string)
+	AddLabel(key, lable string)
 	GetLable(key string) string
 }
 
@@ -40,13 +40,13 @@ type Labels struct {
 	l    sync.RWMutex
 }
 
-func (l *Labels) AddLabels(key, lable string) {
+func (l *Labels) AddLabel(key, lable string) {
 	l.l.Lock()
 	defer l.l.Unlock()
 	l.data[key] = lable
 }
 
-func (l *Labels) GetLabels(key string) string {
+func (l *Labels) GetLabel(key string) string {
 	l.l.RLock()
 	defer l.l.RUnlock()
 
@@ -56,6 +56,10 @@ func (l *Labels) GetLabels(key string) string {
 	}
 
 	return ""
+}
+
+func NewLabel() *Labels {
+	return &Labels{data: make(map[string]string)}
 }
 
 func IsSuccess(lable string) bool {
