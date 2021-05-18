@@ -65,9 +65,9 @@ func NewNode(hcf *clusterdeployment.HostConfig, r runner.Runner) (*Node, error) 
 				err := t.Run(n.r, n.host)
 				if err != nil {
 					label := fmt.Sprintf("%s: run task: %s on node: %s fail", task.FAILED, t.Name(), n.host.Address)
-					t.AddLabels(n.host.Address, label)
+					t.AddLabel(n.host.Address, label)
 				} else {
-					t.AddLabels(n.host.Address, task.SUCCESS)
+					t.AddLabel(n.host.Address, task.SUCCESS)
 					logrus.Infof("run task: %s success on %s\n", t.Name(), n.host.Address)
 				}
 			}

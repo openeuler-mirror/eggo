@@ -51,7 +51,6 @@ func (m *MockRunner) Close() {
 type MockTask struct {
 	// some need data
 	name string
-	l    *task.Labels
 }
 
 func (m *MockTask) Run(r runner.Runner, hcf *clusterdeployment.HostConfig) error {
@@ -76,14 +75,6 @@ func (m *MockTask) Run(r runner.Runner, hcf *clusterdeployment.HostConfig) error
 
 func (m *MockTask) Name() string {
 	return m.name
-}
-
-func (m *MockTask) AddLabel(key, lable string) {
-	m.l.AddLabel(key, lable)
-}
-
-func (m *MockTask) GetLable(key string) string {
-	return m.l.GetLabel(key)
 }
 
 func addNodes() {
@@ -118,7 +109,11 @@ func releaseNodes(nodes []string) {
 
 func TestRunTaskOnNodes(t *testing.T) {
 	addNodes()
-	tt := &MockTask{name: "precheck", l: task.NewLabel()}
+	tt := task.NewTaskInstance(
+		&MockTask{
+			name: "precheck",
+		},
+	)
 	nodes := []string{"192.168.0.1", "192.168.0.2"}
 	err := RunTaskOnNodes(tt, nodes)
 	if err != nil {
@@ -134,7 +129,11 @@ func TestRunTaskOnNodes(t *testing.T) {
 
 func TestRunTaskOnAll(t *testing.T) {
 	addNodes()
-	tt := &MockTask{name: "precheck", l: task.NewLabel()}
+	tt := task.NewTaskInstance(
+		&MockTask{
+			name: "precheck",
+		},
+	)
 	err := RunTaskOnAll(tt)
 	if err != nil {
 		t.Fatalf("run task on all node failed: %v\n", err)

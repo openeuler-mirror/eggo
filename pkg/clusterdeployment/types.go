@@ -29,31 +29,31 @@ type HostConfig struct {
 
 	Type string `json:"type"`
 
-	Lables map[string]string `json:"lables"`
+	Labels map[string]string `json:"labels"`
 }
 
 type ApiServer struct {
-	Sans      []string          `json: "sans,omitempty"`
-	Timeout   string            `json: "timeout,omitempty"`
-	ExtraArgs map[string]string `json: "extra-args,omitempty"`
+	Sans      []string          `json:"sans,omitempty"`
+	Timeout   string            `json:"timeout,omitempty"`
+	ExtraArgs map[string]string `json:"extra-args,omitempty"`
 }
 
 type ControlManager struct {
-	ExtraArgs map[string]string `json: "extra-args,omitempty"`
+	ExtraArgs map[string]string `json:"extra-args,omitempty"`
 }
 
 type Scheduler struct {
-	ExtraArgs map[string]string `json: "extra-args,omitempty"`
+	ExtraArgs map[string]string `json:"extra-args,omitempty"`
 }
 
 type ControlPlaneConfig struct {
-	ApiConf       *ApiServer      `json: "apiconf,omitempty"`
-	ManagerConf   *ControlManager `json: "managerconf,omitempty"`
-	SchedulerConf *Scheduler      `json: "schedulerconf,omitempty"`
+	ApiConf       *ApiServer      `json:"apiconf,omitempty"`
+	ManagerConf   *ControlManager `json:"managerconf,omitempty"`
+	SchedulerConf *Scheduler      `json:"schedulerconf,omitempty"`
 }
 
 type ClusterConfig struct {
-	ControlPlane *ControlPlaneConfig `json: "controlplane,omitempty"`
+	ControlPlane *ControlPlaneConfig `json:"controlplane,omitempty"`
 	Nodes        []*HostConfig       `json:"nodes,omitempty"`
 	// TODO: add other configurations at here
 }

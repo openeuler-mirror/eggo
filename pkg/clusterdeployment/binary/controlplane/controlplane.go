@@ -30,10 +30,9 @@ const (
 
 type ControlPlaneTask struct {
 	ccfg *clusterdeployment.ClusterConfig
-	task.Labels
 }
 
-var ctask *ControlPlaneTask
+var ctask *task.TaskInstance
 
 func (ct *ControlPlaneTask) Name() string {
 	return "ControlplaneTask"
@@ -80,9 +79,11 @@ func runKubernetesServices() error {
 }
 
 func Init(conf *clusterdeployment.ClusterConfig) error {
-	ctask = &ControlPlaneTask{
-		ccfg: conf,
-	}
+	ctask = task.NewTaskInstance(
+		&ControlPlaneTask{
+			ccfg: conf,
+		},
+	)
 
 	// TODO: run task on every controlplane node
 	return nil
