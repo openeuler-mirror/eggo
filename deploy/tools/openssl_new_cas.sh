@@ -168,7 +168,7 @@ keyUsage=keyEncipherment,dataEncipherment
 extendedKeyUsage=clientAuth
 EOF
 
-	openssl_gen_cert_and_key_with_ca front-proxy-client $tmp_dir/front-proxy-client-csr.conf ca.crt ca.key
+	openssl_gen_cert_and_key_with_ca front-proxy-client $tmp_dir/front-proxy-client-csr.conf front-proxy-ca.crt front-proxy-ca.key
 
 	rm -f front-proxy-client.csr
 	popd
