@@ -19,6 +19,8 @@ import (
 
 	cp "gitee.com/openeuler/eggo/pkg/clusterdeployment"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/controlplane"
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
+	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 
 	"github.com/sirupsen/logrus"
@@ -40,8 +42,8 @@ func New(conf *cp.ClusterConfig) (cp.ClusterDeploymentAPI, error) {
 		config:      conf,
 		connections: make(map[string]runner.Runner),
 	}
-	// connect all node
-	bcd.initConnections()
+	// register and connect all nodes
+	bcd.registerNodes()
 
 	return &bcd, nil
 }
@@ -53,9 +55,17 @@ type BinaryClusterDeployment struct {
 	connections map[string]runner.Runner
 }
 
-func (bcp *BinaryClusterDeployment) initConnections() error {
+func (bcp *BinaryClusterDeployment) registerNodes() error {
 	bcp.connLock.Lock()
 	defer bcp.connLock.Unlock()
+
+	var err error
+	defer func() {
+		if err != nil {
+			bcp.Finish()
+			nodemanager.UnRegisterAllNodes()
+		}
+	}()
 
 	for _, cfg := range bcp.config.Nodes {
 		if _, ok := bcp.connections[cfg.Address]; ok {
@@ -63,10 +73,16 @@ func (bcp *BinaryClusterDeployment) initConnections() error {
 		}
 		r, err := runner.NewSSHRunner(cfg)
 		if err != nil {
-			logrus.Errorf("connect node: %s failed: %v\n", cfg.Address, err)
+			logrus.Errorf("connect node: %s failed: %v", cfg.Address, err)
 			return err
 		}
 		bcp.connections[cfg.Address] = r
+
+		err = nodemanager.RegisterNode(cfg, r)
+		if err != nil {
+			logrus.Errorf("register node: %s failed: %v", cfg.Address, err)
+			return err
+		}
 	}
 	return nil
 }
@@ -82,6 +98,7 @@ func (bcp *BinaryClusterDeployment) Finish() {
 
 func (bcp *BinaryClusterDeployment) PrepareInfrastructure() error {
 	logrus.Info("do prepare infrastructure...")
+	infrastructure.PrepareInfrastructure(bcp.config)
 	return nil
 }
 

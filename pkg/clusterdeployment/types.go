@@ -21,17 +21,28 @@ const (
 	ETCD   = 0x4
 )
 
+type OpenPorts struct {
+	Port     int    `json:"port"`
+	Protocol string `json:"protocol"` // tcp/udp
+}
+
+type Packages struct {
+	Type string `json:"type"` // repo, pkg, binary
+	Dst  string `json:"dstpath"`
+}
+
 type HostConfig struct {
-	Arch           string   `json:"arch"`
-	Name           string   `json:"name"`
-	Address        string   `json:"address"`
-	Port           int      `json:"port"`
-	ExtraIPs       []string `json:"extra-ips"`
-	OpenPorts      []int    `json:"open-ports"`
-	UserName       string   `json:"username"`
-	Password       string   `json:"password"`
-	PrivateKey     string   `json:"private-key"`
-	PrivateKeyPath string   `json:"private-key-path"`
+	Arch           string              `json:"arch"`
+	Name           string              `json:"name"`
+	Address        string              `json:"address"`
+	Port           int                 `json:"port"`
+	ExtraIPs       []string            `json:"extra-ips"`
+	OpenPorts      []*OpenPorts        `json:"open-ports"`
+	UserName       string              `json:"username"`
+	Password       string              `json:"password"`
+	PrivateKey     string              `json:"private-key"`
+	PrivateKeyPath string              `json:"private-key-path"`
+	Packages       map[string]Packages `json:"packages"`
 
 	// 0x1 is master, 0x2 is worker, 0x4 is etcd
 	// 0x3 is master and worker
@@ -82,11 +93,18 @@ type ServiceClusterConfig struct {
 	Gateway string `json:"gateway"`
 }
 
+type PackageSrcConfig struct {
+	Type   string `json:"type"` // tar.gz...
+	ArmSrc string `json:"arm-srcpath"`
+	X86Src string `json:"x86-srcPath"`
+}
+
 type ClusterConfig struct {
 	Certificate    CertificateConfig    `json:"certificate,omitempty"`
 	ServiceCluster ServiceClusterConfig `json:"servicecluster,omitempty"`
 	LocalEndpoint  APIEndpoint          `json:"local-endpoint,omitempty"`
 	ControlPlane   ControlPlaneConfig   `json:"controlplane,omitempty"`
+	PackageSrc     *PackageSrcConfig    `json:"packagesource,omitempty"`
 	Nodes          []*HostConfig        `json:"nodes,omitempty"`
 	// TODO: add other configurations at here
 }
