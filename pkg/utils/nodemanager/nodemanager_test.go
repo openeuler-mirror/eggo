@@ -85,7 +85,7 @@ func addNodes() {
 		Port:     22,
 		UserName: "root",
 		Password: "123456",
-		Type:     "master",
+		Type:     clusterdeployment.Master,
 	}
 	hcf2 := &clusterdeployment.HostConfig{
 		Arch:     "arm64",
@@ -94,7 +94,7 @@ func addNodes() {
 		Port:     22,
 		UserName: "root",
 		Password: "123456",
-		Type:     "work",
+		Type:     clusterdeployment.Worker,
 	}
 	r := &MockRunner{}
 	RegisterNode(hcf1, r)
