@@ -26,9 +26,14 @@ func Add(a, b int) int {
 	return a + b
 }
 
+func NotLast(idx, size int) bool {
+	return idx != size-1
+}
+
 var (
 	funcMap = template.FuncMap{
-		"Add": Add,
+		"Add":     Add,
+		"NotLast": NotLast,
 	}
 
 	BaseCsrTemplate = `[ req ]
@@ -72,6 +77,30 @@ extendedKeyUsage = {{ .ExtendedKeyUsage }}
 subjectAltName = @alt_names
 {{- end }}
 	`
+
+	BaseSystemdServiceTemplate = `[Unit]
+Description={{ .Description }}
+Documentation={{ .Documentation }}
+{{- range $i, $v := .Afters }}
+After={{ $v }}
+{{- end }}
+
+[Service]
+{{- range $i, $v := .EnvironmentFiles }}
+EnvironmentFile=-{{ $v }}
+{{- end }}
+{{- $alen := len .Arguments }}
+ExecStart={{ .Command }}{{if ne $alen 0 }} \\{{end}}
+{{- range $i, $v := .Arguments }}
+		{{ $v }}{{if NotLast $i $alen }} \\{{end}}
+{{- end }}
+
+Restart={{ .RestartPolicy }}
+LimitNOFILE={{ .LimitNoFile }}
+
+[Install]
+WantedBy={{ .WantedBy }}
+	`
 )
 
 type CsrConfig struct {
@@ -99,6 +128,73 @@ func CreateCsrTemplate(name string, conf *CsrConfig) (string, error) {
 	datastore["Organization"] = conf.Organization
 	datastore["CommonName"] = conf.CommonName
 	datastore["ExtendedKeyUsage"] = conf.ExtendedKeyUsage
+
+	return kkutil.Render(tmpl, datastore)
+}
+
+type SystemdServiceConfig struct {
+	Description      string
+	Documentation    string
+	Afters           []string
+	EnvironmentFiles []string
+	Command          string
+	Arguments        []string
+	RestartPolicy    string
+	LimitNoFile      string
+	WantedBy         string
+}
+
+func CreateSystemdServiceTemplate(name string, conf *SystemdServiceConfig) (string, error) {
+	if conf == nil {
+		return "", fmt.Errorf("invalid csr config")
+	}
+	tmpl := template.Must(template.New(name).Funcs(funcMap).Parse(dedent.Dedent(BaseSystemdServiceTemplate)))
+	datastore := map[string]interface{}{}
+
+	if conf.Description == "" {
+		return "", fmt.Errorf("must provide a description")
+	}
+	datastore["Description"] = conf.Description
+
+	if conf.Documentation == "" {
+		return "", fmt.Errorf("must provide a documentation")
+	}
+	datastore["Documentation"] = conf.Documentation
+
+	if len(conf.Afters) > 0 {
+		datastore["Afters"] = conf.Afters
+	}
+
+	if len(conf.EnvironmentFiles) > 0 {
+		datastore["EnvironmentFiles"] = conf.EnvironmentFiles
+	}
+
+	if conf.Command == "" {
+		return "", fmt.Errorf("must provide a command")
+	}
+	datastore["Command"] = conf.Command
+
+	if len(conf.Arguments) > 0 {
+		datastore["Arguments"] = conf.Arguments
+	}
+
+	restartPolicy := "on-failure"
+	if conf.RestartPolicy != "" {
+		restartPolicy = conf.RestartPolicy
+	}
+	datastore["RestartPolicy"] = restartPolicy
+
+	limitNoFile := "65536"
+	if conf.LimitNoFile != "" {
+		limitNoFile = conf.LimitNoFile
+	}
+	datastore["LimitNoFile"] = limitNoFile
+
+	wantedBy := "multi-user.target"
+	if conf.WantedBy != "" {
+		wantedBy = conf.WantedBy
+	}
+	datastore["WantedBy"] = wantedBy
 
 	return kkutil.Render(tmpl, datastore)
 }

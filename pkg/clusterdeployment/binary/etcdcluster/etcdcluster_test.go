@@ -46,12 +46,12 @@ func TestDeployEtcd(t *testing.T) {
 	defer os.RemoveAll(dstTempDir)
 
 	nodes := []*clusterdeployment.HostConfig{
-		&clusterdeployment.HostConfig{
+		{
 			Arch:    "amd64",
 			Name:    "node0",
 			Address: "192.168.0.1",
 		},
-		&clusterdeployment.HostConfig{
+		{
 			Arch:    "aarch64",
 			Name:    "node1",
 			Address: "192.168.0.2",
@@ -71,12 +71,13 @@ func TestDeployEtcd(t *testing.T) {
 	if err := prepareEtcdConfigs(conf, configsTempDir); err != nil {
 		t.Fatalf("prepare etcd configs failed: %v", err)
 	}
+	r := &runner.LocalRunner{}
 
-	if err := generateCerts(&runner.LocalRunner{}, conf); err != nil {
+	if err := generateCerts(r, conf); err != nil {
 		t.Fatalf("generate etcd certs failed: %v", err)
 	}
 
-	if err := copyCertsAndConfigs(conf, &runner.LocalRunner{}, &clusterdeployment.HostConfig{
+	if err := copyCertsAndConfigs(conf, r, &clusterdeployment.HostConfig{
 		Arch:    "aarch64",
 		Name:    "node0",
 		Address: "192.168.0.1",
@@ -101,7 +102,7 @@ func TestDeployEtcd(t *testing.T) {
 		}
 	}
 
-	envStr, err := ioutil.ReadFile(filepath.Join(dstTempDir, "etcd.conf"))
+	envStr, err := r.RunCommand("sudo cat " + filepath.Join(dstTempDir, "etcd.conf"))
 	if err != nil {
 		t.Fatalf("read etcd env config file etcd.conf failed: %v", err)
 	}
@@ -111,6 +112,4 @@ func TestDeployEtcd(t *testing.T) {
 		strings.Contains(string(envStr), "ETCD_UNSUPPORTED_ARCH=aarch64") {
 		t.Fatalf("etcd env config file not right")
 	}
-
-	return
 }
