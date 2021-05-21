@@ -18,6 +18,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
@@ -26,7 +27,8 @@ import (
 )
 
 const (
-	DefaultCertPath = "/etc/kubernetes"
+	DefaultKubeHomePath = "/etc/kubernetes"
+	DefaultCertPath     = "/etc/kubernetes/pki"
 )
 
 type AltNames struct {
@@ -46,6 +48,8 @@ type CertGenerator interface {
 	CreateServiceAccount(savePath string) error
 	CreateCA(config *CertConfig, savePath string, name string) error
 	CreateCertAndKey(caCertPath, caKeyPath string, config *CertConfig, savePath string, name string) error
+	CreateKubeConfig(savePath, filename string, caCertPath, credName, certPath, keyPath string, enpoint string) error
+	CleanAll(savePath string) error
 }
 
 type OpensshBinCertGenerator struct {
@@ -56,6 +60,26 @@ func NewOpensshBinCertGenerator(r runner.Runner) CertGenerator {
 	return &OpensshBinCertGenerator{
 		r: r,
 	}
+}
+
+func (o *OpensshBinCertGenerator) CleanAll(savePath string) error {
+	if filepath.IsAbs(savePath) {
+		return fmt.Errorf("%s is not absolute path", savePath)
+	}
+	savePath = filepath.Clean(savePath)
+	if savePath == "/" {
+		return fmt.Errorf("rm -rf %s is risk", savePath)
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("sudo rm -rf %s", savePath))
+
+	_, err := o.r.RunCommand(sb.String())
+	if err != nil {
+		return err
+	}
+	logrus.Debugf("clean all success")
+	return nil
 }
 
 func (o *OpensshBinCertGenerator) CreateServiceAccount(savePath string) error {
@@ -95,7 +119,7 @@ func (o *OpensshBinCertGenerator) CreateCA(config *CertConfig, savePath string, 
 	if err != nil {
 		return err
 	}
-	logrus.Debugf("create service account success")
+	logrus.Debugf("create root ca success")
 	return nil
 }
 
@@ -126,27 +150,45 @@ func createCsrString(name string, config *CertConfig) (string, error) {
 
 func (o *OpensshBinCertGenerator) CreateCertAndKey(caCertPath, caKeyPath string, config *CertConfig, savePath string, name string) error {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("sudo mkdir -p %s && sudo cd %s", savePath, savePath))
+	sb.WriteString(fmt.Sprintf("sudo mkdir -p %s && sudo cd %s ", savePath, savePath))
 	csr, err := createCsrString(name, config)
 	if err != nil {
 		return err
 	}
 	csrBase64 := base64.StdEncoding.EncodeToString([]byte(csr))
-	sb.WriteString(fmt.Sprintf("sudo echo %s | base64 -d > %s/%s-crs.conf", csrBase64, savePath, name))
+	sb.WriteString(fmt.Sprintf("&& sudo echo %s | base64 -d > %s/%s-crs.conf", csrBase64, savePath, name))
 	_, err = o.r.RunCommand(sb.String())
 	if err != nil {
 		logrus.Errorf("create %s-csr.conf failed: %v", name, err)
 		return err
 	}
 
+	sb.Reset()
 	sb.WriteString(fmt.Sprintf("sudo cd %s && sudo openssl genrsa -out %s.key 4096 ", savePath, name))
 	sb.WriteString(fmt.Sprintf("&& sudo openssl req -new -key %s.key -out %s.csr -config %s/%s-csr.conf", name, name, savePath, name))
 	sb.WriteString(fmt.Sprintf("&& sudo openssl x509 -req -in %s.csr -CA %s -CAkey %s -CAcreateserial -out %s.crt -days 10000 -extensions v3_ext -extfile %s-csr.conf", name, caCertPath, caKeyPath, name, name))
+	sb.WriteString(fmt.Sprintf("&& sudo rm %s/%s-crs.conf", savePath, name))
 	_, err = o.r.RunCommand(sb.String())
 	if err != nil {
-		logrus.Errorf("create %s-csr.conf failed: %v", name, err)
+		logrus.Errorf("create certs and keys: '%s' failed: %v", name, err)
 		return err
 	}
-	logrus.Debugf("create service account success")
+	logrus.Debugf("create certs and keys: '%s' success", name)
+	return nil
+}
+
+func (o *OpensshBinCertGenerator) CreateKubeConfig(savePath, filename string, caCertPath, credName, certPath, keyPath string, enpoint string) error {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("sudo cd %s ", savePath))
+	sb.WriteString(fmt.Sprintf("&& sudo KUBECONFIG=%s kubectl config set-cluster default-cluster --server=%s --certificate-authority %s --embed-certs ", filename, enpoint, caCertPath))
+	sb.WriteString(fmt.Sprintf("&& sudo KUBECONFIG=%s kubectl config set-credentials %s --client-key %s --client-certificate %s --embed-certs", filename, credName, keyPath, certPath))
+	sb.WriteString(fmt.Sprintf("&& sudo KUBECONFIG=%s kubectl config set-context default-system --cluster default-cluster --user %s", filename, credName))
+	sb.WriteString(fmt.Sprintf("&& sudo KUBECONFIG=%s kubectl config use-context default-system", filename))
+	_, err := o.r.RunCommand(sb.String())
+	if err != nil {
+		logrus.Errorf("create kubeconfig: '%s' failed: %v", filename, err)
+		return err
+	}
+	logrus.Debugf("create kubeconfig: '%s' success", filename)
 	return nil
 }

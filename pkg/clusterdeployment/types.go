@@ -15,6 +15,12 @@
 
 package clusterdeployment
 
+const (
+	Master = 0x1
+	Worker = 0x2
+	ETCD   = 0x4
+)
+
 type HostConfig struct {
 	Arch           string   `json:"arch"`
 	Name           string   `json:"name"`
@@ -27,7 +33,10 @@ type HostConfig struct {
 	PrivateKey     string   `json:"private-key"`
 	PrivateKeyPath string   `json:"private-key-path"`
 
-	Type string `json:"type"`
+	// 0x1 is master, 0x2 is worker, 0x4 is etcd
+	// 0x3 is master and worker
+	// 0x7 is master, worker and etcd
+	Type uint16 `json:"type"`
 
 	Labels map[string]string `json:"labels"`
 }
@@ -50,13 +59,21 @@ type Scheduler struct {
 	ExtraArgs map[string]string `json:"extra-args,omitempty"`
 }
 
+type APIEndpoint struct {
+	AdvertiseAddress string `json:"advertise-address,omitempty"`
+	BindPort         int32  `json:"bind-port,omitempty"`
+}
 type ControlPlaneConfig struct {
-	ApiConf       ApiServer      `json:"apiconf,omitempty"`
-	ManagerConf   ControlManager `json:"managerconf,omitempty"`
-	SchedulerConf Scheduler      `json:"schedulerconf,omitempty"`
+	Endpoint      string          `json:"endpoint,omitempty"`
+	ApiConf       *ApiServer      `json:"apiconf,omitempty"`
+	ManagerConf   *ControlManager `json:"managerconf,omitempty"`
+	SchedulerConf *Scheduler      `json:"schedulerconf,omitempty"`
 }
 
 type CertificateConfig struct {
+	// default is "/etc/kubernetes"
+	// certificate save in "${SavePath}/pki"
+	// kube config save in "${SavePath}"
 	SavePath string `json:"savepath"`
 }
 
@@ -68,7 +85,8 @@ type ServiceClusterConfig struct {
 type ClusterConfig struct {
 	Certificate    CertificateConfig    `json:"certificate,omitempty"`
 	ServiceCluster ServiceClusterConfig `json:"servicecluster,omitempty"`
-	ControlPlane   *ControlPlaneConfig  `json:"controlplane,omitempty"`
+	LocalEndpoint  APIEndpoint          `json:"local-endpoint,omitempty"`
+	ControlPlane   ControlPlaneConfig   `json:"controlplane,omitempty"`
 	Nodes          []*HostConfig        `json:"nodes,omitempty"`
 	// TODO: add other configurations at here
 }
