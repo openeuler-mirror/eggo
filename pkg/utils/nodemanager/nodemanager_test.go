@@ -112,8 +112,7 @@ func TestRunTaskOnNodes(t *testing.T) {
 	tt := task.NewTaskInstance(
 		&MockTask{
 			name: "precheck",
-		},
-	)
+		})
 	nodes := []string{"192.168.0.1", "192.168.0.2"}
 	err := RunTaskOnNodes(tt, nodes)
 	if err != nil {
