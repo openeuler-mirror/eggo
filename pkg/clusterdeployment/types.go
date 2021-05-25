@@ -99,12 +99,22 @@ type PackageSrcConfig struct {
 	X86Src string `json:"x86-srcPath"`
 }
 
+type EtcdClusterConfig struct {
+	Token     string            `json:token`
+	Nodes     []*HostConfig     `json:nodes`
+	DataDir   string            `json:data-dir`
+	CertsDir  string            `json:certs-dir` // local certs dir in machine running eggo, default /etc/kubernetes/pki
+	ExtraArgs map[string]string `json:extra-args`
+	// TODO: add loadbalance configuration
+}
+
 type ClusterConfig struct {
 	Certificate    CertificateConfig    `json:"certificate,omitempty"`
 	ServiceCluster ServiceClusterConfig `json:"servicecluster,omitempty"`
 	LocalEndpoint  APIEndpoint          `json:"local-endpoint,omitempty"`
 	ControlPlane   ControlPlaneConfig   `json:"controlplane,omitempty"`
 	PackageSrc     *PackageSrcConfig    `json:"packagesource,omitempty"`
+	EtcdCluster    EtcdClusterConfig    `json:"etcdcluster,omitempty"`
 	Nodes          []*HostConfig        `json:"nodes,omitempty"`
 	// TODO: add other configurations at here
 }

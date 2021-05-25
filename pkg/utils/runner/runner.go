@@ -17,6 +17,8 @@ package runner
 
 import (
 	"errors"
+	"fmt"
+	"os/exec"
 	"time"
 
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
@@ -30,6 +32,32 @@ type Runner interface {
 	RunCommand(cmd string) (string, error)
 	Reconnect() error
 	Close()
+}
+
+type LocalRunner struct {
+}
+
+func (r *LocalRunner) Copy(src, dst string) error {
+	output, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("sudo cp -f %v %v", src, dst)).CombinedOutput()
+	if err != nil {
+		logrus.Errorf("copy %s to %s failed: %v\noutput: %v\n", src, dst, err, string(output))
+	}
+	return err
+}
+
+func (r *LocalRunner) RunCommand(cmd string) (string, error) {
+	output, err := exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
+	return string(output), err
+}
+
+func (r *LocalRunner) Reconnect() error {
+	// nothing to do
+	return nil
+}
+
+func (r *LocalRunner) Close() {
+	// nothing to do
+	return
 }
 
 type SSHRunner struct {

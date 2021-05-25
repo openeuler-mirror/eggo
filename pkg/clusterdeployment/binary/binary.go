@@ -19,6 +19,7 @@ import (
 
 	cp "gitee.com/openeuler/eggo/pkg/clusterdeployment"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/controlplane"
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/etcdcluster"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
@@ -104,7 +105,13 @@ func (bcp *BinaryClusterDeployment) PrepareInfrastructure() error {
 
 func (bcp *BinaryClusterDeployment) DeployEtcdCluster() error {
 	logrus.Info("do deploy etcd cluster...")
-	return nil
+	err := etcdcluster.Init(bcp.config)
+	if err != nil {
+		logrus.Errorf("deploy etcd cluster failed: %v", err)
+	} else {
+		logrus.Info("deploy etcd cluster success")
+	}
+	return err
 }
 
 func (bcp *BinaryClusterDeployment) InitControlPlane() error {
