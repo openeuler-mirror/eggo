@@ -57,7 +57,7 @@ type Sans struct {
 	IPs      []string `json:"ips"`
 }
 type ApiServer struct {
-	Sans      Sans              `json:"sans,omitempty"`
+	CertSans  Sans              `json:"cert-sans,omitempty"`
 	Timeout   string            `json:"timeout,omitempty"`
 	ExtraArgs map[string]string `json:"extra-args,omitempty"`
 }
@@ -90,6 +90,7 @@ type CertificateConfig struct {
 
 type ServiceClusterConfig struct {
 	CIDR    string `json:"cidr"`
+	DNSAddr string `json:"dns-address"`
 	Gateway string `json:"gateway"`
 }
 
@@ -100,17 +101,24 @@ type PackageSrcConfig struct {
 }
 
 type EtcdClusterConfig struct {
-	Token     string            `json:token`
-	Nodes     []*HostConfig     `json:nodes`
-	DataDir   string            `json:data-dir`
-	CertsDir  string            `json:certs-dir` // local certs dir in machine running eggo, default /etc/kubernetes/pki
-	ExtraArgs map[string]string `json:extra-args`
+	Token     string            `json:"token"`
+	Nodes     []*HostConfig     `json:"nodes"`
+	DataDir   string            `json:"data-dir"`
+	CertsDir  string            `json:"certs-dir"` // local certs dir in machine running eggo, default /etc/kubernetes/pki
+	ExtraArgs map[string]string `json:"extra-args"`
 	// TODO: add loadbalance configuration
+}
+
+type NetworkConfig struct {
+	PodCIDR    string            `json:"pod-cidr"`
+	Plugin     string            `json:"plugin"`
+	PluginArgs map[string]string `json:"plugin-args"`
 }
 
 type ClusterConfig struct {
 	Certificate    CertificateConfig    `json:"certificate,omitempty"`
 	ServiceCluster ServiceClusterConfig `json:"servicecluster,omitempty"`
+	Network        NetworkConfig        `json:"network,omitempty"`
 	LocalEndpoint  APIEndpoint          `json:"local-endpoint,omitempty"`
 	ControlPlane   ControlPlaneConfig   `json:"controlplane,omitempty"`
 	PackageSrc     *PackageSrcConfig    `json:"packagesource,omitempty"`

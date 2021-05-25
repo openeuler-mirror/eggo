@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/commontools"
 	"gitee.com/openeuler/eggo/pkg/utils/certs"
 	"gitee.com/openeuler/eggo/pkg/utils/endpoint"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
@@ -83,6 +84,11 @@ func (ct *ControlPlaneTask) Run(r runner.Runner, hcf *clusterdeployment.HostConf
 		return err
 	}
 
+	// run services of k8s
+	if err = runKubernetesServices(r, ct.ccfg, hcf); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -107,8 +113,8 @@ func generateApiServerCertificate(savePath string, cg certs.CertGenerator, ccfg 
 		ips = append(ips, ccfg.ServiceCluster.Gateway)
 	}
 	if ccfg.ControlPlane.ApiConf != nil {
-		ips = append(ips, ccfg.ControlPlane.ApiConf.Sans.IPs...)
-		dnsnames = append(dnsnames, ccfg.ControlPlane.ApiConf.Sans.DNSNames...)
+		ips = append(ips, ccfg.ControlPlane.ApiConf.CertSans.IPs...)
+		dnsnames = append(dnsnames, ccfg.ControlPlane.ApiConf.CertSans.DNSNames...)
 	}
 
 	apiserverConfig := &certs.CertConfig{
@@ -326,7 +332,12 @@ func generateCertsAndKubeConfigs(r runner.Runner, ccfg *clusterdeployment.Cluste
 	return generateKubeConfigs(rootPath, certPath, cg, ccfg)
 }
 
-func runKubernetesServices() error {
+func runKubernetesServices(r runner.Runner, ccfg *clusterdeployment.ClusterConfig, hcf *clusterdeployment.HostConfig) error {
+	// set up api-server service
+	if err := commontools.SetupControlplaneServices(r, ccfg, hcf); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -336,26 +347,24 @@ func Init(conf *clusterdeployment.ClusterConfig) error {
 			ccfg: conf,
 		},
 	)
-	firstMaster := true
 
 	for _, node := range conf.Nodes {
 		if node.Type&clusterdeployment.Master != 0 {
-			if firstMaster {
-				firstMaster = false
-				if err := nodemanager.RunTaskOnNodes(ctask, []string{node.Address}); err != nil {
-					logrus.Errorf("init first control plane master failed: %v", err)
-					return err
-				}
-				err := nodemanager.WaitTaskOnNodesFinished(ctask, []string{node.Address}, time.Minute*5)
-				if err != nil {
-					logrus.Errorf("wait to init first control plane master finish failed: %v", err)
-					return err
-				}
-				continue
+			if err := nodemanager.RunTaskOnNodes(ctask, []string{node.Address}); err != nil {
+				logrus.Errorf("init first control plane master failed: %v", err)
+				return err
 			}
-			// TODO: join other master node
+			err := nodemanager.WaitTaskOnNodesFinished(ctask, []string{node.Address}, time.Minute*5)
+			if err != nil {
+				logrus.Errorf("wait to init first control plane master finish failed: %v", err)
+				return err
+			}
+			// TODO: join other master use bootstrap
+			break
 		}
 	}
+
+	// TODO: upload certificates and kubeconfigs into cluster
 
 	return nil
 }
