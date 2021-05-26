@@ -89,6 +89,9 @@ After={{ $v }}
 {{- range $i, $v := .EnvironmentFiles }}
 EnvironmentFile=-{{ $v }}
 {{- end }}
+{{- range $i, $v := .ExecStartPre }}
+ExecStartPre={{ $v }}
+{{- end }}
 {{- $alen := len .Arguments }}
 ExecStart={{ .Command }}{{if ne $alen 0 }} \\{{end}}
 {{- range $i, $v := .Arguments }}
@@ -142,6 +145,7 @@ type SystemdServiceConfig struct {
 	RestartPolicy    string
 	LimitNoFile      string
 	WantedBy         string
+	ExecStartPre     []string
 }
 
 func CreateSystemdServiceTemplate(name string, conf *SystemdServiceConfig) (string, error) {
@@ -163,6 +167,10 @@ func CreateSystemdServiceTemplate(name string, conf *SystemdServiceConfig) (stri
 
 	if len(conf.Afters) > 0 {
 		datastore["Afters"] = conf.Afters
+	}
+
+	if len(conf.ExecStartPre) > 0 {
+		datastore["ExecStartPre"] = conf.ExecStartPre
 	}
 
 	if len(conf.EnvironmentFiles) > 0 {

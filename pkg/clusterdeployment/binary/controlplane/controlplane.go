@@ -25,6 +25,7 @@ import (
 
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/commontools"
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
 	"gitee.com/openeuler/eggo/pkg/utils"
 	"gitee.com/openeuler/eggo/pkg/utils/certs"
 	"gitee.com/openeuler/eggo/pkg/utils/endpoint"
@@ -88,6 +89,12 @@ type ControlPlaneTask struct {
 	ccfg *clusterdeployment.ClusterConfig
 }
 
+func NewControlPlaneTask(ccf *clusterdeployment.ClusterConfig) *ControlPlaneTask {
+	return &ControlPlaneTask{
+		ccfg: ccf,
+	}
+}
+
 func (ct *ControlPlaneTask) Name() string {
 	return "ControlplaneTask"
 }
@@ -118,14 +125,10 @@ func (ct *ControlPlaneTask) Run(r runner.Runner, hcf *clusterdeployment.HostConf
 
 func check(r runner.Runner, savePath string) error {
 	// check dependences softwares
-	for _, s := range KubeSoftwares {
-		_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"which %s\"", s))
-		if err != nil {
-			logrus.Errorf("chech kubernetes software: %s, failed: %v\n", s, err)
-			return err
-		}
-		logrus.Debugf("check kubernetes software: %s success\n", s)
+	if err := infrastructure.CheckDependences(r, KubeSoftwares); err != nil {
+		return err
 	}
+
 	for _, ca := range commontools.CommonCaCerts {
 		_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"ls %s\"", filepath.Join(savePath, ca)))
 		if err != nil {
@@ -345,7 +348,7 @@ func generateCertsAndKubeConfigs(r runner.Runner, ccfg *clusterdeployment.Cluste
 
 func runKubernetesServices(r runner.Runner, ccfg *clusterdeployment.ClusterConfig, hcf *clusterdeployment.HostConfig) error {
 	// set up api-server service
-	if err := commontools.SetupControlplaneServices(r, ccfg, hcf); err != nil {
+	if err := commontools.SetupMasterServices(r, ccfg, hcf); err != nil {
 		return err
 	}
 

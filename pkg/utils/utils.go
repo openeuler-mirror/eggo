@@ -42,3 +42,19 @@ func GetSysHome() string {
 	}
 	return "/root"
 }
+
+func IsISulad(engine string) bool {
+	if engine == "isula" || engine == "iSula" || engine == "isulad" || engine == "iSulad" || engine == "" {
+		return true
+	}
+
+	return false
+}
+
+func IsDocker(engine string) bool {
+	if engine == "docker" || engine == "Docker" || engine == "dockerd" || engine == "Dockerd" {
+		return true
+	}
+
+	return false
+}

@@ -184,7 +184,7 @@ func SetupSchedulerService(r runner.Runner, ccfg *clusterdeployment.ClusterConfi
 	return nil
 }
 
-func SetupControlplaneServices(r runner.Runner, ccfg *clusterdeployment.ClusterConfig, hcf *clusterdeployment.HostConfig) error {
+func SetupMasterServices(r runner.Runner, ccfg *clusterdeployment.ClusterConfig, hcf *clusterdeployment.HostConfig) error {
 	// set up api-server service
 	if err := SetupAPIServerService(r, ccfg, hcf); err != nil {
 		logrus.Errorf("setup api server service failed: %v", err)
@@ -203,8 +203,136 @@ func SetupControlplaneServices(r runner.Runner, ccfg *clusterdeployment.ClusterC
 
 	_, err := r.RunCommand("sudo systemctl start kube-apiserver kube-controller-manager kube-scheduler")
 	if err != nil {
-		logrus.Errorf("start k8s services failed: %v", err)
+		logrus.Errorf("start k8s master services failed: %v", err)
 	}
-	logrus.Info("setup controlplane services success")
+	logrus.Info("setup k8s master services success")
+	return nil
+}
+
+func SetupKubeletService(r runner.Runner, kcf *clusterdeployment.Kubelet, hcf *clusterdeployment.HostConfig) error {
+	defaultArgs := map[string]string{
+		"--config":                     "/etc/kubernetes/kubelet_config.yaml",
+		"--network-plugin":             "cni",
+		"--cni-bin-dir":                "/usr/libexec/cni/",
+		"--pod-infra-container-image":  "k8s.gcr.io/pause:3.2",
+		"--kubeconfig":                 "/etc/kubernetes/kubelet.kubeconfig",
+		"--bootstrap-kubeconfig":       "/etc/kubernetes/kubelet-bootstrap.kubeconfig",
+		"--register-node":              "true",
+		"--hostname-override":          hcf.Name,
+		"--container-runtime=":         "remote",
+		"--container-runtime-endpoint": "unix:///var/run/isulad.sock",
+		"--v":                          "2",
+	}
+
+	if kcf != nil {
+		configArgs := map[string]string{
+			"--network-plugin":             kcf.NetworkPlugin,
+			"--cni-bin-dir":                kcf.CniBinDir,
+			"--pod-infra-container-image":  kcf.PauseImage,
+			"--container-runtime-endpoint": kcf.RuntimeEndpoint,
+		}
+
+		for k, v := range kcf.ExtraArgs {
+			defaultArgs[k] = v
+		}
+		for k, v := range configArgs {
+			if v != "" {
+				defaultArgs[k] = v
+			}
+		}
+	}
+
+	var args []string
+	for k, v := range defaultArgs {
+		args = append(args, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	conf := &template.SystemdServiceConfig{
+		Description:   "The Kubernetes Node Agent",
+		Documentation: "https://kubernetes.io/docs/reference/generated/kubelet/",
+		Afters:        []string{"network-online.target"},
+		Command:       "/usr/bin/kubelet",
+		Arguments:     args,
+		ExecStartPre:  []string{"swapoff -a"},
+	}
+	serviceConf, err := template.CreateSystemdServiceTemplate("kubelet-systemd", conf)
+	if err != nil {
+		logrus.Errorf("create kubelet systemd service config failed: %v", err)
+		return err
+	}
+	var sb strings.Builder
+	csrBase64 := base64.StdEncoding.EncodeToString([]byte(serviceConf))
+	sb.WriteString(fmt.Sprintf("sudo -E /bin/sh -c \"echo %s | base64 -d > %s\"", csrBase64, filepath.Join(SystemdServiceConfigPath, "kubelet.service")))
+	_, err = r.RunCommand(sb.String())
+	if err != nil {
+		return err
+	}
+	_, err = r.RunCommand("sudo systemctl enable kubelet")
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func SetupProxyService(r runner.Runner, kpcf *clusterdeployment.KubeProxy, hcf *clusterdeployment.HostConfig) error {
+	defaultArgs := map[string]string{
+		"--config":      "/etc/kubernetes/kube-proxy-config.yaml",
+		"--hostname":    hcf.Name,
+		"--logtostderr": "true",
+		"--v":           "2",
+	}
+	if kpcf != nil {
+		for k, v := range kpcf.ExtraArgs {
+			defaultArgs[k] = v
+		}
+	}
+
+	var args []string
+	for k, v := range defaultArgs {
+		args = append(args, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	conf := &template.SystemdServiceConfig{
+		Description:   "Kubernetes Kube-Proxy Server",
+		Documentation: "https://kubernetes.io/docs/reference/generated/kube-proxy/",
+		Command:       "/usr/bin/kube-proxy",
+		Arguments:     args,
+	}
+	serviceConf, err := template.CreateSystemdServiceTemplate("proxy-systemd", conf)
+	if err != nil {
+		logrus.Errorf("create proxy systemd service config failed: %v", err)
+		return err
+	}
+	var sb strings.Builder
+	csrBase64 := base64.StdEncoding.EncodeToString([]byte(serviceConf))
+	sb.WriteString(fmt.Sprintf("sudo -E /bin/sh -c \"echo %s | base64 -d > %s\"", csrBase64, filepath.Join(SystemdServiceConfigPath, "kube-proxy.service")))
+	_, err = r.RunCommand(sb.String())
+	if err != nil {
+		return err
+	}
+	_, err = r.RunCommand("sudo systemctl enable kube-proxy")
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func SetupWorkerServices(r runner.Runner, ccfg *clusterdeployment.ClusterConfig, hcf *clusterdeployment.HostConfig) error {
+	// set up k8s worker service
+	if err := SetupKubeletService(r, ccfg.ControlPlane.KubeletConf, hcf); err != nil {
+		logrus.Errorf("setup k8s kubelet service failed: %v", err)
+		return err
+	}
+
+	if err := SetupProxyService(r, ccfg.ControlPlane.ProxyConf, hcf); err != nil {
+		logrus.Errorf("setup k8s proxy service failed: %v", err)
+		return err
+	}
+
+	_, err := r.RunCommand("sudo -E /bin/sh -c \"systemctl start kubelet kube-proxy\"")
+	if err != nil {
+		logrus.Errorf("start k8s worker services failed: %v", err)
+	}
+	logrus.Info("setup k8s worker services success")
 	return nil
 }

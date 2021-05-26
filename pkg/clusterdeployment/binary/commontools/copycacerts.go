@@ -47,5 +47,9 @@ func (ct *CopyCaCertificatesTask) Run(r runner.Runner, hcf *clusterdeployment.Ho
 		return fmt.Errorf("[certs] cannot find ca certificates")
 	}
 
+	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"mkdir -p %s\"", ct.Cluster.Certificate.SavePath)); err != nil {
+		return err
+	}
+
 	return r.Copy(clusterdeployment.GetCertificateStorePath(ct.Cluster.Name), ct.Cluster.Certificate.SavePath)
 }

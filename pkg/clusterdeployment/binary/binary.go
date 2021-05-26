@@ -18,6 +18,7 @@ import (
 	"sync"
 
 	cp "gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/bootstrap"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/cleanupcluster"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/controlplane"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/etcdcluster"
@@ -100,7 +101,12 @@ func (bcp *BinaryClusterDeployment) Finish() {
 
 func (bcp *BinaryClusterDeployment) PrepareInfrastructure() error {
 	logrus.Info("do prepare infrastructure...")
-	infrastructure.PrepareInfrastructure(bcp.config)
+	if err := infrastructure.Init(bcp.config); err != nil {
+		logrus.Errorf("prepare infrastructure falied: %v", err)
+		return err
+	}
+
+	logrus.Info("prepare infrastructe success")
 	return nil
 }
 
@@ -122,7 +128,13 @@ func (bcp *BinaryClusterDeployment) InitControlPlane() error {
 }
 
 func (bcp *BinaryClusterDeployment) JoinBootstrap() error {
-	logrus.Info("do join new work or master...")
+	logrus.Info("do join new worker or master...")
+	if err := bootstrap.Init(bcp.config); err != nil {
+		logrus.Errorf("bootstrap falied: %v", err)
+		return err
+	}
+
+	logrus.Info("do join new worker or master success")
 	return nil
 }
 

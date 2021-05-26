@@ -172,7 +172,7 @@ func TestPrepareInfrastructure(t *testing.T) {
 		},
 	}
 
-	if err := PrepareInfrastructure(ccfg); err != nil {
+	if err := Init(ccfg); err != nil {
 		t.Fatalf("test PrepareInfrastructure failed: %v\n", err)
 	}
 

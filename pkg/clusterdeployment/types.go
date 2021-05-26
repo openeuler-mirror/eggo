@@ -79,6 +79,21 @@ type Scheduler struct {
 	ExtraArgs map[string]string `json:"extra-args,omitempty"`
 }
 
+type Kubelet struct {
+	DnsVip          string            `json:"dns-vip,omitempty"`
+	DnsDomain       string            `json:"dns-domain"`
+	PauseImage      string            `json:"pause-image"`
+	NetworkPlugin   string            `json:"network-plugin"`
+	CniBinDir       string            `json:"cni-bin-dir"`
+	Runtime         string            `json:"runtime"`
+	RuntimeEndpoint string            `json:"runtime-endpoint"`
+	ExtraArgs       map[string]string `json:"extra-args,omitempty"`
+}
+
+type KubeProxy struct {
+	ExtraArgs map[string]string `json:"extra-args,omitempty"`
+}
+
 type APIEndpoint struct {
 	AdvertiseAddress string `json:"advertise-address,omitempty"`
 	BindPort         int32  `json:"bind-port,omitempty"`
@@ -88,6 +103,8 @@ type ControlPlaneConfig struct {
 	ApiConf       *ApiServer      `json:"apiconf,omitempty"`
 	ManagerConf   *ControlManager `json:"managerconf,omitempty"`
 	SchedulerConf *Scheduler      `json:"schedulerconf,omitempty"`
+	KubeletConf   *Kubelet        `json:"kubeletconf,omitempty"`
+	ProxyConf     *KubeProxy      `json:"kubeproxyconf,omitempty"`
 }
 
 type CertificateConfig struct {
@@ -131,6 +148,11 @@ type BootstrapTokenConfig struct {
 	TTL             *time.Duration `json:"ttl"`
 	Usages          []string       `json:"usages"`
 	AuthExtraGroups []string       `json:"auth_extra_groups"`
+}
+
+type LoadBalancer struct {
+	IP   string `json:"ip"`
+	Port string `json:"port"`
 }
 
 type ClusterConfig struct {
