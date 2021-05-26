@@ -225,3 +225,81 @@ classDiagram
 	
 ```
 
+#### 证书管理设计
+
+集群的创建、新节点的加入都依赖证书；因此Eggo需要创建、存储和分发CA证书，并且协助节点创建其他依赖的证书；证书管理分为两种场景：
+
+- 命令行管理集群的场景，需要创建并且本地存储ca证书和admin.kubeconfig，在集群部署master和node节点时分发相应的ca证书；
+- 集群管理集群的场景，需要创建并且根据集群对应的存储ca证书和admin.kubeconfig到元集群的ETCD中，在集群部署master和node节点时分发相应的ca证书；
+
+证书管理流程图如下：
+
+```mermaid
+flowchart TD
+	A(eggo) --> BA[CMD模式]
+	subgraph command
+	BA --> BB{ca existed}
+	BB -->|NO| BC(create ca)
+	BC --> BD[save ca into disk]
+	BB -->|YES| BE(read ca from disk)
+	BD --> BE
+	end
+	A --> CA[集群管理模式]
+	subgraph cluster
+	CA --> CB{ca exist}
+	CB -->|NO| CC(create ca)
+	CC --> CD[save ca into etcd]
+	CB -->|YES| CE(read ca from etcd)
+	CD --> CE
+	end
+	BE --> E
+	CE --> E
+	subgraph master
+	E{is master} -->|YES| F[copy ca]
+	F --> FA[create required ceritifaces and kubeconfigs]
+	FA --> FB[run k8s services]
+	end
+	E -->|NO| G[copy ca]
+	subgraph worker
+	G --> GA[get token]
+	GA --> GB{is expired}
+	GB -->|YES| GC[create new token]
+	GB -->|NO| GD[return token]
+	GC --> GD
+	GD --> H[generate bootstrap kubeconfig]
+	H --> I[join worker into cluster]
+	end
+```
+
+时序关系如下：
+
+```mermaid
+sequenceDiagram
+	participant eggo
+	participant master
+	participant worker
+	eggo->eggo: exist ca?
+	alt no
+		eggo->>eggo: create and save ca
+	end
+	rect rgba(0,255,0,.1)
+	eggo->>master: copy ca to master
+	master->>master: create certificates and kubeconfigs
+	master->>master: run services for k8s
+	master-->>eggo: return
+	end
+	rect rgba(255,255,0,.1)
+	eggo->>worker: copy ca to worker
+	eggo->>master: request token
+	master->>master: check token, is expired token?
+	alt yes
+		master->>master: create new token
+	end
+	master-->>eggo: return token
+	eggo->>worker: send token to worker
+	worker->>worker: create bootstrap kubeconfig
+	worker->>worker: join to cluster
+	worker-->>eggo: return
+	end
+```
+

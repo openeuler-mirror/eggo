@@ -61,3 +61,19 @@ EggoDeploy组件交互关系图
 类和接口关系如下：
 
 ![node-task类关系图](./imgs/detailed_design_node_task_manager_2.png)
+
+#### 证书管理设计
+
+集群的创建、新节点的加入都依赖证书；因此Eggo需要创建、存储和分发CA证书，并且协助节点创建其他依赖的证书；证书管理分为两种场景：
+
+- 命令行管理集群的场景，需要创建并且本地存储ca证书和admin.kubeconfig，在集群部署master和node节点时分发相应的ca证书；
+- 集群管理集群的场景，需要创建并且根据集群对应的存储ca证书和admin.kubeconfig到元集群的ETCD中，在集群部署master和node节点时分发相应的ca证书；
+
+证书管理流程图如下：
+
+![cert-manage](./imgs/detailed_design_cert_manage_2.png)
+
+时序关系如下：
+
+![detailed_design_cert_manage](./imgs/detailed_design_cert_manage_1.png)
+
