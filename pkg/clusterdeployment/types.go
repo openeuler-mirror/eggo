@@ -15,11 +15,28 @@
 
 package clusterdeployment
 
+import (
+	"path/filepath"
+
+	"github.com/sirupsen/logrus"
+)
+
 const (
 	Master = 0x1
 	Worker = 0x2
 	ETCD   = 0x4
+
+	DefaultKubeHomePath = "/etc/kubernetes"
+	DefaultCertPath     = "/etc/kubernetes/pki"
 )
+
+var (
+	EggoHomePath = "/etc/eggo/"
+)
+
+func GetCertificateStorePath(cluster string) string {
+	return filepath.Join(EggoHomePath, cluster, "pki")
+}
 
 type OpenPorts struct {
 	Port     int    `json:"port"`
@@ -82,10 +99,9 @@ type ControlPlaneConfig struct {
 }
 
 type CertificateConfig struct {
-	// default is "/etc/kubernetes"
-	// certificate save in "${SavePath}/pki"
-	// kube config save in "${SavePath}"
-	SavePath string `json:"savepath"`
+	SavePath       string `json:"savepath"` // default is "/etc/kubernetes/pki"
+	ExternalCA     bool   `json:"external-ca"`
+	ExternalCAPath string `json:"external-ca-path"`
 }
 
 type ServiceClusterConfig struct {
@@ -117,6 +133,8 @@ type NetworkConfig struct {
 }
 
 type ClusterConfig struct {
+	Name           string               `json:"name"`
+	ConfigDir      string               `json:"config-dir"` // default "/etc/kubernetes"
 	Certificate    CertificateConfig    `json:"certificate,omitempty"`
 	ServiceCluster ServiceClusterConfig `json:"servicecluster,omitempty"`
 	Network        NetworkConfig        `json:"network,omitempty"`
@@ -126,6 +144,28 @@ type ClusterConfig struct {
 	EtcdCluster    EtcdClusterConfig    `json:"etcdcluster,omitempty"`
 	Nodes          []*HostConfig        `json:"nodes,omitempty"`
 	// TODO: add other configurations at here
+}
+
+func (c ClusterConfig) GetConfigDir() string {
+	if c.ConfigDir != "" {
+		if !filepath.IsAbs(c.ConfigDir) {
+			logrus.Debugf("ignore invalid config dir: %s, just use default", c.ConfigDir)
+			return DefaultKubeHomePath
+		}
+		return filepath.Clean(c.ConfigDir)
+	}
+	return DefaultKubeHomePath
+}
+
+func (c ClusterConfig) GetCertDir() string {
+	if c.Certificate.SavePath != "" {
+		if !filepath.IsAbs(c.Certificate.SavePath) {
+			logrus.Debugf("ignore invalid certificate save path: %s, just use default", c.Certificate.SavePath)
+			return DefaultCertPath
+		}
+		return filepath.Clean(c.Certificate.SavePath)
+	}
+	return DefaultCertPath
 }
 
 type ClusterDeploymentAPI interface {

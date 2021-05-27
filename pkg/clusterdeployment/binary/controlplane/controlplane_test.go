@@ -15,10 +15,12 @@
 package controlplane
 
 import (
+	"fmt"
 	"testing"
 
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
+	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"github.com/sirupsen/logrus"
 )
 
@@ -45,7 +47,9 @@ func (m *MockRunner) Close() {
 }
 
 func TestInit(t *testing.T) {
+	lr := &runner.LocalRunner{}
 	conf := &clusterdeployment.ClusterConfig{
+		Name: "test-cluster",
 		ServiceCluster: clusterdeployment.ServiceClusterConfig{
 			CIDR:    "10.244.0.0/16",
 			Gateway: "10.244.0.1",
@@ -87,6 +91,8 @@ func TestInit(t *testing.T) {
 		nodemanager.UnRegisterAllNodes()
 	}()
 
+	clusterdeployment.EggoHomePath = "/tmp/eggo"
+	lr.RunCommand(fmt.Sprintf("sudo mkdir -p -m 0777 %s/%s/pki", clusterdeployment.EggoHomePath, conf.Name))
 	if err := Init(conf); err != nil {
 		t.Fatalf("do control plane init failed: %v", err)
 	}

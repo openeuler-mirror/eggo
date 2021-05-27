@@ -18,17 +18,22 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/template"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	certutil "k8s.io/client-go/util/cert"
+	keyutil "k8s.io/client-go/util/keyutil"
 )
 
 const (
-	DefaultKubeHomePath = "/etc/kubernetes"
-	DefaultCertPath     = "/etc/kubernetes/pki"
+	ServiceAccountKeyBaseName    = "sa"
+	ServiceAccountPrivateKeyName = "sa.key"
+	ServiceAccountPublicKeyName  = "sa.pub"
 )
 
 type AltNames struct {
@@ -38,18 +43,125 @@ type AltNames struct {
 
 type CertConfig struct {
 	CommonName         string
-	Organization       string
+	Organizations      []string
 	AltNames           AltNames
 	Usages             []x509.ExtKeyUsage
 	PublicKeyAlgorithm x509.PublicKeyAlgorithm
 }
 
 type CertGenerator interface {
+	RunCommand(cmd string) (string, error)
 	CreateServiceAccount(savePath string) error
 	CreateCA(config *CertConfig, savePath string, name string) error
 	CreateCertAndKey(caCertPath, caKeyPath string, config *CertConfig, savePath string, name string) error
 	CreateKubeConfig(savePath, filename string, caCertPath, credName, certPath, keyPath string, enpoint string) error
 	CleanAll(savePath string) error
+}
+
+type LocalCertGenerator struct {
+	keyAlgorithm x509.PublicKeyAlgorithm
+	lr           runner.Runner
+}
+
+func NewLocalCertGenerator() CertGenerator {
+	// TODO: only support RSA now
+	return &LocalCertGenerator{
+		keyAlgorithm: x509.RSA,
+		lr:           &runner.LocalRunner{},
+	}
+}
+
+func (l *LocalCertGenerator) RunCommand(cmd string) (string, error) {
+	return l.lr.RunCommand(cmd)
+}
+
+func (l *LocalCertGenerator) CreateServiceAccount(savePath string) error {
+	_, err := keyutil.PrivateKeyFromFile(filepath.Join(savePath, ServiceAccountPrivateKeyName))
+	if err == nil {
+		logrus.Info("service account certs exist\n")
+		return nil
+	} else if !os.IsNotExist(err) {
+		return errors.Wrapf(err, "service account exist, but not valid")
+	}
+
+	signer, err := GetKeySigner(l.keyAlgorithm)
+	if err != nil {
+		logrus.Errorf("new private key for service account failed: %v", err)
+		return err
+	}
+	err = WriteKey(signer, filepath.Join(savePath, "sa.key"))
+	if err != nil {
+		logrus.Errorf("write private key for service account failed: %v", err)
+		return err
+	}
+	err = WritePublicKey(signer.Public(), filepath.Join(savePath, "sa.pub"))
+	if err != nil {
+		logrus.Errorf("write public key for service account failed: %v", err)
+	}
+	return err
+}
+
+func (l *LocalCertGenerator) CreateCA(config *CertConfig, savePath string, name string) error {
+	if _, err := certutil.CertsFromFile(filepath.Join(savePath, GetCertName(name))); err == nil {
+		if _, err := keyutil.PrivateKeyFromFile(filepath.Join(savePath, GetKeyName(name))); err == nil {
+			logrus.Infof("[certs] using exist %s ca", GetCertName(name))
+			return nil
+		}
+		logrus.Infof("[certs] using exist %s keyless ca", name)
+		return nil
+	}
+	ips, err := ParseIPsFromString(config.AltNames.IPs)
+	if err != nil {
+		logrus.Errorf("parse altnames failed: %v", err)
+		return err
+	}
+
+	signer, err := GetKeySigner(config.PublicKeyAlgorithm)
+	if err != nil {
+		logrus.Errorf("invalid public key algorithm: %v", err)
+		return err
+	}
+
+	cc := certutil.Config{
+		CommonName:   config.CommonName,
+		Organization: config.Organizations,
+		Usages:       config.Usages,
+		AltNames: certutil.AltNames{
+			DNSNames: config.AltNames.DNSNames,
+			IPs:      ips,
+		},
+	}
+	cert, err := certutil.NewSelfSignedCACert(cc, signer)
+	if err != nil {
+		logrus.Errorf("create self signed ca cert failed: %v", err)
+		return err
+	}
+
+	if err := WriteKey(signer, filepath.Join(savePath, GetKeyName(name))); err != nil {
+		logrus.Errorf("write key: %s failed: %v", GetKeyName(name), err)
+		return err
+	}
+
+	if err := WriteCert(cert, filepath.Join(savePath, GetCertName(name))); err != nil {
+		logrus.Errorf("write cert: %s failed: %v", GetCertName(name), err)
+		return err
+	}
+
+	return nil
+}
+
+func (l *LocalCertGenerator) CreateCertAndKey(caCertPath, caKeyPath string, config *CertConfig, savePath string, name string) error {
+	logrus.Info("TODO: do not need CreateCertAndKey for LocalCertGenerator now.")
+	return nil
+}
+
+func (l *LocalCertGenerator) CreateKubeConfig(savePath, filename string, caCertPath, credName, certPath, keyPath string, enpoint string) error {
+	logrus.Info("TODO: do not need CreateKubeConfig for LocalCertGenerator now.")
+	return nil
+}
+
+func (l *LocalCertGenerator) CleanAll(savePath string) error {
+	return os.RemoveAll(savePath)
 }
 
 type OpensshBinCertGenerator struct {
@@ -60,6 +172,10 @@ func NewOpensshBinCertGenerator(r runner.Runner) CertGenerator {
 	return &OpensshBinCertGenerator{
 		r: r,
 	}
+}
+
+func (g *OpensshBinCertGenerator) RunCommand(cmd string) (string, error) {
+	return g.r.RunCommand(cmd)
 }
 
 func (o *OpensshBinCertGenerator) CleanAll(savePath string) error {
@@ -104,9 +220,10 @@ func getSubject(config *CertConfig) string {
 		sb.WriteString("/CN=")
 		sb.WriteString(config.CommonName)
 	}
-	if config.Organization != "" {
+	if len(config.Organizations) > 0 {
 		sb.WriteString("/O=")
-		sb.WriteString(config.Organization)
+		// TODO: support multi organizations
+		sb.WriteString(config.Organizations[0])
 	}
 	return sb.String()
 }
@@ -142,8 +259,12 @@ func createCsrString(name string, config *CertConfig) (string, error) {
 	if len(extKeyUsage) > 0 {
 		extKeyUsage = extKeyUsage[1:]
 	}
+	var org string
+	if len(config.Organizations) > 0 {
+		org = config.Organizations[0]
+	}
 	csrconfig := &template.CsrConfig{
-		Organization:     config.Organization,
+		Organization:     org,
 		CommonName:       config.CommonName,
 		IPs:              config.AltNames.IPs,
 		DNSNames:         config.AltNames.DNSNames,

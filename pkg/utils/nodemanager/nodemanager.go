@@ -23,6 +23,7 @@ import (
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/task"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -99,7 +100,7 @@ func checkFinished(t task.Task, nodes []string) (bool, error) {
 			return false, nil
 		}
 		if task.IsFailed(label) {
-			err = fmt.Errorf("%s", label)
+			err = errors.Wrapf(err, "task: %s failed: %v", t.Name(), label)
 			break
 		}
 	}
@@ -135,8 +136,8 @@ func checkAllFinished(t task.Task) (bool, error) {
 			return false, nil
 		}
 		if task.IsFailed(label) {
-			err = fmt.Errorf("%s", label)
-			break
+			err = errors.Wrapf(err, "task: %s failed: %v", t.Name(), label)
+			continue
 		}
 	}
 
@@ -192,4 +193,64 @@ func RunTaskOnAll(t task.Task) error {
 	}
 
 	return doRetryPushTask(t, retryNodes)
+}
+
+func RunTasksOnNode(tasks []task.Task, node string) error {
+	manager.lock.RLock()
+	defer manager.lock.RUnlock()
+
+	for _, t := range tasks {
+		if n, ok := manager.nodes[node]; ok {
+			i := 0
+			for ; i < 5; i++ {
+				if n.PushTask(t) {
+					break
+				}
+				time.Sleep(time.Second * 6)
+			}
+			if i == 5 {
+				logrus.Errorf("node: %s work with too much tasks, will retry it", node)
+				return fmt.Errorf("node: %s work with too much tasks, will retry it", node)
+			}
+		} else {
+			logrus.Errorf("unkown node %s", node)
+			return fmt.Errorf("unkown node %s", node)
+		}
+	}
+
+	return nil
+}
+
+func checkTasksFinished(tasks []task.Task, node string) (bool, error) {
+	finished := true
+	var err error
+	for _, t := range tasks {
+		label := t.GetLabel(node)
+		if label == "" {
+			return false, nil
+		}
+		if task.IsFailed(label) {
+			err = errors.Wrapf(err, "task: %s failed: %v", t.Name(), label)
+			continue
+		}
+	}
+
+	return finished, err
+}
+
+func WaitTasksOnNodeFinished(tasks []task.Task, node string, timeout time.Duration) error {
+	for {
+		select {
+		case <-time.After(timeout):
+			return fmt.Errorf("timeout for wait tasks finish at node: %s", node)
+		default:
+			f, err := checkTasksFinished(tasks, node)
+			if err != nil {
+				return err
+			}
+			if f {
+				return nil
+			}
+		}
+	}
 }
