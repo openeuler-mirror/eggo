@@ -105,6 +105,7 @@ type EtcdClusterConfig struct {
 	Nodes     []*HostConfig     `json:"nodes"`
 	DataDir   string            `json:"data-dir"`
 	CertsDir  string            `json:"certs-dir"` // local certs dir in machine running eggo, default /etc/kubernetes/pki
+	External  bool              `json:"external"`  // if use external, eggo will ignore etcd deploy and cleanup
 	ExtraArgs map[string]string `json:"extra-args"`
 	// TODO: add loadbalance configuration
 }

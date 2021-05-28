@@ -10,7 +10,7 @@
  * See the Mulan PSL v2 for more details.
  * Author: wangfengtu
  * Create: 2021-05-22
- * Description: nodemanager testcase
+ * Description: etcd cluster testcase
  ******************************************************************************/
 
 package etcdcluster

@@ -18,6 +18,7 @@ import (
 	"sync"
 
 	cp "gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/cleanupcluster"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/controlplane"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/etcdcluster"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
@@ -132,5 +133,11 @@ func (bcp *BinaryClusterDeployment) UpgradeCluster() error {
 
 func (bcp *BinaryClusterDeployment) CleanupCluster() error {
 	logrus.Info("do clean cluster...")
-	return nil
+	err := cleanupcluster.Init(bcp.config)
+	if err != nil {
+		logrus.Infof("cleanup cluster failed: %v", err)
+	} else {
+		logrus.Info("cleanup cluster success")
+	}
+	return err
 }
