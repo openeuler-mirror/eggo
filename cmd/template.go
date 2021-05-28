@@ -8,37 +8,29 @@
  * IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR
  * PURPOSE.
  * See the Mulan PSL v2 for more details.
- * Author: zhangxiaoyu
- * Create: 2021-05-19
- * Description: eggo utils implement
+ * Author: wangfengtu
+ * Create: 2021-05-31
+ * Description: eggo create template command implement
  ******************************************************************************/
 
-package utils
+package main
 
 import (
-	"os/user"
-	"strings"
+	"github.com/spf13/cobra"
 )
 
-func IsX86Arch(arch string) bool {
-	if strings.HasPrefix(arch, "x86") || strings.HasPrefix(arch, "X86") {
-		return true
-	}
-
-	return false
+func createTemplate(cmd *cobra.Command, args []string) error {
+	return createDeployConfigTemplate(opts.config)
 }
 
-func IsArmArch(arch string) bool {
-	if strings.HasPrefix(arch, "arm") || strings.HasPrefix(arch, "Arm") || strings.HasPrefix(arch, "ARM") {
-		return true
+func NewTemplateCmd() *cobra.Command {
+	templateCmd := &cobra.Command{
+		Use:   "template",
+		Short: "create a default template of eggo config",
+		RunE:  createTemplate,
 	}
 
-	return false
-}
+	setupTemplateCmdOpts(templateCmd)
 
-func GetSysHome() string {
-	if user, err := user.Current(); err == nil {
-		return user.HomeDir
-	}
-	return "/root"
+	return templateCmd
 }
