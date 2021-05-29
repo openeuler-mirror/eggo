@@ -45,6 +45,30 @@ func ParseIPsFromString(ipStrs []string) ([]net.IP, error) {
 	return ips, nil
 }
 
+func ReadCertFromFile(filename string) (*x509.Certificate, error) {
+	certs, err := certutil.CertsFromFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	// just support one certs in file
+	return certs[0], nil
+}
+
+func ReadKeyFromFile(filename string) (crypto.Signer, error) {
+	privateKey, err := keyutil.PrivateKeyFromFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	switch key := privateKey.(type) {
+	case *rsa.PrivateKey:
+		return key, nil
+	case *ecdsa.PrivateKey:
+		return key, nil
+	default:
+		return nil, fmt.Errorf("file: %s with unsupport private key type", filename)
+	}
+}
+
 func WriteKey(key crypto.Signer, filename string) error {
 	encodedKey, err := keyutil.MarshalPrivateKeyToPEM(key)
 	if err != nil {

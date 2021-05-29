@@ -35,19 +35,19 @@ func TestDeployEtcd(t *testing.T) {
 
 	certsTempDir = clusterdeployment.GetCertificateStorePath("test-cluster")
 
-	//defer os.RemoveAll(certsTempDir)
+	defer os.RemoveAll(certsTempDir)
 
 	configsTempDir, err := ioutil.TempDir("", "etcd-test-src-configs-")
 	if err != nil {
 		t.Fatalf("create tempdir for etcd config failed: %v", err)
 	}
-	//defer os.RemoveAll(configsTempDir)
+	defer os.RemoveAll(configsTempDir)
 
 	dstTempDir, err := ioutil.TempDir("", "etcd-test-dst-")
 	if err != nil {
 		t.Fatalf("create tempdir for dst etcd configs and certs failed: %v", err)
 	}
-	//defer os.RemoveAll(dstTempDir)
+	defer os.RemoveAll(dstTempDir)
 
 	nodes := []*clusterdeployment.HostConfig{
 		{

@@ -18,6 +18,7 @@ package clusterdeployment
 import (
 	"path/filepath"
 
+	"gitee.com/openeuler/eggo/pkg/utils"
 	"github.com/sirupsen/logrus"
 )
 
@@ -25,18 +26,7 @@ const (
 	Master = 0x1
 	Worker = 0x2
 	ETCD   = 0x4
-
-	DefaultKubeHomePath = "/etc/kubernetes"
-	DefaultCertPath     = "/etc/kubernetes/pki"
 )
-
-var (
-	EggoHomePath = "/etc/eggo/"
-)
-
-func GetCertificateStorePath(cluster string) string {
-	return filepath.Join(EggoHomePath, cluster, "pki")
-}
 
 type OpenPorts struct {
 	Port     int    `json:"port"`
@@ -150,22 +140,33 @@ func (c ClusterConfig) GetConfigDir() string {
 	if c.ConfigDir != "" {
 		if !filepath.IsAbs(c.ConfigDir) {
 			logrus.Debugf("ignore invalid config dir: %s, just use default", c.ConfigDir)
-			return DefaultKubeHomePath
+			return utils.DefaultK8SRootDir
 		}
 		return filepath.Clean(c.ConfigDir)
 	}
-	return DefaultKubeHomePath
+	return utils.DefaultK8SRootDir
 }
 
 func (c ClusterConfig) GetCertDir() string {
 	if c.Certificate.SavePath != "" {
 		if !filepath.IsAbs(c.Certificate.SavePath) {
 			logrus.Debugf("ignore invalid certificate save path: %s, just use default", c.Certificate.SavePath)
-			return DefaultCertPath
+			return utils.DefaultK8SCertDir
 		}
 		return filepath.Clean(c.Certificate.SavePath)
 	}
-	return DefaultCertPath
+	return utils.DefaultK8SCertDir
+}
+
+func (c ClusterConfig) GetManifestDir() string {
+	if c.ConfigDir != "" {
+		if !filepath.IsAbs(c.ConfigDir) {
+			logrus.Debugf("ignore invalid config dir: %s, just use default", c.ConfigDir)
+			return utils.DefaultK8SManifestsDir
+		}
+		return filepath.Clean(c.ConfigDir)
+	}
+	return utils.DefaultK8SManifestsDir
 }
 
 type ClusterDeploymentAPI interface {
