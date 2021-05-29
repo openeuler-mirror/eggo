@@ -28,6 +28,7 @@ import (
 
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/etcdcluster"
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/task"
@@ -197,7 +198,10 @@ func (t *cleanupClusterTask) Run(r runner.Runner, hostConfig *clusterdeployment.
 
 	t.r, t.hostConfig = r, hostConfig
 
-	// TODO: call infrastructure function to cleanup
+	// call infrastructure function to cleanup
+	if err := infrastructure.RemoveDependences(r, hostConfig); err != nil {
+		logrus.Errorf("remove dependences failed: %v", err)
+	}
 
 	if isType(hostConfig.Type, clusterdeployment.Worker) {
 		cleanupWorker(t)

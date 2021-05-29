@@ -51,7 +51,7 @@ func (it *InfrastructureTask) Run(r runner.Runner, hcg *clusterdeployment.HostCo
 		return err
 	}
 
-	if err := installDependences(r, hcg, it.ccfg.PackageSrc); err != nil {
+	if err := InstallDependences(r, hcg, it.ccfg.PackageSrc); err != nil {
 		logrus.Errorf("install dependences failed: %v", err)
 		return err
 	}
@@ -76,45 +76,6 @@ func check(hcg *clusterdeployment.HostConfig) error {
 
 	if hcg.Type == 0 {
 		return fmt.Errorf("no role for %s", hcg.Address)
-	}
-
-	return nil
-}
-
-func installDependences(r runner.Runner, hcg *clusterdeployment.HostConfig, pcfg *clusterdeployment.PackageSrcConfig) error {
-	// repo, pkg, binary
-	repo := []string{}
-	pkg := []string{}
-	binary := make(map[string]string)
-
-	for p, c := range hcg.Packages {
-		switch c.Type {
-		case "repo":
-			repo = append(repo, p)
-		case "pkg":
-			pkg = append(pkg, p)
-		case "binary":
-			if c.Dst == "" {
-				return fmt.Errorf("no dst for binary %s", p)
-			}
-			binary[p] = c.Dst
-		default:
-			return fmt.Errorf("invalid type %s for %s", c.Type, p)
-		}
-	}
-
-	if len(repo) != 0 {
-		ir := NewInstallByRepo(repo)
-		if err := doInstallDependences(r, hcg, ir); err != nil {
-			return err
-		}
-	}
-
-	if len(pkg) != 0 || len(binary) != 0 {
-		il := NewInstallByLocal(pcfg, pkg, binary)
-		if err := doInstallDependences(r, hcg, il); err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -158,25 +119,6 @@ func addFirewallPort(r runner.Runner, hcg *clusterdeployment.HostConfig) error {
 	}
 
 	if err := exposePorts(r, ports...); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func doInstallDependences(r runner.Runner, hcg *clusterdeployment.HostConfig, di DependencesInstall) error {
-	if err := di.PreInstall(r, hcg); err != nil {
-		logrus.Errorf("pre install failed: %v", err)
-		return err
-	}
-
-	if err := di.DoInstall(r, hcg); err != nil {
-		logrus.Errorf("do install failed: %v", err)
-		return err
-	}
-
-	if err := di.PostInstall(r); err != nil {
-		logrus.Errorf("post install failed: %v", err)
 		return err
 	}
 
