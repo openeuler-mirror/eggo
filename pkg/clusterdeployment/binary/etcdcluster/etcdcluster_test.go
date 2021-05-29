@@ -27,23 +27,27 @@ import (
 )
 
 func TestDeployEtcd(t *testing.T) {
-	certsTempDir, err := ioutil.TempDir("", "etcd-test-src-certs-")
+	certsTempDir, err := ioutil.TempDir("", "etcd-test-eggo-")
 	if err != nil {
-		t.Fatalf("create tempdir for etcd certs failed: %v", err)
+		t.Fatalf("create eggo config dir failed: %v", err)
 	}
-	defer os.RemoveAll(certsTempDir)
+	clusterdeployment.EggoHomePath = certsTempDir
+
+	certsTempDir = clusterdeployment.GetCertificateStorePath("test-cluster")
+
+	//defer os.RemoveAll(certsTempDir)
 
 	configsTempDir, err := ioutil.TempDir("", "etcd-test-src-configs-")
 	if err != nil {
 		t.Fatalf("create tempdir for etcd config failed: %v", err)
 	}
-	defer os.RemoveAll(configsTempDir)
+	//defer os.RemoveAll(configsTempDir)
 
 	dstTempDir, err := ioutil.TempDir("", "etcd-test-dst-")
 	if err != nil {
 		t.Fatalf("create tempdir for dst etcd configs and certs failed: %v", err)
 	}
-	defer os.RemoveAll(dstTempDir)
+	//defer os.RemoveAll(dstTempDir)
 
 	nodes := []*clusterdeployment.HostConfig{
 		{
@@ -58,6 +62,7 @@ func TestDeployEtcd(t *testing.T) {
 		},
 	}
 	conf := &clusterdeployment.ClusterConfig{
+		Name:        "test-cluster",
 		Certificate: clusterdeployment.CertificateConfig{SavePath: dstTempDir},
 		EtcdCluster: clusterdeployment.EtcdClusterConfig{
 			Token:     "etcd-cluster",

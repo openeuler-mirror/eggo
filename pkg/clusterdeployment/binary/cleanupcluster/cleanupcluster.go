@@ -28,7 +28,6 @@ import (
 
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/etcdcluster"
-	"gitee.com/openeuler/eggo/pkg/utils/certs"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/task"
@@ -108,7 +107,7 @@ func getKubeHomePath(savePath string) string {
 	if savePath != "" {
 		return filepath.Clean(savePath)
 	} else {
-		return certs.DefaultCertPath
+		return clusterdeployment.DefaultCertPath
 	}
 }
 
@@ -342,7 +341,7 @@ func getEtcdMembers(t *removeEtcdsTask) []*etcdMember {
 }
 
 func getEtcdCertsOpts(savePath string) string {
-	certsPath := certs.DefaultCertPath
+	certsPath := clusterdeployment.DefaultCertPath
 	if savePath != "" {
 		certsPath = savePath
 	}

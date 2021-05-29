@@ -59,18 +59,15 @@ func genEtcdHealthcheckClientCerts(savePath string, hostname string, cg certs.Ce
 func genApiserverEtcdClientCerts(savePath string, cg certs.CertGenerator, ccfg *clusterdeployment.ClusterConfig) error {
 	return cg.CreateCertAndKey(filepath.Join(savePath, "etcd", "ca.crt"), filepath.Join(savePath, "etcd", "ca.key"),
 		&certs.CertConfig{
-			CommonName:   "kube-apiserver-etcd-client",
-			Organization: "system:masters",
-			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			CommonName:    "kube-apiserver-etcd-client",
+			Organizations: []string{"system:masters"},
+			Usages:        []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		}, savePath, "kube-apiserver-etcd-client")
 }
 
 // see: https://kubernetes.io/docs/setup/best-practices/certificates/
 func generateCerts(r runner.Runner, ccfg *clusterdeployment.ClusterConfig) error {
-	savePath := certs.DefaultCertPath
-	if ccfg.Certificate.SavePath != "" {
-		savePath = ccfg.EtcdCluster.CertsDir
-	}
+	savePath := clusterdeployment.GetCertificateStorePath(ccfg.Name)
 	etcdCertsPath := filepath.Join(savePath, "etcd")
 	cg := certs.NewOpensshBinCertGenerator(r)
 

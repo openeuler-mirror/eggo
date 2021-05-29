@@ -40,16 +40,12 @@ const (
 	APIServerKubeletName            = "apiserver-kubelet-client"
 	FrontProxyClientName            = "front-proxy-client"
 	AdminKubeConfigName             = "admin"
-	KubeletKubeConfigName           = "kubelet"
 	ControllerManagerKubeConfigName = "controller-manager"
 	SchedulerKubeConfigName         = "scheduler"
-	KubeProxyKubeConfigName         = "kube-proxy"
 
 	KubeConfigFileNameAdmin      = "admin.conf"
-	KubeConfigFileNameKubelet    = "kubelet.conf"
 	KubeConfigFileNameController = "controller-manager.conf"
 	KubeConfigFileNameScheduler  = "scheduler.conf"
-	KubeConfigFileNameKubeProxy  = "kube-proxy.conf"
 )
 
 var (
@@ -59,10 +55,6 @@ var (
 type ControlPlaneTask struct {
 	ccfg *clusterdeployment.ClusterConfig
 }
-
-var (
-	ctask *task.TaskInstance
-)
 
 func (ct *ControlPlaneTask) Name() string {
 	return "ControlplaneTask"
@@ -74,7 +66,7 @@ func (ct *ControlPlaneTask) Run(r runner.Runner, hcf *clusterdeployment.HostConf
 	}
 
 	// do precheck phase
-	err := check(r)
+	err := check(r, ct.ccfg.Certificate.SavePath)
 	if err != nil {
 		return err
 	}
@@ -92,7 +84,7 @@ func (ct *ControlPlaneTask) Run(r runner.Runner, hcf *clusterdeployment.HostConf
 	return nil
 }
 
-func check(r runner.Runner) error {
+func check(r runner.Runner, savePath string) error {
 	// check dependences softwares
 	for _, s := range KubeSoftwares {
 		_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"which %s\"", s))
@@ -101,6 +93,14 @@ func check(r runner.Runner) error {
 			return err
 		}
 		logrus.Debugf("check kubernetes software: %s success\n", s)
+	}
+	for _, ca := range commontools.CommonCaCerts {
+		_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"ls %s\"", filepath.Join(savePath, ca)))
+		if err != nil {
+			logrus.Errorf("chech ca cert: %s, failed: %v\n", ca, err)
+			return err
+		}
+		logrus.Debugf("chech ca cert: %s success\n", ca)
 	}
 	return nil
 }
@@ -118,8 +118,8 @@ func generateApiServerCertificate(savePath string, cg certs.CertGenerator, ccfg 
 	}
 
 	apiserverConfig := &certs.CertConfig{
-		CommonName:   "kube-apiserver",
-		Organization: "kubernetes",
+		CommonName:    "kube-apiserver",
+		Organizations: []string{"kubernetes"},
 		AltNames: certs.AltNames{
 			IPs:      ips,
 			DNSNames: dnsnames,
@@ -133,9 +133,9 @@ func generateApiServerCertificate(savePath string, cg certs.CertGenerator, ccfg 
 
 func generateApiServerKubeletCertificate(savePath string, cg certs.CertGenerator) error {
 	apiserverConfig := &certs.CertConfig{
-		CommonName:   "kube-apiserver-kubelet-client",
-		Organization: "system:masters",
-		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		CommonName:    "kube-apiserver-kubelet-client",
+		Organizations: []string{"system:masters"},
+		Usages:        []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 	}
 	caCertPath := fmt.Sprintf("%s/%s.crt", savePath, RootCAName)
 	caKeyPath := fmt.Sprintf("%s/%s.key", savePath, RootCAName)
@@ -154,24 +154,13 @@ func generateFrontProxyClientCertificate(savePath string, cg certs.CertGenerator
 
 func generateAdminCertificate(savePath string, cg certs.CertGenerator) error {
 	adminConfig := &certs.CertConfig{
-		CommonName:   "kubernetes-admin",
-		Organization: "system:masters",
-		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		CommonName:    "kubernetes-admin",
+		Organizations: []string{"system:masters"},
+		Usages:        []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 	}
 	caCertPath := fmt.Sprintf("%s/%s.crt", savePath, RootCAName)
 	caKeyPath := fmt.Sprintf("%s/%s.key", savePath, RootCAName)
 	return cg.CreateCertAndKey(caCertPath, caKeyPath, adminConfig, savePath, AdminKubeConfigName)
-}
-
-func generateKubeletCertificate(savePath string, nodeName string, cg certs.CertGenerator) error {
-	adminConfig := &certs.CertConfig{
-		CommonName:   fmt.Sprintf("system:node:%s", nodeName),
-		Organization: "system:nodes",
-		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-	}
-	caCertPath := fmt.Sprintf("%s/%s.crt", savePath, RootCAName)
-	caKeyPath := fmt.Sprintf("%s/%s.key", savePath, RootCAName)
-	return cg.CreateCertAndKey(caCertPath, caKeyPath, adminConfig, savePath, nodeName+"-"+KubeletKubeConfigName)
 }
 
 func generateControllerManagerCertificate(savePath string, cg certs.CertGenerator) error {
@@ -194,34 +183,7 @@ func generateSchedulerCertificate(savePath string, cg certs.CertGenerator) error
 	return cg.CreateCertAndKey(caCertPath, caKeyPath, controllerConfig, savePath, SchedulerKubeConfigName)
 }
 
-func generateKubeProxyCertificate(savePath string, cg certs.CertGenerator) error {
-	// TODO: maybe just to use service account
-	controllerConfig := &certs.CertConfig{
-		CommonName: "system:kube-proxy",
-		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-	}
-	caCertPath := fmt.Sprintf("%s/%s.crt", savePath, RootCAName)
-	caKeyPath := fmt.Sprintf("%s/%s.key", savePath, RootCAName)
-	return cg.CreateCertAndKey(caCertPath, caKeyPath, controllerConfig, savePath, KubeProxyKubeConfigName)
-}
-
 func generateCerts(savePath string, cg certs.CertGenerator, ccfg *clusterdeployment.ClusterConfig) (err error) {
-	// create root ca
-	caConfig := &certs.CertConfig{
-		CommonName: "kubernetes",
-	}
-	if err = cg.CreateCA(caConfig, savePath, RootCAName); err != nil {
-		return
-	}
-
-	// create front proxy ca
-	frontCaConfig := &certs.CertConfig{
-		CommonName: "front-proxy-ca",
-	}
-	if err = cg.CreateCA(frontCaConfig, savePath, FrontProxyCAName); err != nil {
-		return
-	}
-
 	// create certificate and keys
 
 	if err = generateApiServerCertificate(savePath, cg, ccfg); err != nil {
@@ -233,6 +195,36 @@ func generateCerts(savePath string, cg certs.CertGenerator, ccfg *clusterdeploym
 	}
 
 	return generateFrontProxyClientCertificate(savePath, cg)
+}
+
+func prepareCAs(savePath string) error {
+	lcg := certs.NewLocalCertGenerator()
+
+	if _, err := lcg.RunCommand(fmt.Sprintf("sudo mkdir -p -m 0700 %s", savePath)); err != nil {
+		logrus.Errorf("prepare certificates store path failed: %v", err)
+		return err
+	}
+
+	if err := lcg.CreateServiceAccount(savePath); err != nil {
+		return err
+	}
+	// create root ca
+	caConfig := &certs.CertConfig{
+		CommonName: "kubernetes",
+	}
+	if err := lcg.CreateCA(caConfig, savePath, RootCAName); err != nil {
+		return err
+	}
+
+	// create front proxy ca
+	frontCaConfig := &certs.CertConfig{
+		CommonName: "front-proxy-ca",
+	}
+	if err := lcg.CreateCA(frontCaConfig, savePath, FrontProxyCAName); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func getEndpoint(ccfg *clusterdeployment.ClusterConfig) (string, error) {
@@ -267,17 +259,6 @@ func generateKubeConfigs(rootPath, certPath string, cg certs.CertGenerator, ccfg
 		return
 	}
 
-	for _, node := range ccfg.Nodes {
-		if err = generateKubeletCertificate(certPath, node.Name, cg); err != nil {
-			return
-		}
-		err = cg.CreateKubeConfig(rootPath, node.Name+"-"+KubeConfigFileNameKubelet, filepath.Join(certPath, "ca.crt"), "default-auth",
-			filepath.Join(certPath, node.Name+"-kubelet.key"), filepath.Join(certPath, node.Name+"-kubelet.crt"), apiEndpoint)
-		if err != nil {
-			return
-		}
-	}
-
 	if err = generateControllerManagerCertificate(certPath, cg); err != nil {
 		return
 	}
@@ -290,28 +271,14 @@ func generateKubeConfigs(rootPath, certPath string, cg certs.CertGenerator, ccfg
 	if err = generateSchedulerCertificate(certPath, cg); err != nil {
 		return
 	}
-	err = cg.CreateKubeConfig(rootPath, KubeConfigFileNameScheduler, filepath.Join(certPath, "ca.crt"), "default-scheduler",
-		filepath.Join(certPath, "scheduler.key"), filepath.Join(certPath, "scheduler.crt"), localEndpoint)
-	if err != nil {
-		return
-	}
 
-	if err = generateKubeProxyCertificate(certPath, cg); err != nil {
-		return err
-	}
-	return cg.CreateKubeConfig(rootPath, KubeConfigFileNameKubeProxy, filepath.Join(certPath, "ca.crt"), "default-kube-proxy",
-		filepath.Join(certPath, "kube-proxy.key"), filepath.Join(certPath, "kube-proxy.crt"), apiEndpoint)
+	return cg.CreateKubeConfig(rootPath, KubeConfigFileNameScheduler, filepath.Join(certPath, "ca.crt"), "default-scheduler",
+		filepath.Join(certPath, "scheduler.key"), filepath.Join(certPath, "scheduler.crt"), localEndpoint)
 }
 
 func generateCertsAndKubeConfigs(r runner.Runner, ccfg *clusterdeployment.ClusterConfig) (err error) {
-	rootPath := certs.DefaultKubeHomePath
-	if ccfg.Certificate.SavePath != "" {
-		if filepath.IsAbs(ccfg.Certificate.SavePath) {
-			return fmt.Errorf("certifacates store path: '%s' must be absolute", ccfg.Certificate.SavePath)
-		}
-		rootPath = filepath.Clean(ccfg.Certificate.SavePath)
-	}
-	certPath := filepath.Join(rootPath, "pki")
+	rootPath := ccfg.GetConfigDir()
+	certPath := ccfg.GetCertDir()
 
 	cg := certs.NewOpensshBinCertGenerator(r)
 	defer func() {
@@ -319,10 +286,6 @@ func generateCertsAndKubeConfigs(r runner.Runner, ccfg *clusterdeployment.Cluste
 			cg.CleanAll(rootPath)
 		}
 	}()
-
-	if err = cg.CreateServiceAccount(certPath); err != nil {
-		return
-	}
 
 	// clean generated certifactes
 	if err = generateCerts(certPath, cg, ccfg); err != nil {
@@ -341,30 +304,48 @@ func runKubernetesServices(r runner.Runner, ccfg *clusterdeployment.ClusterConfi
 	return nil
 }
 
-func Init(conf *clusterdeployment.ClusterConfig) error {
-	ctask = task.NewTaskInstance(
-		&ControlPlaneTask{
-			ccfg: conf,
-		},
-	)
+func JoinMaterNode(conf *clusterdeployment.ClusterConfig, masterNode *clusterdeployment.HostConfig) error {
+	joinMasterTasks := []task.Task{
+		task.NewTaskInstance(
+			&commontools.CopyCaCertificatesTask{
+				Cluster: conf,
+			},
+		),
+		task.NewTaskInstance(
+			&ControlPlaneTask{
+				ccfg: conf,
+			},
+		),
+	}
 
+	err := nodemanager.RunTasksOnNode(joinMasterTasks, masterNode.Address)
+	if err != nil {
+		return err
+	}
+
+	if err := nodemanager.WaitTasksOnNodeFinished(joinMasterTasks, masterNode.Address, time.Minute*5); err != nil {
+		logrus.Errorf("wait to init first control plane master finish failed: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func Init(conf *clusterdeployment.ClusterConfig) error {
+	var firstMaster *clusterdeployment.HostConfig
 	for _, node := range conf.Nodes {
 		if node.Type&clusterdeployment.Master != 0 {
-			if err := nodemanager.RunTaskOnNodes(ctask, []string{node.Address}); err != nil {
-				logrus.Errorf("init first control plane master failed: %v", err)
-				return err
-			}
-			err := nodemanager.WaitTaskOnNodesFinished(ctask, []string{node.Address}, time.Minute*5)
-			if err != nil {
-				logrus.Errorf("wait to init first control plane master finish failed: %v", err)
-				return err
-			}
-			// TODO: join other master use bootstrap
+			firstMaster = node
 			break
 		}
 	}
 
-	// TODO: upload certificates and kubeconfigs into cluster
+	// generate ca certificates in eggo
+	err := prepareCAs(clusterdeployment.GetCertificateStorePath(conf.Name))
+	if err != nil {
+		logrus.Errorf("[certs] create ca certificates failed: %v", err)
+		return err
+	}
 
-	return nil
+	return JoinMaterNode(conf, firstMaster)
 }

@@ -94,7 +94,8 @@ func TestCleanupCluster(t *testing.T) {
 		},
 	}
 	conf := &clusterdeployment.ClusterConfig{
-		Certificate: clusterdeployment.CertificateConfig{SavePath: "/tmp/test"},
+		ConfigDir:   "/tmp/test",
+		Certificate: clusterdeployment.CertificateConfig{SavePath: "/tmp/test/pki"},
 		Nodes:       nodes,
 	}
 

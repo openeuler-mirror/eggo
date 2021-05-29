@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
-	"gitee.com/openeuler/eggo/pkg/utils/certs"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/task"
@@ -52,16 +51,8 @@ func (t *EtcdDeployEtcdsTask) Name() string {
 	return "EtcdDeployEtcdsTask"
 }
 
-func getDstCertsDir(ccfg *clusterdeployment.ClusterConfig) string {
-	if ccfg.Certificate.SavePath != "" {
-		return ccfg.Certificate.SavePath
-	} else {
-		return certs.DefaultCertPath
-	}
-}
-
 func getDstEtcdCertsDir(ccfg *clusterdeployment.ClusterConfig) string {
-	return filepath.Join(getDstCertsDir(ccfg), "etcd")
+	return filepath.Join(ccfg.GetCertDir(), "etcd")
 }
 
 func copyCertsAndConfigs(ccfg *clusterdeployment.ClusterConfig, r runner.Runner,
@@ -105,8 +96,8 @@ func copyCertsAndConfigs(ccfg *clusterdeployment.ClusterConfig, r runner.Runner,
 	healthcheckKey := filepath.Join(etcdDir, hostConfig.Name+"-healthcheck-client.key")
 	copyInfos = append(copyInfos, &copyInfo{src: healthcheckKey, dst: filepath.Join(dstCertsDir, "healthcheck-client.key")})
 
-	createDirsCmd := "sudo mkdir -p " + filepath.Dir(dstConf) + " && chmod 700 " + filepath.Dir(dstConf) +
-		" && mkdir -p " + dstCertsDir + " && chmod 700 " + dstCertsDir + " && mkdir -p " + filepath.Dir(dstService)
+	createDirsCmd := "sudo mkdir -p -m 0700 " + filepath.Dir(dstConf) +
+		" && mkdir -p -m 0700 " + dstCertsDir + " && mkdir -p " + filepath.Dir(dstService)
 	if output, err := r.RunCommand(createDirsCmd); err != nil {
 		return fmt.Errorf("run command on %v to create dirs failed: %v\noutput: %v",
 			hostConfig.Address, err, output)
@@ -195,7 +186,7 @@ func prepareEtcdConfigs(ccfg *clusterdeployment.ClusterConfig, tempConfigsDir st
 			State:         "new",
 			PeerAddresses: peerAddresses,
 			DataDir:       dataDir,
-			CertsDir:      getDstCertsDir(ccfg),
+			CertsDir:      ccfg.GetCertDir(),
 			ExtraArgs:     ccfg.EtcdCluster.ExtraArgs,
 		}
 		envFile := filepath.Join(tempConfigsDir, node.Name+".conf")

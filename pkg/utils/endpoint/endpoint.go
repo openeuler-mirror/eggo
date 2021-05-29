@@ -20,7 +20,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"k8s.io/apimachinery/pkg/util/validation"
+	validation "k8s.io/apimachinery/pkg/util/validation"
 )
 
 func GetEndpoint(advertiseAddr string, bindPort int) (string, error) {
