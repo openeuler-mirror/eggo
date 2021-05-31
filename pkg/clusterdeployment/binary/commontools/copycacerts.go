@@ -10,7 +10,18 @@ import (
 )
 
 var (
-	CommonCaCerts = []string{"sa.pub", "sa.key", "ca.crt", "ca.key", "front-proxy-ca.crt", "front-proxy-ca.key", "etcd/ca.key", "etcd/ca.crt"}
+	CommonCaCerts = []string{
+		"sa.pub",
+		"sa.key",
+		"ca.crt",
+		"ca.key",
+		"front-proxy-ca.crt",
+		"front-proxy-ca.key",
+		"kube-apiserver-etcd-client.crt",
+		"kube-apiserver-etcd-client.key",
+		"etcd/ca.key",
+		"etcd/ca.crt",
+	}
 )
 
 type CopyCaCertificatesTask struct {

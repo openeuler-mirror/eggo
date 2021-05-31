@@ -17,7 +17,9 @@ package clusterdeployment
 
 import (
 	"path/filepath"
+	"time"
 
+	"gitee.com/openeuler/eggo/pkg/utils"
 	"github.com/sirupsen/logrus"
 )
 
@@ -25,18 +27,7 @@ const (
 	Master = 0x1
 	Worker = 0x2
 	ETCD   = 0x4
-
-	DefaultKubeHomePath = "/etc/kubernetes"
-	DefaultCertPath     = "/etc/kubernetes/pki"
 )
-
-var (
-	EggoHomePath = "/etc/eggo/"
-)
-
-func GetCertificateStorePath(cluster string) string {
-	return filepath.Join(EggoHomePath, cluster, "pki")
-}
 
 type OpenPorts struct {
 	Port     int    `json:"port"`
@@ -132,17 +123,27 @@ type NetworkConfig struct {
 	PluginArgs map[string]string `json:"plugin-args"`
 }
 
+type BootstrapTokenConfig struct {
+	Description     string         `json:"description"`
+	ID              string         `json:"ID"`
+	Secret          string         `json:"secret"`
+	TTL             *time.Duration `json:"ttl"`
+	Usages          []string       `json:"usages"`
+	AuthExtraGroups []string       `json:"auth_extra_groups"`
+}
+
 type ClusterConfig struct {
-	Name           string               `json:"name"`
-	ConfigDir      string               `json:"config-dir"` // default "/etc/kubernetes"
-	Certificate    CertificateConfig    `json:"certificate,omitempty"`
-	ServiceCluster ServiceClusterConfig `json:"servicecluster,omitempty"`
-	Network        NetworkConfig        `json:"network,omitempty"`
-	LocalEndpoint  APIEndpoint          `json:"local-endpoint,omitempty"`
-	ControlPlane   ControlPlaneConfig   `json:"controlplane,omitempty"`
-	PackageSrc     *PackageSrcConfig    `json:"packagesource,omitempty"`
-	EtcdCluster    EtcdClusterConfig    `json:"etcdcluster,omitempty"`
-	Nodes          []*HostConfig        `json:"nodes,omitempty"`
+	Name            string                  `json:"name"`
+	ConfigDir       string                  `json:"config-dir"` // default "/etc/kubernetes"
+	Certificate     CertificateConfig       `json:"certificate,omitempty"`
+	ServiceCluster  ServiceClusterConfig    `json:"servicecluster,omitempty"`
+	Network         NetworkConfig           `json:"network,omitempty"`
+	LocalEndpoint   APIEndpoint             `json:"local-endpoint,omitempty"`
+	ControlPlane    ControlPlaneConfig      `json:"controlplane,omitempty"`
+	PackageSrc      *PackageSrcConfig       `json:"packagesource,omitempty"`
+	EtcdCluster     EtcdClusterConfig       `json:"etcdcluster,omitempty"`
+	Nodes           []*HostConfig           `json:"nodes,omitempty"`
+	BootStrapTokens []*BootstrapTokenConfig `json:"bootstrap-tokens"`
 	// TODO: add other configurations at here
 }
 
@@ -150,22 +151,33 @@ func (c ClusterConfig) GetConfigDir() string {
 	if c.ConfigDir != "" {
 		if !filepath.IsAbs(c.ConfigDir) {
 			logrus.Debugf("ignore invalid config dir: %s, just use default", c.ConfigDir)
-			return DefaultKubeHomePath
+			return utils.DefaultK8SRootDir
 		}
 		return filepath.Clean(c.ConfigDir)
 	}
-	return DefaultKubeHomePath
+	return utils.DefaultK8SRootDir
 }
 
 func (c ClusterConfig) GetCertDir() string {
 	if c.Certificate.SavePath != "" {
 		if !filepath.IsAbs(c.Certificate.SavePath) {
 			logrus.Debugf("ignore invalid certificate save path: %s, just use default", c.Certificate.SavePath)
-			return DefaultCertPath
+			return utils.DefaultK8SCertDir
 		}
 		return filepath.Clean(c.Certificate.SavePath)
 	}
-	return DefaultCertPath
+	return utils.DefaultK8SCertDir
+}
+
+func (c ClusterConfig) GetManifestDir() string {
+	if c.ConfigDir != "" {
+		if !filepath.IsAbs(c.ConfigDir) {
+			logrus.Debugf("ignore invalid config dir: %s, just use default", c.ConfigDir)
+			return utils.DefaultK8SManifestsDir
+		}
+		return filepath.Clean(c.ConfigDir)
+	}
+	return utils.DefaultK8SManifestsDir
 }
 
 type ClusterDeploymentAPI interface {

@@ -17,14 +17,15 @@ package controlplane
 
 import (
 	"crypto/x509"
+	"encoding/base64"
 	"fmt"
-	"net"
 	"path/filepath"
-	"strconv"
+	"strings"
 	"time"
 
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/commontools"
+	"gitee.com/openeuler/eggo/pkg/utils"
 	"gitee.com/openeuler/eggo/pkg/utils/certs"
 	"gitee.com/openeuler/eggo/pkg/utils/endpoint"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
@@ -43,9 +44,40 @@ const (
 	ControllerManagerKubeConfigName = "controller-manager"
 	SchedulerKubeConfigName         = "scheduler"
 
-	KubeConfigFileNameAdmin      = "admin.conf"
-	KubeConfigFileNameController = "controller-manager.conf"
-	KubeConfigFileNameScheduler  = "scheduler.conf"
+	AdminRoleConfig = `apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+	annotations:
+	rbac.authorization.kubernetes.io/autoupdate: "true"
+	labels:
+	kubernetes.io/bootstrapping: rbac-defaults
+	name: system:kube-apiserver-to-kubelet
+rules:
+	- apiGroups:
+		- ""
+	resources:
+		- nodes/proxy
+		- nodes/stats
+		- nodes/log
+		- nodes/spec
+		- nodes/metrics
+	verbs:
+		- "*"
+`
+	AdminRoleBindConfig = `apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+	name: system:kube-apiserver
+	namespace: ""
+roleRef:
+	apiGroup: rbac.authorization.k8s.io
+	kind: ClusterRole
+	name: system:kube-apiserver-to-kubelet
+subjects:
+	- apiGroup: rbac.authorization.k8s.io
+	kind: User
+	name: kubernetes
+`
 )
 
 var (
@@ -227,25 +259,12 @@ func prepareCAs(savePath string) error {
 	return nil
 }
 
-func getEndpoint(ccfg *clusterdeployment.ClusterConfig) (string, error) {
-	host, sport, err := net.SplitHostPort(ccfg.ControlPlane.Endpoint)
-	if err != nil {
-		host = ccfg.LocalEndpoint.AdvertiseAddress
-		sport = strconv.Itoa(int(ccfg.LocalEndpoint.BindPort))
-	}
-	port, err := endpoint.ParsePort(sport)
-	if err != nil {
-		return "", err
-	}
-	return endpoint.GetEndpoint(host, port)
-}
-
 func generateKubeConfigs(rootPath, certPath string, cg certs.CertGenerator, ccfg *clusterdeployment.ClusterConfig) (err error) {
 	// create temp certificates and keys for kubeconfigs
 	if err = generateAdminCertificate(certPath, cg); err != nil {
 		return
 	}
-	apiEndpoint, err := getEndpoint(ccfg)
+	apiEndpoint, err := endpoint.GetAPIServerEndpoint(ccfg.ControlPlane.Endpoint, ccfg.LocalEndpoint)
 	if err != nil {
 		return
 	}
@@ -253,7 +272,8 @@ func generateKubeConfigs(rootPath, certPath string, cg certs.CertGenerator, ccfg
 	if err != nil {
 		return
 	}
-	err = cg.CreateKubeConfig(rootPath, KubeConfigFileNameAdmin, filepath.Join(certPath, "ca.crt"), "default-admin",
+
+	err = cg.CreateKubeConfig(rootPath, utils.KubeConfigFileNameAdmin, filepath.Join(certPath, "ca.crt"), "default-admin",
 		filepath.Join(certPath, "admin.key"), filepath.Join(certPath, "admin.crt"), apiEndpoint)
 	if err != nil {
 		return
@@ -262,7 +282,7 @@ func generateKubeConfigs(rootPath, certPath string, cg certs.CertGenerator, ccfg
 	if err = generateControllerManagerCertificate(certPath, cg); err != nil {
 		return
 	}
-	err = cg.CreateKubeConfig(rootPath, KubeConfigFileNameController, filepath.Join(certPath, "ca.crt"), "default-controller-manager",
+	err = cg.CreateKubeConfig(rootPath, utils.KubeConfigFileNameController, filepath.Join(certPath, "ca.crt"), "default-controller-manager",
 		filepath.Join(certPath, "controller-manager.key"), filepath.Join(certPath, "controller-manager.crt"), localEndpoint)
 	if err != nil {
 		return
@@ -272,8 +292,32 @@ func generateKubeConfigs(rootPath, certPath string, cg certs.CertGenerator, ccfg
 		return
 	}
 
-	return cg.CreateKubeConfig(rootPath, KubeConfigFileNameScheduler, filepath.Join(certPath, "ca.crt"), "default-scheduler",
+	return cg.CreateKubeConfig(rootPath, utils.KubeConfigFileNameScheduler, filepath.Join(certPath, "ca.crt"), "default-scheduler",
 		filepath.Join(certPath, "scheduler.key"), filepath.Join(certPath, "scheduler.crt"), localEndpoint)
+}
+
+func generateEncryption(r runner.Runner, savePath string) error {
+	const encry = `kind: EncryptionConfig
+apiVersion: v1
+resources:
+	- resources:
+		- secrets
+	providers:
+		- aescbc:
+			keys:
+			- name: key1
+				secret: ${ENCRYPTION_KEY}
+		- identity: {}
+`
+	var sb strings.Builder
+	sb.WriteString("sudo -E /bin/sh -c \"")
+	sb.WriteString("local ENCRYPTION_KEY=$(head -c 32 /dev/urandom | base64)")
+	encryBase64 := base64.StdEncoding.EncodeToString([]byte(encry))
+	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/%s", encryBase64, savePath, utils.EncryptionConfigName))
+	sb.WriteString("\"")
+
+	_, err := r.RunCommand(sb.String())
+	return err
 }
 
 func generateCertsAndKubeConfigs(r runner.Runner, ccfg *clusterdeployment.ClusterConfig) (err error) {
@@ -292,7 +336,11 @@ func generateCertsAndKubeConfigs(r runner.Runner, ccfg *clusterdeployment.Cluste
 		return
 	}
 
-	return generateKubeConfigs(rootPath, certPath, cg, ccfg)
+	if err = generateKubeConfigs(rootPath, certPath, cg, ccfg); err != nil {
+		return err
+	}
+
+	return generateEncryption(r, rootPath)
 }
 
 func runKubernetesServices(r runner.Runner, ccfg *clusterdeployment.ClusterConfig, hcf *clusterdeployment.HostConfig) error {
@@ -347,5 +395,72 @@ func Init(conf *clusterdeployment.ClusterConfig) error {
 		return err
 	}
 
-	return JoinMaterNode(conf, firstMaster)
+	if err := JoinMaterNode(conf, firstMaster); err != nil {
+		return err
+	}
+
+	post := task.NewTaskInstance(
+		&PostControlPlaneTask{
+			cluster: conf,
+		},
+	)
+	err = nodemanager.RunTaskOnNodes(post, []string{firstMaster.Address})
+	if err != nil {
+		return err
+	}
+
+	if err := nodemanager.WaitTaskOnNodesFinished(post, []string{firstMaster.Address}, time.Minute*5); err != nil {
+		logrus.Errorf("wait to post task for master finish failed: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+type PostControlPlaneTask struct {
+	cluster *clusterdeployment.ClusterConfig
+}
+
+func (ct *PostControlPlaneTask) Name() string {
+	return "PostControlPlaneTask"
+}
+
+func (ct *PostControlPlaneTask) doAdminRole(r runner.Runner) error {
+	var sb strings.Builder
+	sb.WriteString("sudo -E /bin/sh -c \"")
+	sb.WriteString(fmt.Sprintf("KUBECONFIG=%s/admin.conf", ct.cluster.GetConfigDir()))
+	roleBase64 := base64.StdEncoding.EncodeToString([]byte(AdminRoleConfig))
+	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/admin_cluster_role.yaml", roleBase64, ct.cluster.GetManifestDir()))
+	sb.WriteString(fmt.Sprintf(" && kubectl apply -f %s/admin_cluster_role.yaml", ct.cluster.GetManifestDir()))
+	sb.WriteString("\"")
+	_, err := r.RunCommand(sb.String())
+	if err != nil {
+		logrus.Errorf("apply admin role failed: %v", err)
+		return err
+	}
+
+	sb.Reset()
+	sb.WriteString("sudo -E /bin/sh -c \"")
+	sb.WriteString(fmt.Sprintf("KUBECONFIG=%s/admin.conf", ct.cluster.GetConfigDir()))
+	rolebindBase64 := base64.StdEncoding.EncodeToString([]byte(AdminRoleBindConfig))
+	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/admin_cluster_rolebind.yaml", rolebindBase64, ct.cluster.GetManifestDir()))
+	sb.WriteString(fmt.Sprintf(" && kubectl apply --kub -f %s/admin_cluster_rolebind.yaml", ct.cluster.GetManifestDir()))
+	sb.WriteString("\"")
+	_, err = r.RunCommand(sb.String())
+	if err != nil {
+		logrus.Errorf("apply admin rolebind failed: %v", err)
+		return err
+	}
+	return nil
+}
+
+func (ct *PostControlPlaneTask) Run(r runner.Runner, hcf *clusterdeployment.HostConfig) error {
+	// we should setup some resources for new cluster
+
+	// 1. create admin rolebinding
+	if err := ct.doAdminRole(r); err != nil {
+		return err
+	}
+
+	return nil
 }

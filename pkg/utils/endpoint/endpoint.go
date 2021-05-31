@@ -20,12 +20,19 @@ import (
 	"net/url"
 	"strconv"
 
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"github.com/sirupsen/logrus"
 	validation "k8s.io/apimachinery/pkg/util/validation"
+)
+
+const (
+	DefaultEndpointPort = 6443
 )
 
 func GetEndpoint(advertiseAddr string, bindPort int) (string, error) {
 	if !ValidPort(bindPort) {
-		return "", fmt.Errorf("invalid port: %d", bindPort)
+		bindPort = DefaultEndpointPort
+		logrus.Warnf("ignore invalid bindport: %d, use default: %d", bindPort, DefaultEndpointPort)
 	}
 
 	if ip := net.ParseIP(advertiseAddr); ip == nil {
@@ -59,4 +66,20 @@ func FormatURL(host, port string) *url.URL {
 		Scheme: "https",
 		Host:   net.JoinHostPort(host, port),
 	}
+}
+
+func GetAPIServerEndpoint(apiEndpoint string, localEndpoint clusterdeployment.APIEndpoint) (string, error) {
+	host, sport, err := net.SplitHostPort(apiEndpoint)
+	if err != nil {
+		host = localEndpoint.AdvertiseAddress
+		sport = fmt.Sprintf("%d", DefaultEndpointPort)
+		if ValidPort(int(localEndpoint.BindPort)) {
+			sport = strconv.Itoa(int(localEndpoint.BindPort))
+		}
+	}
+	port, err := ParsePort(sport)
+	if err != nil {
+		return "", err
+	}
+	return GetEndpoint(host, port)
 }
