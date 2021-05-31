@@ -24,7 +24,8 @@ import (
 )
 
 func deploy(ccfg *clusterdeployment.ClusterConfig) error {
-	return nil
+	// TODO: save or load config on disk
+	return clusterdeployment.CreateCluster(ccfg)
 }
 
 func deployCluster(cmd *cobra.Command, args []string) error {

@@ -157,7 +157,8 @@ type LoadBalancer struct {
 
 type ClusterConfig struct {
 	Name            string                  `json:"name"`
-	ConfigDir       string                  `json:"config-dir"` // default "/etc/kubernetes"
+	DeployDriver    string                  `json:"deploy-driver"` // default is binary
+	ConfigDir       string                  `json:"config-dir"`    // default "/etc/kubernetes"
 	Certificate     CertificateConfig       `json:"certificate,omitempty"`
 	ServiceCluster  ServiceClusterConfig    `json:"servicecluster,omitempty"`
 	Network         NetworkConfig           `json:"network,omitempty"`
@@ -168,6 +169,9 @@ type ClusterConfig struct {
 	Nodes           []*HostConfig           `json:"nodes,omitempty"`
 	BootStrapTokens []*BootstrapTokenConfig `json:"bootstrap-tokens"`
 	// TODO: add other configurations at here
+}
+
+type ClusterStatus struct {
 }
 
 func (c ClusterConfig) GetConfigDir() string {
@@ -210,4 +214,7 @@ type ClusterDeploymentAPI interface {
 	JoinBootstrap() error
 	UpgradeCluster() error
 	CleanupCluster() error
+	ClusterStatus() (*ClusterStatus, error)
+	ApplyAddons() error
+	Finish()
 }
