@@ -101,6 +101,7 @@ func SetupControllerManagerService(r runner.Runner, ccfg *clusterdeployment.Clus
 		"--authentication-kubeconfig":        "/etc/kubernetes/controller-manager.conf",
 		"--authorization-kubeconfig":         "/etc/kubernetes/controller-manager.conf",
 		"--requestheader-client-ca-file":     "/etc/kubernetes/pki/front-proxy-ca.crt",
+		"--controllers":                      "*,bootstrapsigner,tokencleaner",
 		"--v":                                "2",
 	}
 	if ccfg.ControlPlane.ManagerConf != nil {

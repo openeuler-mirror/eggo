@@ -17,6 +17,7 @@ package clusterdeployment
 
 import (
 	"path/filepath"
+	"time"
 
 	"gitee.com/openeuler/eggo/pkg/utils"
 	"github.com/sirupsen/logrus"
@@ -122,17 +123,27 @@ type NetworkConfig struct {
 	PluginArgs map[string]string `json:"plugin-args"`
 }
 
+type BootstrapTokenConfig struct {
+	Description     string         `json:"description"`
+	ID              string         `json:"ID"`
+	Secret          string         `json:"secret"`
+	TTL             *time.Duration `json:"ttl"`
+	Usages          []string       `json:"usages"`
+	AuthExtraGroups []string       `json:"auth_extra_groups"`
+}
+
 type ClusterConfig struct {
-	Name           string               `json:"name"`
-	ConfigDir      string               `json:"config-dir"` // default "/etc/kubernetes"
-	Certificate    CertificateConfig    `json:"certificate,omitempty"`
-	ServiceCluster ServiceClusterConfig `json:"servicecluster,omitempty"`
-	Network        NetworkConfig        `json:"network,omitempty"`
-	LocalEndpoint  APIEndpoint          `json:"local-endpoint,omitempty"`
-	ControlPlane   ControlPlaneConfig   `json:"controlplane,omitempty"`
-	PackageSrc     *PackageSrcConfig    `json:"packagesource,omitempty"`
-	EtcdCluster    EtcdClusterConfig    `json:"etcdcluster,omitempty"`
-	Nodes          []*HostConfig        `json:"nodes,omitempty"`
+	Name            string                  `json:"name"`
+	ConfigDir       string                  `json:"config-dir"` // default "/etc/kubernetes"
+	Certificate     CertificateConfig       `json:"certificate,omitempty"`
+	ServiceCluster  ServiceClusterConfig    `json:"servicecluster,omitempty"`
+	Network         NetworkConfig           `json:"network,omitempty"`
+	LocalEndpoint   APIEndpoint             `json:"local-endpoint,omitempty"`
+	ControlPlane    ControlPlaneConfig      `json:"controlplane,omitempty"`
+	PackageSrc      *PackageSrcConfig       `json:"packagesource,omitempty"`
+	EtcdCluster     EtcdClusterConfig       `json:"etcdcluster,omitempty"`
+	Nodes           []*HostConfig           `json:"nodes,omitempty"`
+	BootStrapTokens []*BootstrapTokenConfig `json:"bootstrap-tokens"`
 	// TODO: add other configurations at here
 }
 
