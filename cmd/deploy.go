@@ -30,7 +30,7 @@ func deploy(ccfg *api.ClusterConfig) error {
 }
 
 func deployCluster(cmd *cobra.Command, args []string) error {
-	conf, err := loadDeployConfig(opts.config)
+	conf, err := loadDeployConfig(opts.deployConfig)
 	if err != nil {
 		return fmt.Errorf("load deploy config file failed: %v", err)
 	}

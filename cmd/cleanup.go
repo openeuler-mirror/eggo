@@ -30,7 +30,7 @@ func cleanup(ccfg *api.ClusterConfig) error {
 }
 
 func cleanupCluster(cmd *cobra.Command, args []string) error {
-	conf, err := loadDeployConfig(opts.config)
+	conf, err := loadDeployConfig(opts.cleanupConfig)
 	if err != nil {
 		return fmt.Errorf("load deploy config for cleanup failed: %v", err)
 	}

@@ -23,8 +23,10 @@ import (
 )
 
 type eggoOptions struct {
-	config  string
-	version bool
+	templateConfig string
+	deployConfig   string
+	cleanupConfig  string
+	version        bool
 }
 
 var opts eggoOptions
@@ -46,15 +48,15 @@ func setupEggoCmdOpts(eggoCmd *cobra.Command) {
 
 func setupDeployCmdOpts(deployCmd *cobra.Command) {
 	flags := deployCmd.Flags()
-	flags.StringVarP(&opts.config, "file", "f", getDefaultDeployConfig(), "location of cluster deploy config file, default $HOME/.eggo/deploy.yaml")
+	flags.StringVarP(&opts.deployConfig, "file", "f", getDefaultDeployConfig(), "location of cluster deploy config file, default $HOME/.eggo/deploy.yaml")
 }
 
 func setupCleanupCmdOpts(cleanupCmd *cobra.Command) {
 	flags := cleanupCmd.Flags()
-	flags.StringVarP(&opts.config, "file", "f", getDefaultDeployConfig(), "location of cluster deploy config file for cleanup, default $HOME/.eggo/deploy.yaml")
+	flags.StringVarP(&opts.cleanupConfig, "file", "f", getDefaultDeployConfig(), "location of cluster deploy config file for cleanup, default $HOME/.eggo/deploy.yaml")
 }
 
 func setupTemplateCmdOpts(templateCmd *cobra.Command) {
 	flags := templateCmd.Flags()
-	flags.StringVarP(&opts.config, "file", "f", "", "location of eggo's template config file, default $(current)/template.yaml")
+	flags.StringVarP(&opts.templateConfig, "file", "f", "template.yaml", "location of eggo's template config file, default $(current)/template.yaml")
 }

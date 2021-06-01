@@ -20,7 +20,7 @@ import (
 )
 
 func createTemplate(cmd *cobra.Command, args []string) error {
-	return createDeployConfigTemplate(opts.config)
+	return createDeployConfigTemplate(opts.templateConfig)
 }
 
 func NewTemplateCmd() *cobra.Command {

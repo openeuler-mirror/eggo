@@ -72,7 +72,7 @@ func copyCertsAndConfigs(ccfg *api.ClusterConfig, r runner.Runner,
 	copyInfos = append(copyInfos, &copyInfo{src: serviceFile, dst: dstService})
 
 	// certs
-	certsDir := ccfg.EtcdCluster.CertsDir
+	certsDir := api.GetCertificateStorePath(ccfg.Name)
 	etcdDir := filepath.Join(certsDir, "etcd")
 	dstCertsDir := getDstEtcdCertsDir(ccfg)
 
@@ -122,7 +122,7 @@ func (t *EtcdDeployEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfig) e
 		return err
 	}
 
-	if output, err := r.RunCommand("sudo systemctl enable etcd.service"); err != nil {
+	if output, err := r.RunCommand("sudo systemctl enable etcd.service && systemctl restart etcd.service"); err != nil {
 		return fmt.Errorf("run command on %v to enable etcd service failed: %v\noutput: %v",
 			hostConfig.Address, err, output)
 	}

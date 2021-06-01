@@ -24,13 +24,13 @@ import (
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 )
 
-func genEtcdServerCerts(savePath string, hostname string, cg certs.CertGenerator,
+func genEtcdServerCerts(savePath string, hostname string, ip string, cg certs.CertGenerator,
 	ccfg *api.ClusterConfig) error {
 	return cg.CreateCertAndKey(filepath.Join(savePath, "ca.crt"), filepath.Join(savePath, "ca.key"), &certs.CertConfig{
 		CommonName: hostname + "-server",
 		AltNames: certs.AltNames{
-			IPs:      []string{"127.0.0.1"},
-			DNSNames: []string{"localhost"},
+			IPs:      []string{"127.0.0.1", ip},
+			DNSNames: []string{"localhost", hostname},
 		},
 		Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 	}, savePath, hostname+"-server")
@@ -56,12 +56,17 @@ func genEtcdHealthcheckClientCerts(savePath string, hostname string, cg certs.Ce
 	}, savePath, hostname+"-healthcheck-client")
 }
 
-func genApiserverEtcdClientCerts(savePath string, cg certs.CertGenerator, ccfg *api.ClusterConfig) error {
+func genApiserverEtcdClientCerts(savePath string, hostnameList []string, ipList []string, cg certs.CertGenerator,
+	ccfg *api.ClusterConfig) error {
 	return cg.CreateCertAndKey(filepath.Join(savePath, "etcd", "ca.crt"), filepath.Join(savePath, "etcd", "ca.key"),
 		&certs.CertConfig{
 			CommonName:    "kube-apiserver-etcd-client",
 			Organizations: []string{"system:masters"},
-			Usages:        []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			AltNames: certs.AltNames{
+				IPs:      append(ipList, "127.0.0.1"),
+				DNSNames: append(hostnameList, "localhost"),
+			},
+			Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		}, savePath, "kube-apiserver-etcd-client")
 }
 
@@ -81,7 +86,7 @@ func generateCerts(r runner.Runner, ccfg *api.ClusterConfig) error {
 
 	for _, node := range ccfg.EtcdCluster.Nodes {
 		// generate etcd-server certificates
-		if err := genEtcdServerCerts(etcdCertsPath, node.Name, cg, ccfg); err != nil {
+		if err := genEtcdServerCerts(etcdCertsPath, node.Name, node.Address, cg, ccfg); err != nil {
 			return err
 		}
 
@@ -96,8 +101,15 @@ func generateCerts(r runner.Runner, ccfg *api.ClusterConfig) error {
 		}
 	}
 
+	var hostnameList []string
+	var ipList []string
+	for _, node := range ccfg.Nodes {
+		hostnameList = append(hostnameList, node.Name)
+		ipList = append(ipList, node.Address)
+	}
+
 	// generate apiserver-etcd-client certificates
-	if err := genApiserverEtcdClientCerts(savePath, cg, ccfg); err != nil {
+	if err := genApiserverEtcdClientCerts(savePath, hostnameList, ipList, cg, ccfg); err != nil {
 		return err
 	}
 

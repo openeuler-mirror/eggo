@@ -28,8 +28,10 @@ func showVersion() {
 
 func NewEggoCmd() *cobra.Command {
 	eggoCmd := &cobra.Command{
-		Short: "eggo is a tool built to provide standard multi-ways for creating Kubernetes clusters",
-		Use:   "eggo",
+		Short:         "eggo is a tool built to provide standard multi-ways for creating Kubernetes clusters",
+		Use:           "eggo",
+		SilenceUsage:  true,
+		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.version {
 				showVersion()
@@ -51,6 +53,7 @@ func NewEggoCmd() *cobra.Command {
 
 func main() {
 	if err := NewEggoCmd().Execute(); err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
 }
