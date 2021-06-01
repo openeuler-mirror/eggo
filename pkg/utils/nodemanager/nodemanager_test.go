@@ -16,6 +16,7 @@
 package nodemanager
 
 import (
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -31,6 +32,11 @@ type MockRunner struct {
 
 func (m *MockRunner) Copy(src, dst string) error {
 	logrus.Infof("copy %s to %s", src, dst)
+	return nil
+}
+
+func (m *MockRunner) CopyDir(src, dst string) error {
+	logrus.Infof("copydir %s to %s", src, dst)
 	return nil
 }
 
@@ -123,6 +129,19 @@ func TestRunTaskOnNodes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run task on ondes failed: %v\n", err)
 	}
+
+	errTask := task.NewTaskInstance(
+		&ErrorTask{
+			name: "ErrorTask",
+		})
+	err = RunTaskOnNodes(errTask, nodes)
+	if err != nil {
+		t.Fatalf("run err task failed: %v", err)
+	}
+	err = WaitTaskOnNodesFinished(errTask, nodes, time.Second*30)
+	if err == nil {
+		t.Fatal("run error task on ondes success")
+	}
 	releaseNodes(nodes)
 }
 
@@ -142,4 +161,22 @@ func TestRunTaskOnAll(t *testing.T) {
 		t.Fatal("run task on all ondes failed\n")
 	}
 	UnRegisterAllNodes()
+}
+
+type ErrorTask struct {
+	// some need data
+	name string
+}
+
+func (m *ErrorTask) Run(r runner.Runner, hcf *api.HostConfig) error {
+	rand.Seed(time.Now().UnixNano())
+
+	time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
+	logrus.Errorf("run error task return error")
+
+	return fmt.Errorf("ErrorTask is error")
+}
+
+func (m *ErrorTask) Name() string {
+	return m.name
 }

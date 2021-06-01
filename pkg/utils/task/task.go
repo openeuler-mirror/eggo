@@ -71,7 +71,7 @@ func (t *TaskInstance) GetLabel(key string) string {
 }
 
 func IsSuccess(label string) bool {
-	return strings.HasPrefix(label, SUCCESS)
+	return label == SUCCESS
 }
 
 func IsFailed(label string) bool {

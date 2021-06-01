@@ -18,7 +18,10 @@ package runner
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 
 	"gitee.com/openeuler/eggo/pkg/api"
@@ -28,13 +31,23 @@ import (
 )
 
 type Runner interface {
+	// only copy file, do not support copy dir
 	Copy(src, dst string) error
+	CopyDir(srcDir, dstDir string) error
 	RunCommand(cmd string) (string, error)
 	Reconnect() error
 	Close()
 }
 
 type LocalRunner struct {
+}
+
+func (r *LocalRunner) CopyDir(srcDir, dstDir string) error {
+	output, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("sudo cp -rf %v %v", srcDir, dstDir)).CombinedOutput()
+	if err != nil {
+		logrus.Errorf("copy %s to %s failed: %v\noutput: %v\n", srcDir, dstDir, err, string(output))
+	}
+	return err
 }
 
 func (r *LocalRunner) Copy(src, dst string) error {
@@ -123,6 +136,41 @@ func (ssh *SSHRunner) Copy(src, dst string) error {
 	}
 	logrus.Debugf("Copy %s to %s:%s success\n", src, ssh.Host.Address, dst)
 	return nil
+}
+
+func (ssh *SSHRunner) CopyDir(srcDir, dstDir string) error {
+	fi, err := os.Stat(srcDir)
+	if err != nil {
+		logrus.Errorf("check src dir: %s failed: %v", srcDir, err)
+		return err
+	}
+	if !fi.IsDir() {
+		return fmt.Errorf("src dir %s is not a directory", srcDir)
+	}
+	tmpDir, err := ioutil.TempDir("", "eggo-certs-")
+	if err != nil {
+		return err
+	}
+	tmpCert := filepath.Join(tmpDir, "pki.tar.gz")
+	lr := &LocalRunner{}
+	// tar src dir
+	_, err = lr.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"mkdir -p %s && cd %s && tar -cf %s *\"", tmpDir, srcDir, tmpCert))
+	if err != nil {
+		logrus.Errorf("create cert tmp tar failed: %v", err)
+		return err
+	}
+	// scp to dist
+	err = ssh.Copy(tmpCert, filepath.Join(dstDir, "pki.tar.gz"))
+	if err != nil {
+		logrus.Errorf("copy tmp tar failed: %v", err)
+		return err
+	}
+	// untar tmp file
+	_, err = ssh.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"cd %s && tar -xf %s && rm -f %s\"", dstDir, "pki.tar.gz", "pki.tar.gz"))
+	if err != nil {
+		logrus.Errorf("untar tmp tar failed: %v", err)
+	}
+	return err
 }
 
 func (ssh *SSHRunner) RunCommand(cmd string) (string, error) {

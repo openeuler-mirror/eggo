@@ -39,10 +39,6 @@ var (
 			Type: "repo",
 		},
 		{
-			Name: "kubernetes-kubeadm",
-			Type: "repo",
-		},
-		{
 			Name: "kubernetes-master",
 			Type: "repo",
 		},
@@ -312,15 +308,25 @@ func addPackagesAndExports(hostconfig *api.HostConfig, pkgs []*api.Packages,
 	}
 }
 
-func addUserPackages(hostconfig *api.HostConfig, pkgs []*Package) {
+func addUserPackages(hostconfig *api.HostConfig, userPkgs []*Package) {
 	if hostconfig.Packages == nil {
 		hostconfig.Packages = []*api.Packages{}
 	}
-	for _, pkg := range pkgs {
+
+	noDupPkgs := make(map[string]int, len(hostconfig.Packages))
+	for i, p := range hostconfig.Packages {
+		noDupPkgs[p.Name] = i
+	}
+
+	for _, pkg := range userPkgs {
 		p := &api.Packages{
 			Name: pkg.Name,
 			Type: pkg.Type,
 			Dst:  pkg.Dst,
+		}
+		if i, ok := noDupPkgs[pkg.Name]; ok {
+			hostconfig.Packages[i] = p
+			continue
 		}
 		hostconfig.Packages = append(hostconfig.Packages, p)
 	}
@@ -553,10 +559,6 @@ func createDeployConfigTemplate(file string) error {
 			"master": {
 				&Package{
 					Name: "kubernetes-master",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "kubernetes-kubeadm",
 					Type: "pkg",
 				},
 				&Package{

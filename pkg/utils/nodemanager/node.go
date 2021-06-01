@@ -109,6 +109,7 @@ func NewNode(hcf *api.HostConfig, r runner.Runner) (*Node, error) {
 					t.AddLabel(n.host.Address, label)
 					// set task status on node after task
 					n.addLabel(t.Name(), fmt.Sprintf("%s with err: %v", FinishPrefix, err))
+					logrus.Errorf("%s", label)
 				} else {
 					t.AddLabel(n.host.Address, task.SUCCESS)
 					// set task status on node after task

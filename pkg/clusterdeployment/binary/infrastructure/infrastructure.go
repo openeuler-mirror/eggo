@@ -87,7 +87,7 @@ func setHostname(r runner.Runner, hcg *api.HostConfig) error {
 		return nil
 	}
 
-	_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"hostnamectl sethostname %s\"", hcg.Name))
+	_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"hostnamectl set-hostname %s\"", hcg.Name))
 	if err != nil {
 		return fmt.Errorf("set Hostname %s for %s failed: %v", hcg.Name, hcg.Address, err)
 	}
