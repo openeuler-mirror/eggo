@@ -46,7 +46,32 @@ const (
 
 var (
 	KubeWorkerSoftwares = []string{"kubelet", "kube-proxy", "kubectl"}
+	tokenTask           *GetTokenTask
 )
+
+type GetTokenTask struct {
+	tokenStr string
+}
+
+func (gt *GetTokenTask) Name() string {
+	return "GetTokenTask"
+}
+
+func (gt *GetTokenTask) Run(r runner.Runner, hcg *clusterdeployment.HostConfig) error {
+	token, err := commontools.GetBootstrapToken(r, gt.tokenStr)
+	if err != nil {
+		return err
+	}
+	gt.tokenStr = token
+	return nil
+}
+
+func getTokenString() string {
+	if tokenTask == nil {
+		return ""
+	}
+	return tokenTask.tokenStr
+}
 
 type BootstrapTask struct {
 	ccfg *clusterdeployment.ClusterConfig
@@ -143,24 +168,12 @@ func prepareISulad(r runner.Runner, ccfg *clusterdeployment.ClusterConfig) error
 }
 
 func prepareConfig(r runner.Runner, ccfg *clusterdeployment.ClusterConfig, hcf *clusterdeployment.HostConfig) error {
-	// get Token from control plane
-	token, err := GetToken()
-	if err != nil {
-		logrus.Errorf("get token failed: %v", err)
-		return err
-	}
-
-	if err := genConfig(r, ccfg, hcf, token); err != nil {
+	if err := genConfig(r, ccfg, hcf, getTokenString()); err != nil {
 		logrus.Errorf("generate config failed: %v", err)
 		return err
 	}
 
 	return nil
-}
-
-func GetToken() (string, error) {
-	// get token to join
-	return "", nil
 }
 
 func genConfig(r runner.Runner, ccfg *clusterdeployment.ClusterConfig, hcf *clusterdeployment.HostConfig, token string) error {
@@ -404,10 +417,16 @@ func Init(config *clusterdeployment.ClusterConfig) error {
 			workers = append(workers, node.Address)
 		}
 	}
-
-	if len(masters) != 0 {
-		masters = masters[1:]
+	if len(masters) == 0 {
+		return fmt.Errorf("no master found for cluster")
 	}
 
-	return JoinNode(config, masters, workers)
+	if tokenTask == nil {
+		tokenTask = &GetTokenTask{}
+	}
+	if err := nodemanager.RunTasksOnNode([]task.Task{task.NewTaskInstance(tokenTask)}, masters[0]); err != nil {
+		return err
+	}
+
+	return JoinNode(config, masters[1:], workers)
 }

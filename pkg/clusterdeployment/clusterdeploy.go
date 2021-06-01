@@ -18,6 +18,8 @@ package clusterdeployment
 import (
 	"fmt"
 	"sync"
+
+	"github.com/sirupsen/logrus"
 )
 
 type ClusterDeploymentCreator func(*ClusterConfig) (ClusterDeploymentAPI, error)
@@ -59,4 +61,60 @@ func RegisterClusterDeploymentDriver(name string, c ClusterDeploymentCreator) er
 
 func GetClusterDeploymentDriver(name string) (ClusterDeploymentCreator, error) {
 	return factory.get(name)
+}
+
+func CreateCluster(cc *ClusterConfig) error {
+	if cc == nil {
+		return fmt.Errorf("cluster config is required")
+	}
+	creator, err := GetClusterDeploymentDriver(cc.DeployDriver)
+	if err != nil {
+		logrus.Errorf("get cluster deployment driver: %s failed: %v", cc.DeployDriver, err)
+		return err
+	}
+	handler, err := creator(cc)
+	if err != nil {
+		logrus.Errorf("create cluster deployment instance with driver: %s, failed: %v", cc.DeployDriver, err)
+		return err
+	}
+	defer handler.Finish()
+	if err := handler.PrepareInfrastructure(); err != nil {
+		return err
+	}
+	if err := handler.DeployEtcdCluster(); err != nil {
+		return err
+	}
+	if err := handler.InitControlPlane(); err != nil {
+		return err
+	}
+	if err := handler.JoinBootstrap(); err != nil {
+		return err
+	}
+	if err := handler.ApplyAddons(); err != nil {
+		return err
+	}
+	logrus.Infof("[cluster] create cluster '%s' successed", cc.Name)
+	return nil
+}
+
+func RemoveCluster(cc *ClusterConfig) error {
+	if cc == nil {
+		return fmt.Errorf("cluster config is required")
+	}
+	creator, err := GetClusterDeploymentDriver(cc.DeployDriver)
+	if err != nil {
+		logrus.Errorf("get cluster deployment driver: %s failed: %v", cc.DeployDriver, err)
+		return err
+	}
+	handler, err := creator(cc)
+	if err != nil {
+		logrus.Errorf("remove cluster deployment instance with driver: %s, failed: %v", cc.DeployDriver, err)
+		return err
+	}
+	defer handler.Finish()
+	if err := handler.CleanupCluster(); err != nil {
+		return err
+	}
+	logrus.Infof("[cluster] remove cluster '%s' successed", cc.Name)
+	return nil
 }

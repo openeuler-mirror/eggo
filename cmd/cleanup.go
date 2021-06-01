@@ -24,7 +24,8 @@ import (
 )
 
 func cleanup(ccfg *clusterdeployment.ClusterConfig) error {
-	return nil
+	// TODO: cleanup config of cluster on disk
+	return clusterdeployment.RemoveCluster(ccfg)
 }
 
 func cleanupCluster(cmd *cobra.Command, args []string) error {

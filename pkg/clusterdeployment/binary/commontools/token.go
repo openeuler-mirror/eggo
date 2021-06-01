@@ -43,10 +43,10 @@ func CreateBootstrapToken(r runner.Runner, bconf *clusterdeployment.BootstrapTok
 	datastore["Description"] = bconf.Description
 	datastore["ID"] = bconf.ID
 	datastore["Secret"] = bconf.Secret
-	ttl := *bconf.TTL
-	if bconf.TTL == nil {
-		// default set ttl 24 hours
-		ttl = 24 * time.Hour
+	// default set ttl 24 hours
+	ttl := 24 * time.Hour
+	if bconf.TTL != nil {
+		ttl = *bconf.TTL
 	}
 	datastore["Expiration"] = now.Add(ttl).Format(time.RFC3339)
 	for _, usage := range bconf.Usages {
@@ -85,16 +85,37 @@ func CreateBootstrapTokensForCluster(r runner.Runner, ccfg *clusterdeployment.Cl
 	return nil
 }
 
-func GenerateBootstrapToken() (token, id, secret string, err error) {
-	tokenStr, err := bootstraputil.GenerateBootstrapToken()
+func GetBootstrapToken(r runner.Runner, tokenStr string) (string, error) {
+	token, id, secret, err := ParseBootstrapTokenStr(tokenStr)
 	if err != nil {
-		logrus.Errorf("generate bootstrap token string error: %v", err)
-		return "", "", "", err
+		return "", err
 	}
-	splitStrs := bootstraputil.BootstrapTokenRegexp.FindStringSubmatch(tokenStr)
+	bconf := &clusterdeployment.BootstrapTokenConfig{
+		Description:     "bootstrap token for eggo",
+		ID:              id,
+		Secret:          secret,
+		Usages:          []string{"authentication", "signing"},
+		AuthExtraGroups: []string{""},
+	}
+	err = CreateBootstrapToken(r, bconf)
+
+	return token, err
+}
+
+func ParseBootstrapTokenStr(useToken string) (token, id, secret string, err error) {
+	if useToken == "" {
+		tokenStr, err := bootstraputil.GenerateBootstrapToken()
+		if err != nil {
+			logrus.Errorf("generate bootstrap token string error: %v", err)
+			return "", "", "", err
+		}
+		useToken = tokenStr
+	}
+
+	splitStrs := bootstraputil.BootstrapTokenRegexp.FindStringSubmatch(useToken)
 	if len(splitStrs) != 3 {
-		logrus.Errorf("generate bootstrap token string invalid: %s", tokenStr)
-		return "", "", "", fmt.Errorf("generate bootstrap token string invalid: %s", tokenStr)
+		logrus.Errorf("generate bootstrap token string invalid: %s", useToken)
+		return "", "", "", fmt.Errorf("generate bootstrap token string invalid: %s", useToken)
 	}
 
 	return splitStrs[0], splitStrs[1], splitStrs[2], nil

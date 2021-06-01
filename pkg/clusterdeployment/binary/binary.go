@@ -20,6 +20,7 @@ import (
 	cp "gitee.com/openeuler/eggo/pkg/clusterdeployment"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/bootstrap"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/cleanupcluster"
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/commontools"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/controlplane"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/etcdcluster"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
@@ -40,15 +41,14 @@ func init() {
 }
 
 func New(conf *cp.ClusterConfig) (cp.ClusterDeploymentAPI, error) {
-	// TODO: finish binary implements
-	bcd := BinaryClusterDeployment{
+	bcd := &BinaryClusterDeployment{
 		config:      conf,
 		connections: make(map[string]runner.Runner),
 	}
 	// register and connect all nodes
 	bcd.registerNodes()
 
-	return &bcd, nil
+	return bcd, nil
 }
 
 type BinaryClusterDeployment struct {
@@ -152,4 +152,22 @@ func (bcp *BinaryClusterDeployment) CleanupCluster() error {
 		logrus.Info("cleanup cluster success")
 	}
 	return err
+}
+
+func (bcp *BinaryClusterDeployment) ApplyAddons() error {
+	// Setup coredns at here, like need addons
+	err := commontools.SetUpCoredns(bcp.config)
+	if err != nil {
+		logrus.Errorf("setup coredns failed: %v", err)
+		return err
+	}
+
+	// TODO: apply all addons at here
+
+	return nil
+}
+
+func (bcp *BinaryClusterDeployment) ClusterStatus() (*cp.ClusterStatus, error) {
+	// TODO: support ClusterStatus
+	return nil, nil
 }

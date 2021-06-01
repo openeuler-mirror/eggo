@@ -9,7 +9,7 @@ func TestGenerateBootstrapToken(t *testing.T) {
 	idPattern := `[a-z0-9]{6}`
 	secretPattern := `[a-z0-9]{16}`
 	tokenPattern := `\A([a-z0-9]{6})\.([a-z0-9]{16})\z`
-	token, id, secret, err := GenerateBootstrapToken()
+	token, id, secret, err := ParseBootstrapTokenStr("")
 	if err != nil {
 		t.Fatalf("run GenerateBootstrapToken failed: %v", err)
 	}
