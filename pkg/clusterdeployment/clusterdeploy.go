@@ -17,57 +17,18 @@ package clusterdeployment
 
 import (
 	"fmt"
-	"sync"
 
+	"gitee.com/openeuler/eggo/pkg/api"
+	_ "gitee.com/openeuler/eggo/pkg/clusterdeployment/binary"
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment/manager"
 	"github.com/sirupsen/logrus"
 )
 
-type ClusterDeploymentCreator func(*ClusterConfig) (ClusterDeploymentAPI, error)
-
-type clusterDeploymentFactory struct {
-	registry map[string]ClusterDeploymentCreator
-	m        sync.Mutex
-}
-
-func (df *clusterDeploymentFactory) register(name string, c ClusterDeploymentCreator) error {
-	df.m.Lock()
-	defer df.m.Unlock()
-	if _, ok := df.registry[name]; ok {
-		return fmt.Errorf("driver %s is already registered", name)
-	}
-	df.registry[name] = c
-	return nil
-}
-
-func (df *clusterDeploymentFactory) get(name string) (ClusterDeploymentCreator, error) {
-	df.m.Lock()
-	defer df.m.Unlock()
-	c, ok := df.registry[name]
-	if ok {
-		return c, nil
-	}
-	return nil, fmt.Errorf("driver %s cannot be found", name)
-}
-
-// global factory instance
-var factory = &clusterDeploymentFactory{registry: make(map[string]ClusterDeploymentCreator)}
-
-func RegisterClusterDeploymentDriver(name string, c ClusterDeploymentCreator) error {
-	if c == nil {
-		return fmt.Errorf("creator is nil")
-	}
-	return factory.register(name, c)
-}
-
-func GetClusterDeploymentDriver(name string) (ClusterDeploymentCreator, error) {
-	return factory.get(name)
-}
-
-func CreateCluster(cc *ClusterConfig) error {
+func CreateCluster(cc *api.ClusterConfig) error {
 	if cc == nil {
 		return fmt.Errorf("cluster config is required")
 	}
-	creator, err := GetClusterDeploymentDriver(cc.DeployDriver)
+	creator, err := manager.GetClusterDeploymentDriver(cc.DeployDriver)
 	if err != nil {
 		logrus.Errorf("get cluster deployment driver: %s failed: %v", cc.DeployDriver, err)
 		return err
@@ -97,11 +58,11 @@ func CreateCluster(cc *ClusterConfig) error {
 	return nil
 }
 
-func RemoveCluster(cc *ClusterConfig) error {
+func RemoveCluster(cc *api.ClusterConfig) error {
 	if cc == nil {
 		return fmt.Errorf("cluster config is required")
 	}
-	creator, err := GetClusterDeploymentDriver(cc.DeployDriver)
+	creator, err := manager.GetClusterDeploymentDriver(cc.DeployDriver)
 	if err != nil {
 		logrus.Errorf("get cluster deployment driver: %s failed: %v", cc.DeployDriver, err)
 		return err

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/template"
 	"github.com/sirupsen/logrus"
@@ -16,7 +16,7 @@ const (
 	SystemdServiceConfigPath = "/usr/lib/systemd/system"
 )
 
-func SetupAPIServerService(r runner.Runner, ccfg *clusterdeployment.ClusterConfig, hcf *clusterdeployment.HostConfig) error {
+func SetupAPIServerService(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig) error {
 	defaultArgs := map[string]string{
 		"--advertise-address":                  hcf.Address,
 		"--allow-privileged":                   "true",
@@ -85,7 +85,7 @@ func SetupAPIServerService(r runner.Runner, ccfg *clusterdeployment.ClusterConfi
 	return nil
 }
 
-func SetupControllerManagerService(r runner.Runner, ccfg *clusterdeployment.ClusterConfig, hcf *clusterdeployment.HostConfig) error {
+func SetupControllerManagerService(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig) error {
 	defaultArgs := map[string]string{
 		"--bind-address":                     "0.0.0.0",
 		"--cluster-cidr":                     ccfg.Network.PodCIDR,
@@ -140,7 +140,7 @@ func SetupControllerManagerService(r runner.Runner, ccfg *clusterdeployment.Clus
 	return nil
 }
 
-func SetupSchedulerService(r runner.Runner, ccfg *clusterdeployment.ClusterConfig) error {
+func SetupSchedulerService(r runner.Runner, ccfg *api.ClusterConfig) error {
 	defaultArgs := map[string]string{
 		"--kubeconfig":                "/etc/kubernetes/scheduler.conf",
 		"--authentication-kubeconfig": "/etc/kubernetes/scheduler.conf",
@@ -184,7 +184,7 @@ func SetupSchedulerService(r runner.Runner, ccfg *clusterdeployment.ClusterConfi
 	return nil
 }
 
-func SetupMasterServices(r runner.Runner, ccfg *clusterdeployment.ClusterConfig, hcf *clusterdeployment.HostConfig) error {
+func SetupMasterServices(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig) error {
 	// set up api-server service
 	if err := SetupAPIServerService(r, ccfg, hcf); err != nil {
 		logrus.Errorf("setup api server service failed: %v", err)
@@ -209,7 +209,7 @@ func SetupMasterServices(r runner.Runner, ccfg *clusterdeployment.ClusterConfig,
 	return nil
 }
 
-func SetupKubeletService(r runner.Runner, kcf *clusterdeployment.Kubelet, hcf *clusterdeployment.HostConfig) error {
+func SetupKubeletService(r runner.Runner, kcf *api.Kubelet, hcf *api.HostConfig) error {
 	defaultArgs := map[string]string{
 		"--config":                     "/etc/kubernetes/kubelet_config.yaml",
 		"--network-plugin":             "cni",
@@ -274,7 +274,7 @@ func SetupKubeletService(r runner.Runner, kcf *clusterdeployment.Kubelet, hcf *c
 	return nil
 }
 
-func SetupProxyService(r runner.Runner, kpcf *clusterdeployment.KubeProxy, hcf *clusterdeployment.HostConfig) error {
+func SetupProxyService(r runner.Runner, kpcf *api.KubeProxy, hcf *api.HostConfig) error {
 	defaultArgs := map[string]string{
 		"--config":      "/etc/kubernetes/kube-proxy-config.yaml",
 		"--hostname":    hcf.Name,
@@ -317,7 +317,7 @@ func SetupProxyService(r runner.Runner, kpcf *clusterdeployment.KubeProxy, hcf *
 	return nil
 }
 
-func SetupWorkerServices(r runner.Runner, ccfg *clusterdeployment.ClusterConfig, hcf *clusterdeployment.HostConfig) error {
+func SetupWorkerServices(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig) error {
 	// set up k8s worker service
 	if err := SetupKubeletService(r, ccfg.ControlPlane.KubeletConf, hcf); err != nil {
 		logrus.Errorf("setup k8s kubelet service failed: %v", err)

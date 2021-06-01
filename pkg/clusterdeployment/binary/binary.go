@@ -17,13 +17,14 @@ package binary
 import (
 	"sync"
 
-	cp "gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/bootstrap"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/cleanupcluster"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/commontools"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/controlplane"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/etcdcluster"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment/manager"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 
@@ -31,16 +32,17 @@ import (
 )
 
 const (
-	name = "binary driver"
+	name = "binary"
 )
 
 func init() {
-	if err := cp.RegisterClusterDeploymentDriver(name, New); err != nil {
+	if err := manager.RegisterClusterDeploymentDriver(name, New); err != nil {
 		logrus.Fatal(err)
 	}
+	logrus.Info("register binary")
 }
 
-func New(conf *cp.ClusterConfig) (cp.ClusterDeploymentAPI, error) {
+func New(conf *api.ClusterConfig) (api.ClusterDeploymentAPI, error) {
 	bcd := &BinaryClusterDeployment{
 		config:      conf,
 		connections: make(map[string]runner.Runner),
@@ -52,7 +54,7 @@ func New(conf *cp.ClusterConfig) (cp.ClusterDeploymentAPI, error) {
 }
 
 type BinaryClusterDeployment struct {
-	config *cp.ClusterConfig
+	config *api.ClusterConfig
 
 	connLock    sync.Mutex
 	connections map[string]runner.Runner
@@ -167,7 +169,7 @@ func (bcp *BinaryClusterDeployment) ApplyAddons() error {
 	return nil
 }
 
-func (bcp *BinaryClusterDeployment) ClusterStatus() (*cp.ClusterStatus, error) {
+func (bcp *BinaryClusterDeployment) ClusterStatus() (*api.ClusterStatus, error) {
 	// TODO: support ClusterStatus
 	return nil, nil
 }

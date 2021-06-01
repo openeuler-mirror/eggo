@@ -19,13 +19,13 @@ import (
 	"crypto/x509"
 	"path/filepath"
 
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/utils/certs"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 )
 
 func genEtcdServerCerts(savePath string, hostname string, cg certs.CertGenerator,
-	ccfg *clusterdeployment.ClusterConfig) error {
+	ccfg *api.ClusterConfig) error {
 	return cg.CreateCertAndKey(filepath.Join(savePath, "ca.crt"), filepath.Join(savePath, "ca.key"), &certs.CertConfig{
 		CommonName: hostname + "-server",
 		AltNames: certs.AltNames{
@@ -37,7 +37,7 @@ func genEtcdServerCerts(savePath string, hostname string, cg certs.CertGenerator
 }
 
 func genEtcdPeerCerts(savePath string, hostname string, ip string, cg certs.CertGenerator,
-	ccfg *clusterdeployment.ClusterConfig) error {
+	ccfg *api.ClusterConfig) error {
 	return cg.CreateCertAndKey(filepath.Join(savePath, "ca.crt"), filepath.Join(savePath, "ca.key"), &certs.CertConfig{
 		CommonName: hostname + "-peer",
 		AltNames: certs.AltNames{
@@ -49,14 +49,14 @@ func genEtcdPeerCerts(savePath string, hostname string, ip string, cg certs.Cert
 }
 
 func genEtcdHealthcheckClientCerts(savePath string, hostname string, cg certs.CertGenerator,
-	ccfg *clusterdeployment.ClusterConfig) error {
+	ccfg *api.ClusterConfig) error {
 	return cg.CreateCertAndKey(filepath.Join(savePath, "ca.crt"), filepath.Join(savePath, "ca.key"), &certs.CertConfig{
 		CommonName: hostname + "-healthcheck-client",
 		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 	}, savePath, hostname+"-healthcheck-client")
 }
 
-func genApiserverEtcdClientCerts(savePath string, cg certs.CertGenerator, ccfg *clusterdeployment.ClusterConfig) error {
+func genApiserverEtcdClientCerts(savePath string, cg certs.CertGenerator, ccfg *api.ClusterConfig) error {
 	return cg.CreateCertAndKey(filepath.Join(savePath, "etcd", "ca.crt"), filepath.Join(savePath, "etcd", "ca.key"),
 		&certs.CertConfig{
 			CommonName:    "kube-apiserver-etcd-client",
@@ -66,8 +66,8 @@ func genApiserverEtcdClientCerts(savePath string, cg certs.CertGenerator, ccfg *
 }
 
 // see: https://kubernetes.io/docs/setup/best-practices/certificates/
-func generateCerts(r runner.Runner, ccfg *clusterdeployment.ClusterConfig) error {
-	savePath := clusterdeployment.GetCertificateStorePath(ccfg.Name)
+func generateCerts(r runner.Runner, ccfg *api.ClusterConfig) error {
+	savePath := api.GetCertificateStorePath(ccfg.Name)
 	etcdCertsPath := filepath.Join(savePath, "etcd")
 	cg := certs.NewOpensshBinCertGenerator(r)
 

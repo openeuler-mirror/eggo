@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"sync"
 
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/task"
 	"github.com/sirupsen/logrus"
@@ -31,7 +31,7 @@ const (
 )
 
 type Node struct {
-	host *clusterdeployment.HostConfig
+	host *api.HostConfig
 	r    runner.Runner
 	stop chan bool
 	// work on up to 10 tasks at a time
@@ -87,7 +87,7 @@ func (n *Node) Finish() {
 	logrus.Infof("node: %s is finished", n.host.Address)
 }
 
-func NewNode(hcf *clusterdeployment.HostConfig, r runner.Runner) (*Node, error) {
+func NewNode(hcf *api.HostConfig, r runner.Runner) (*Node, error) {
 	// TODO: maybe we need deap copy hostconfig
 	n := &Node{
 		host:   hcf,

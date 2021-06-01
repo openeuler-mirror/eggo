@@ -20,7 +20,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/api"
 	"github.com/sirupsen/logrus"
 	validation "k8s.io/apimachinery/pkg/util/validation"
 )
@@ -68,7 +68,7 @@ func FormatURL(host, port string) *url.URL {
 	}
 }
 
-func GetAPIServerEndpoint(apiEndpoint string, localEndpoint clusterdeployment.APIEndpoint) (string, error) {
+func GetAPIServerEndpoint(apiEndpoint string, localEndpoint api.APIEndpoint) (string, error) {
 	host, sport, err := net.SplitHostPort(apiEndpoint)
 	if err != nil {
 		host = localEndpoint.AdvertiseAddress

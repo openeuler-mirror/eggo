@@ -26,10 +26,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/etcdcluster"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
-	"gitee.com/openeuler/eggo/pkg/utils"
+	"gitee.com/openeuler/eggo/pkg/constants"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/task"
@@ -54,9 +54,9 @@ func (f *originFuncs) removeAll(path string) error {
 }
 
 type cleanupClusterTask struct {
-	ccfg       *clusterdeployment.ClusterConfig
+	ccfg       *api.ClusterConfig
 	r          runner.Runner
-	hostConfig *clusterdeployment.HostConfig
+	hostConfig *api.HostConfig
 }
 
 func (t *cleanupClusterTask) Name() string {
@@ -109,7 +109,7 @@ func getKubeHomePath(savePath string) string {
 	if savePath != "" {
 		return filepath.Clean(savePath)
 	} else {
-		return utils.DefaultK8SCertDir
+		return constants.DefaultK8SCertDir
 	}
 }
 
@@ -192,7 +192,7 @@ func isPkgInstalled(t *cleanupClusterTask, pkg string) bool {
 	return false
 }
 
-func (t *cleanupClusterTask) Run(r runner.Runner, hostConfig *clusterdeployment.HostConfig) error {
+func (t *cleanupClusterTask) Run(r runner.Runner, hostConfig *api.HostConfig) error {
 	if hostConfig == nil {
 		return fmt.Errorf("empty host config")
 	}
@@ -204,15 +204,15 @@ func (t *cleanupClusterTask) Run(r runner.Runner, hostConfig *clusterdeployment.
 		logrus.Errorf("remove dependences failed: %v", err)
 	}
 
-	if isType(hostConfig.Type, clusterdeployment.Worker) {
+	if isType(hostConfig.Type, api.Worker) {
 		cleanupWorker(t)
 	}
 
-	if isType(hostConfig.Type, clusterdeployment.Master) {
+	if isType(hostConfig.Type, api.Master) {
 		cleanupMaster(t)
 	}
 
-	if isType(hostConfig.Type, clusterdeployment.ETCD) {
+	if isType(hostConfig.Type, api.ETCD) {
 		if !t.ccfg.EtcdCluster.External {
 			cleanupEtcd(t)
 		} else {
@@ -232,7 +232,7 @@ func (t *cleanupClusterTask) Run(r runner.Runner, hostConfig *clusterdeployment.
 	return nil
 }
 
-func getAllIps(nodes []*clusterdeployment.HostConfig) []string {
+func getAllIps(nodes []*api.HostConfig) []string {
 	var ips []string
 
 	for _, node := range nodes {
@@ -243,18 +243,18 @@ func getAllIps(nodes []*clusterdeployment.HostConfig) []string {
 }
 
 type removeWorkersTask struct {
-	ccfg       *clusterdeployment.ClusterConfig
+	ccfg       *api.ClusterConfig
 	r          runner.Runner
-	hostConfig *clusterdeployment.HostConfig
+	hostConfig *api.HostConfig
 }
 
 func (t *removeWorkersTask) Name() string {
 	return "removeWorkersTask"
 }
 
-func getFirstMaster(nodes []*clusterdeployment.HostConfig) string {
+func getFirstMaster(nodes []*api.HostConfig) string {
 	for _, node := range nodes {
-		if isType(node.Type, clusterdeployment.Master) {
+		if isType(node.Type, api.Master) {
 			return node.Address
 		}
 	}
@@ -273,13 +273,13 @@ func runRemoveWorker(t *removeWorkersTask, worker string) {
 
 func removeWorkers(t *removeWorkersTask) {
 	for _, node := range t.ccfg.Nodes {
-		if isType(node.Type, clusterdeployment.Worker) {
+		if isType(node.Type, api.Worker) {
 			runRemoveWorker(t, node.Name)
 		}
 	}
 }
 
-func (t *removeWorkersTask) Run(r runner.Runner, hostConfig *clusterdeployment.HostConfig) error {
+func (t *removeWorkersTask) Run(r runner.Runner, hostConfig *api.HostConfig) error {
 	t.hostConfig, t.r = hostConfig, r
 
 	// TODO: remove system resource
@@ -291,18 +291,18 @@ func (t *removeWorkersTask) Run(r runner.Runner, hostConfig *clusterdeployment.H
 }
 
 type removeEtcdsTask struct {
-	ccfg       *clusterdeployment.ClusterConfig
+	ccfg       *api.ClusterConfig
 	r          runner.Runner
-	hostConfig *clusterdeployment.HostConfig
+	hostConfig *api.HostConfig
 }
 
 func (t *removeEtcdsTask) Name() string {
 	return "removeEtcdsTask"
 }
 
-func getFirstEtcd(nodes []*clusterdeployment.HostConfig) string {
+func getFirstEtcd(nodes []*api.HostConfig) string {
 	for _, node := range nodes {
-		if isType(node.Type, clusterdeployment.ETCD) {
+		if isType(node.Type, api.ETCD) {
 			return node.Address
 		}
 	}
@@ -346,7 +346,7 @@ func getEtcdMembers(t *removeEtcdsTask) []*etcdMember {
 }
 
 func getEtcdCertsOpts(savePath string) string {
-	certsPath := utils.DefaultK8SCertDir
+	certsPath := constants.DefaultK8SCertDir
 	if savePath != "" {
 		certsPath = savePath
 	}
@@ -354,7 +354,7 @@ func getEtcdCertsOpts(savePath string) string {
 		certsPath, certsPath, certsPath)
 }
 
-func (t *removeEtcdsTask) Run(r runner.Runner, hostConfig *clusterdeployment.HostConfig) error {
+func (t *removeEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfig) error {
 	t.hostConfig, t.r = hostConfig, r
 
 	for _, member := range getEtcdMembers(t) {
@@ -372,7 +372,7 @@ func (t *removeEtcdsTask) Run(r runner.Runner, hostConfig *clusterdeployment.Hos
 	return nil
 }
 
-func execRemoveWorkersTask(conf *clusterdeployment.ClusterConfig, node string) {
+func execRemoveWorkersTask(conf *api.ClusterConfig, node string) {
 	taskRemoveWorkers := task.NewTaskInstance(
 		&removeWorkersTask{
 			ccfg: conf,
@@ -389,7 +389,7 @@ func execRemoveWorkersTask(conf *clusterdeployment.ClusterConfig, node string) {
 	}
 }
 
-func execRemoveEtcdsTask(conf *clusterdeployment.ClusterConfig, node string) {
+func execRemoveEtcdsTask(conf *api.ClusterConfig, node string) {
 	taskRemoveEtcds := task.NewTaskInstance(
 		&removeEtcdsTask{
 			ccfg: conf,
@@ -406,7 +406,7 @@ func execRemoveEtcdsTask(conf *clusterdeployment.ClusterConfig, node string) {
 	}
 }
 
-func Init(conf *clusterdeployment.ClusterConfig) error {
+func Init(conf *api.ClusterConfig) error {
 	osfuncs = &originFuncs{}
 
 	// remove workers from master

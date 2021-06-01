@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 )
 
@@ -25,7 +25,7 @@ var (
 )
 
 type CopyCaCertificatesTask struct {
-	Cluster *clusterdeployment.ClusterConfig
+	Cluster *api.ClusterConfig
 }
 
 func (ct *CopyCaCertificatesTask) Name() string {
@@ -34,7 +34,7 @@ func (ct *CopyCaCertificatesTask) Name() string {
 
 func checkCaExists(cluster string) bool {
 	for _, cert := range CommonCaCerts {
-		_, err := os.Lstat(filepath.Join(clusterdeployment.GetCertificateStorePath(cluster), cert))
+		_, err := os.Lstat(filepath.Join(api.GetCertificateStorePath(cluster), cert))
 		if os.IsNotExist(err) {
 			return false
 		}
@@ -42,7 +42,7 @@ func checkCaExists(cluster string) bool {
 	return true
 }
 
-func (ct *CopyCaCertificatesTask) Run(r runner.Runner, hcf *clusterdeployment.HostConfig) error {
+func (ct *CopyCaCertificatesTask) Run(r runner.Runner, hcf *api.HostConfig) error {
 	if !checkCaExists(ct.Cluster.Name) {
 		return fmt.Errorf("[certs] cannot find ca certificates")
 	}
@@ -51,5 +51,5 @@ func (ct *CopyCaCertificatesTask) Run(r runner.Runner, hcf *clusterdeployment.Ho
 		return err
 	}
 
-	return r.Copy(clusterdeployment.GetCertificateStorePath(ct.Cluster.Name), ct.Cluster.Certificate.SavePath)
+	return r.Copy(api.GetCertificateStorePath(ct.Cluster.Name), ct.Cluster.Certificate.SavePath)
 }

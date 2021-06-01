@@ -26,13 +26,14 @@ import (
 
 	"gopkg.in/yaml.v1"
 
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/api"
+	"gitee.com/openeuler/eggo/pkg/constants"
 	"gitee.com/openeuler/eggo/pkg/utils"
 	"github.com/sirupsen/logrus"
 )
 
 var (
-	masterPackages = map[string]*clusterdeployment.Packages{
+	masterPackages = map[string]*api.Packages{
 		"kubernetes-master": {
 			Type: "repo",
 		},
@@ -47,7 +48,7 @@ var (
 		},
 	}
 
-	masterExports = []*clusterdeployment.OpenPorts{
+	masterExports = []*api.OpenPorts{
 		// kube-apiserver
 		{
 			Port:     6443,
@@ -65,7 +66,7 @@ var (
 		},
 	}
 
-	nodePackages = map[string]*clusterdeployment.Packages{
+	nodePackages = map[string]*api.Packages{
 		"kubernetes-node": {
 			Type: "repo",
 		},
@@ -83,7 +84,7 @@ var (
 		},
 	}
 
-	nodeExports = []*clusterdeployment.OpenPorts{
+	nodeExports = []*api.OpenPorts{
 		// kubelet
 		{
 			Port:     10250,
@@ -96,13 +97,13 @@ var (
 		},
 	}
 
-	etcdPackages = map[string]*clusterdeployment.Packages{
+	etcdPackages = map[string]*api.Packages{
 		"etcd": {
 			Type: "repo",
 		},
 	}
 
-	etcdExports = []*clusterdeployment.OpenPorts{
+	etcdExports = []*api.OpenPorts{
 		// etcd api
 		{
 			Port:     2379,
@@ -120,7 +121,7 @@ var (
 		},
 	}
 
-	loadbalancePackages = map[string]*clusterdeployment.Packages{
+	loadbalancePackages = map[string]*api.Packages{
 		"nginx": {
 			Type: "repo",
 		},
@@ -146,28 +147,28 @@ type HostConfig struct {
 }
 
 type deployConfig struct {
-	ClusterID         string                                 `yaml:"cluster-id"`
-	Username          string                                 `yaml:"username"`
-	Password          string                                 `yaml:"password"`
-	Masters           []*HostConfig                          `yaml:"masters"`
-	Nodes             []*HostConfig                          `yaml:"nodes"`
-	Etcds             []*HostConfig                          `yaml:"etcds"`
-	LoadBalances      []*HostConfig                          `yaml:"loadbalances"`
-	ConfigDir         string                                 `yaml:"config-dir"`
-	CertificateDir    string                                 `yaml:"certificate-dir"`
-	ExternalCA        bool                                   `yaml:"external-ca"`
-	ExternalCAPath    string                                 `yaml:"external-ca-path"`
-	Service           clusterdeployment.ServiceClusterConfig `yaml:"service"`
-	NetWork           clusterdeployment.NetworkConfig        `yaml:"network"`
-	ApiServerEndpoint string                                 `yaml:"apiserver-endpoint"`
-	ApiServerCertSans clusterdeployment.Sans                 `yaml:"apiserver-cert-sans"`
-	ApiServerTimeout  string                                 `yaml:"apiserver-timeout"`
-	EtcdExternal      bool                                   `yaml:"etcd-external"`
-	EtcdToken         string                                 `yaml:"etcd-token"`
-	EtcdDataDir       string                                 `yaml:"etcd-data-dir"`
-	ConfigExtraArgs   []*ConfigExtraArgs                     `yaml:"config-extra-args"`
-	PackageSrc        clusterdeployment.PackageSrcConfig     `yaml:"package-src"`
-	Packages          map[string][]*Package                  `yaml:"pacakges"` // key: master, node, etcd, loadbalance
+	ClusterID         string                   `yaml:"cluster-id"`
+	Username          string                   `yaml:"username"`
+	Password          string                   `yaml:"password"`
+	Masters           []*HostConfig            `yaml:"masters"`
+	Nodes             []*HostConfig            `yaml:"nodes"`
+	Etcds             []*HostConfig            `yaml:"etcds"`
+	LoadBalances      []*HostConfig            `yaml:"loadbalances"`
+	ConfigDir         string                   `yaml:"config-dir"`
+	CertificateDir    string                   `yaml:"certificate-dir"`
+	ExternalCA        bool                     `yaml:"external-ca"`
+	ExternalCAPath    string                   `yaml:"external-ca-path"`
+	Service           api.ServiceClusterConfig `yaml:"service"`
+	NetWork           api.NetworkConfig        `yaml:"network"`
+	ApiServerEndpoint string                   `yaml:"apiserver-endpoint"`
+	ApiServerCertSans api.Sans                 `yaml:"apiserver-cert-sans"`
+	ApiServerTimeout  string                   `yaml:"apiserver-timeout"`
+	EtcdExternal      bool                     `yaml:"etcd-external"`
+	EtcdToken         string                   `yaml:"etcd-token"`
+	EtcdDataDir       string                   `yaml:"etcd-data-dir"`
+	ConfigExtraArgs   []*ConfigExtraArgs       `yaml:"config-extra-args"`
+	PackageSrc        api.PackageSrcConfig     `yaml:"package-src"`
+	Packages          map[string][]*Package    `yaml:"pacakges"` // key: master, node, etcd, loadbalance
 }
 
 func getEggoDir() string {
@@ -202,47 +203,48 @@ func loadDeployConfig(file string) (*deployConfig, error) {
 	return conf, nil
 }
 
-func getDefaultClusterdeploymentConfig() *clusterdeployment.ClusterConfig {
-	return &clusterdeployment.ClusterConfig{
+func getDefaultClusterdeploymentConfig() *api.ClusterConfig {
+	return &api.ClusterConfig{
 		Name:      "k8s-cluster",
-		ConfigDir: utils.DefaultK8SRootDir,
-		Certificate: clusterdeployment.CertificateConfig{
-			SavePath: utils.DefaultK8SCertDir,
+		ConfigDir: constants.DefaultK8SRootDir,
+		Certificate: api.CertificateConfig{
+			SavePath: constants.DefaultK8SCertDir,
 		},
-		ServiceCluster: clusterdeployment.ServiceClusterConfig{
+		ServiceCluster: api.ServiceClusterConfig{
 			CIDR:    "10.244.0.0/16",
 			DNSAddr: "10.32.0.10",
 			Gateway: "10.244.0.1",
 		},
-		Network: clusterdeployment.NetworkConfig{
+		Network: api.NetworkConfig{
 			PodCIDR:    "10.244.64.0/16",
 			PluginArgs: make(map[string]string),
 		},
-		LocalEndpoint: clusterdeployment.APIEndpoint{
+		LocalEndpoint: api.APIEndpoint{
 			AdvertiseAddress: "127.0.0.1",
 			BindPort:         6443,
 		},
-		ControlPlane: clusterdeployment.ControlPlaneConfig{
-			ApiConf: &clusterdeployment.ApiServer{
+		ControlPlane: api.ControlPlaneConfig{
+			ApiConf: &api.ApiServer{
 				Timeout: "120s",
 			},
 		},
-		PackageSrc: &clusterdeployment.PackageSrcConfig{
+		PackageSrc: &api.PackageSrcConfig{
 			Type:   "tar.gz",
 			ArmSrc: "./pacakges-arm.tar.gz",
 			X86Src: "./packages-x86.tar.gz",
 		},
-		EtcdCluster: clusterdeployment.EtcdClusterConfig{
+		EtcdCluster: api.EtcdClusterConfig{
 			Token:    "etcd-cluster",
 			DataDir:  "/var/lib/datadir",
-			CertsDir: utils.DefaultK8SCertDir,
+			CertsDir: constants.DefaultK8SCertDir,
 			External: false,
 		},
+		DeployDriver: "binary",
 	}
 }
 
 func createCommonHostConfig(userHostconfig *HostConfig, defaultName string, username string,
-	password string) *clusterdeployment.HostConfig {
+	password string) *api.HostConfig {
 	arch, name, port := "amd64", defaultName, 22
 	if userHostconfig.Arch != "" {
 		arch = userHostconfig.Arch
@@ -254,7 +256,7 @@ func createCommonHostConfig(userHostconfig *HostConfig, defaultName string, user
 		port = userHostconfig.Port
 	}
 
-	hostconfig := &clusterdeployment.HostConfig{
+	hostconfig := &api.HostConfig{
 		Arch:     arch,
 		Name:     name,
 		Address:  userHostconfig.Ip,
@@ -266,7 +268,7 @@ func createCommonHostConfig(userHostconfig *HostConfig, defaultName string, user
 	return hostconfig
 }
 
-func portExist(openPorts []*clusterdeployment.OpenPorts, port *clusterdeployment.OpenPorts) bool {
+func portExist(openPorts []*api.OpenPorts, port *api.OpenPorts) bool {
 	for _, p := range openPorts {
 		if p.Protocol == port.Protocol && p.Port == port.Port {
 			return true
@@ -275,10 +277,10 @@ func portExist(openPorts []*clusterdeployment.OpenPorts, port *clusterdeployment
 	return false
 }
 
-func addPackagesAndExports(hostconfig *clusterdeployment.HostConfig, pkgs map[string]*clusterdeployment.Packages,
-	openPorts []*clusterdeployment.OpenPorts) {
+func addPackagesAndExports(hostconfig *api.HostConfig, pkgs map[string]*api.Packages,
+	openPorts []*api.OpenPorts) {
 	if hostconfig.Packages == nil {
-		hostconfig.Packages = make(map[string]clusterdeployment.Packages)
+		hostconfig.Packages = make(map[string]api.Packages)
 	}
 
 	for name, pkg := range pkgs {
@@ -293,12 +295,12 @@ func addPackagesAndExports(hostconfig *clusterdeployment.HostConfig, pkgs map[st
 	}
 }
 
-func addUserPackages(hostconfig *clusterdeployment.HostConfig, pkgs []*Package) {
+func addUserPackages(hostconfig *api.HostConfig, pkgs []*Package) {
 	if hostconfig.Packages == nil {
-		hostconfig.Packages = make(map[string]clusterdeployment.Packages)
+		hostconfig.Packages = make(map[string]api.Packages)
 	}
 	for _, pkg := range pkgs {
-		hostconfig.Packages[pkg.Name] = clusterdeployment.Packages{
+		hostconfig.Packages[pkg.Name] = api.Packages{
 			Type: pkg.Type,
 			Dst:  pkg.Dst,
 		}
@@ -330,14 +332,14 @@ func getPortFromEndPoint(endpoint string) int {
 	return port
 }
 
-func fillHostConfig(ccfg *clusterdeployment.ClusterConfig, conf *deployConfig) {
-	var hostconfig *clusterdeployment.HostConfig
+func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
+	var hostconfig *api.HostConfig
 	var exist bool
-	cache := make(map[string]*clusterdeployment.HostConfig)
+	cache := make(map[string]*api.HostConfig)
 
 	for i, master := range conf.Masters {
 		hostconfig = createCommonHostConfig(master, "k8s-master-"+strconv.Itoa(i), conf.Username, conf.Password)
-		hostconfig.Type |= clusterdeployment.Master
+		hostconfig.Type |= api.Master
 		addPackagesAndExports(hostconfig, masterPackages, masterExports)
 		addUserPackages(hostconfig, conf.Packages["master"])
 		cache[hostconfig.Address] = hostconfig
@@ -349,7 +351,7 @@ func fillHostConfig(ccfg *clusterdeployment.ClusterConfig, conf *deployConfig) {
 			hostconfig = createCommonHostConfig(node, "k8s-node-"+strconv.Itoa(i), conf.Username,
 				conf.Password)
 		}
-		hostconfig.Type |= clusterdeployment.Worker
+		hostconfig.Type |= api.Worker
 		addPackagesAndExports(hostconfig, nodePackages, nodeExports)
 		addUserPackages(hostconfig, conf.Packages["node"])
 		cache[hostconfig.Address] = hostconfig
@@ -365,7 +367,7 @@ func fillHostConfig(ccfg *clusterdeployment.ClusterConfig, conf *deployConfig) {
 		if !exist {
 			hostconfig = createCommonHostConfig(etcd, "etcd-"+strconv.Itoa(i), conf.Username, conf.Password)
 		}
-		hostconfig.Type |= clusterdeployment.ETCD
+		hostconfig.Type |= api.ETCD
 		addPackagesAndExports(hostconfig, etcdPackages, etcdExports)
 		addUserPackages(hostconfig, conf.Packages["etcd"])
 		cache[hostconfig.Address] = hostconfig
@@ -377,9 +379,9 @@ func fillHostConfig(ccfg *clusterdeployment.ClusterConfig, conf *deployConfig) {
 			hostconfig = createCommonHostConfig(lb, "k8s-loadbalance-"+strconv.Itoa(i), conf.Username,
 				conf.Password)
 		}
-		hostconfig.Type |= clusterdeployment.LoadBalance
+		hostconfig.Type |= api.LoadBalance
 
-		addPackagesAndExports(hostconfig, loadbalancePackages, []*clusterdeployment.OpenPorts{
+		addPackagesAndExports(hostconfig, loadbalancePackages, []*api.OpenPorts{
 			{
 				Port:     getPortFromEndPoint(conf.ApiServerEndpoint),
 				Protocol: "tcp",
@@ -431,7 +433,7 @@ func setStrArray(config []string, userConfig []string) {
 	}
 }
 
-func toClusterdeploymentConfig(conf *deployConfig) *clusterdeployment.ClusterConfig {
+func toClusterdeploymentConfig(conf *deployConfig) *api.ClusterConfig {
 	ccfg := getDefaultClusterdeploymentConfig()
 
 	setIfStrConfigNotEmpty(&ccfg.Name, conf.ClusterID)
@@ -451,6 +453,11 @@ func toClusterdeploymentConfig(conf *deployConfig) *clusterdeployment.ClusterCon
 	setStrArray(ccfg.ControlPlane.ApiConf.CertSans.IPs, conf.ApiServerCertSans.IPs)
 	setIfStrConfigNotEmpty(&ccfg.ControlPlane.ApiConf.Timeout, conf.ApiServerTimeout)
 	ccfg.EtcdCluster.External = conf.EtcdExternal
+	for _, node := range ccfg.Nodes {
+		if (node.Type & api.ETCD) != 0 {
+			ccfg.EtcdCluster.Nodes = append(ccfg.EtcdCluster.Nodes, node)
+		}
+	}
 	setIfStrConfigNotEmpty(&ccfg.EtcdCluster.Token, conf.EtcdToken)
 	setIfStrConfigNotEmpty(&ccfg.EtcdCluster.DataDir, conf.EtcdDataDir)
 	setIfStrConfigNotEmpty(&ccfg.PackageSrc.Type, conf.PackageSrc.Type)
@@ -497,26 +504,26 @@ func createDeployConfigTemplate(file string) error {
 				Arch: "amd64",
 			},
 		},
-		ConfigDir:      utils.DefaultK8SRootDir,
-		CertificateDir: utils.DefaultK8SCertDir,
+		ConfigDir:      constants.DefaultK8SRootDir,
+		CertificateDir: constants.DefaultK8SCertDir,
 		ExternalCA:     false,
 		ExternalCAPath: "/opt/externalca",
-		Service: clusterdeployment.ServiceClusterConfig{
+		Service: api.ServiceClusterConfig{
 			CIDR:    "10.244.0.0/16",
 			DNSAddr: "10.32.0.10",
 			Gateway: "10.244.0.1",
 		},
-		NetWork: clusterdeployment.NetworkConfig{
+		NetWork: api.NetworkConfig{
 			PodCIDR:    "10.244.64.0/16",
 			PluginArgs: make(map[string]string),
 		},
 		ApiServerEndpoint: "https://192.168.0.11:6443",
-		ApiServerCertSans: clusterdeployment.Sans{},
+		ApiServerCertSans: api.Sans{},
 		ApiServerTimeout:  "120s",
 		EtcdExternal:      false,
 		EtcdToken:         "etcd-cluster",
 		EtcdDataDir:       "/var/lib/datadir",
-		PackageSrc: clusterdeployment.PackageSrcConfig{
+		PackageSrc: api.PackageSrcConfig{
 			Type:   "tar.gz",
 			ArmSrc: "./pacakges-arm.tar.gz",
 			X86Src: "./packages-x86.tar.gz",

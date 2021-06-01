@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/commontools"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/controlplane"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
@@ -57,7 +57,7 @@ func (gt *GetTokenTask) Name() string {
 	return "GetTokenTask"
 }
 
-func (gt *GetTokenTask) Run(r runner.Runner, hcg *clusterdeployment.HostConfig) error {
+func (gt *GetTokenTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 	token, err := commontools.GetBootstrapToken(r, gt.tokenStr)
 	if err != nil {
 		return err
@@ -74,14 +74,14 @@ func getTokenString() string {
 }
 
 type BootstrapTask struct {
-	ccfg *clusterdeployment.ClusterConfig
+	ccfg *api.ClusterConfig
 }
 
 func (it *BootstrapTask) Name() string {
 	return "BootstrapTask"
 }
 
-func (it *BootstrapTask) Run(r runner.Runner, hcg *clusterdeployment.HostConfig) error {
+func (it *BootstrapTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 	logrus.Info("do join new worker...\n")
 
 	// check worker dependences
@@ -109,7 +109,7 @@ func (it *BootstrapTask) Run(r runner.Runner, hcg *clusterdeployment.HostConfig)
 	return nil
 }
 
-func check(r runner.Runner, ccfg *clusterdeployment.ClusterConfig) error {
+func check(r runner.Runner, ccfg *api.ClusterConfig) error {
 	if ccfg.ControlPlane.KubeletConf == nil {
 		return fmt.Errorf("empty kubeletconf")
 	}
@@ -136,7 +136,7 @@ func check(r runner.Runner, ccfg *clusterdeployment.ClusterConfig) error {
 	return nil
 }
 
-func prepareISulad(r runner.Runner, ccfg *clusterdeployment.ClusterConfig) error {
+func prepareISulad(r runner.Runner, ccfg *api.ClusterConfig) error {
 	if !utils.IsISulad(ccfg.ControlPlane.KubeletConf.Runtime) {
 		return nil
 	}
@@ -167,7 +167,7 @@ func prepareISulad(r runner.Runner, ccfg *clusterdeployment.ClusterConfig) error
 	return nil
 }
 
-func prepareConfig(r runner.Runner, ccfg *clusterdeployment.ClusterConfig, hcf *clusterdeployment.HostConfig) error {
+func prepareConfig(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig) error {
 	if err := genConfig(r, ccfg, hcf, getTokenString()); err != nil {
 		logrus.Errorf("generate config failed: %v", err)
 		return err
@@ -176,7 +176,7 @@ func prepareConfig(r runner.Runner, ccfg *clusterdeployment.ClusterConfig, hcf *
 	return nil
 }
 
-func genConfig(r runner.Runner, ccfg *clusterdeployment.ClusterConfig, hcf *clusterdeployment.HostConfig, token string) error {
+func genConfig(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig, token string) error {
 	apiEndpoint, err := getEndpoint(ccfg)
 	if err != nil {
 		logrus.Errorf("get api server endpoint failed: %v", err)
@@ -196,12 +196,12 @@ func genConfig(r runner.Runner, ccfg *clusterdeployment.ClusterConfig, hcf *clus
 	return nil
 }
 
-func getEndpoint(ccfg *clusterdeployment.ClusterConfig) (string, error) {
+func getEndpoint(ccfg *api.ClusterConfig) (string, error) {
 	host, sport, err := net.SplitHostPort(ccfg.ControlPlane.Endpoint)
 	if err != nil {
 		// TODO: get ready master by master status list
 		for _, n := range ccfg.Nodes {
-			if n.Type&clusterdeployment.Master != 0 {
+			if n.Type&api.Master != 0 {
 				host = n.Address
 				sport = strconv.Itoa(int(ccfg.LocalEndpoint.BindPort))
 				break
@@ -218,7 +218,7 @@ func getEndpoint(ccfg *clusterdeployment.ClusterConfig) (string, error) {
 	return endpoint.GetEndpoint(host, port)
 }
 
-func genKubeletBootstrapAndConfig(r runner.Runner, ccfg *clusterdeployment.ClusterConfig, token, apiEndpoint string) error {
+func genKubeletBootstrapAndConfig(r runner.Runner, ccfg *api.ClusterConfig, token, apiEndpoint string) error {
 	if err := genKubeletBootstrap(r, ccfg, token, apiEndpoint); err != nil {
 		logrus.Errorf("generate kubelet bootstrap failed: %v", err)
 		return err
@@ -232,7 +232,7 @@ func genKubeletBootstrapAndConfig(r runner.Runner, ccfg *clusterdeployment.Clust
 	return nil
 }
 
-func genKubeletBootstrap(r runner.Runner, ccfg *clusterdeployment.ClusterConfig, token, apiEndpoint string) error {
+func genKubeletBootstrap(r runner.Runner, ccfg *api.ClusterConfig, token, apiEndpoint string) error {
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"cd /etc/kubernetes/ && ")
 	sb.WriteString("kubectl config set-cluster kubernetes" +
@@ -261,7 +261,7 @@ func genKubeletBootstrap(r runner.Runner, ccfg *clusterdeployment.ClusterConfig,
 	return nil
 }
 
-func genKubeletConfig(r runner.Runner, ccfg *clusterdeployment.ClusterConfig) error {
+func genKubeletConfig(r runner.Runner, ccfg *api.ClusterConfig) error {
 	kubeletConfig := `apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 authentication:
@@ -288,7 +288,7 @@ runtimeRequestTimeout: "15m"
 	return nil
 }
 
-func genProxyCertAndConfig(r runner.Runner, ccfg *clusterdeployment.ClusterConfig, apiEndpoint string) (err error) {
+func genProxyCertAndConfig(r runner.Runner, ccfg *api.ClusterConfig, apiEndpoint string) (err error) {
 	rootPath := ccfg.GetConfigDir()
 	certPath := ccfg.GetCertDir()
 
@@ -335,7 +335,7 @@ func genProxyCert(savePath string, cg certs.CertGenerator) error {
 	return cg.CreateCertAndKey(caCertPath, caKeyPath, proxyConfig, savePath, KubeProxyKubeConfigName)
 }
 
-func genProxyConfig(r runner.Runner, ccfg *clusterdeployment.ClusterConfig) error {
+func genProxyConfig(r runner.Runner, ccfg *api.ClusterConfig) error {
 	proxyConfig := `kind: KubeProxyConfiguration
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 clientConnection:
@@ -353,7 +353,7 @@ mode: "iptables"
 	return nil
 }
 
-func JoinNode(config *clusterdeployment.ClusterConfig, masters, workers []string) error {
+func JoinNode(config *api.ClusterConfig, masters, workers []string) error {
 	if config == nil {
 		return fmt.Errorf("empty cluster config")
 	}
@@ -407,13 +407,13 @@ func JoinNode(config *clusterdeployment.ClusterConfig, masters, workers []string
 	return nil
 }
 
-func Init(config *clusterdeployment.ClusterConfig) error {
+func Init(config *api.ClusterConfig) error {
 	masters, workers := []string{}, []string{}
 	for _, node := range config.Nodes {
-		if node.Type&clusterdeployment.Master != 0 {
+		if node.Type&api.Master != 0 {
 			masters = append(masters, node.Address)
 		}
-		if node.Type&clusterdeployment.Worker != 0 {
+		if node.Type&api.Worker != 0 {
 			workers = append(workers, node.Address)
 		}
 	}

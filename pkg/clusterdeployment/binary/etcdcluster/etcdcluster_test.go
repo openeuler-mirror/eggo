@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 )
 
@@ -33,8 +33,8 @@ func TestDeployEtcd(t *testing.T) {
 	}
 	defer os.RemoveAll(certsTempDir)
 
-	clusterdeployment.EggoHomePath = certsTempDir
-	certsTempDir = clusterdeployment.GetCertificateStorePath("test-cluster")
+	api.EggoHomePath = certsTempDir
+	certsTempDir = api.GetCertificateStorePath("test-cluster")
 
 	configsTempDir, err := ioutil.TempDir("", "etcd-test-src-configs-")
 	if err != nil {
@@ -48,7 +48,7 @@ func TestDeployEtcd(t *testing.T) {
 	}
 	defer os.RemoveAll(dstTempDir)
 
-	nodes := []*clusterdeployment.HostConfig{
+	nodes := []*api.HostConfig{
 		{
 			Arch:    "amd64",
 			Name:    "node0",
@@ -60,10 +60,10 @@ func TestDeployEtcd(t *testing.T) {
 			Address: "192.168.0.2",
 		},
 	}
-	conf := &clusterdeployment.ClusterConfig{
+	conf := &api.ClusterConfig{
 		Name:        "test-cluster",
-		Certificate: clusterdeployment.CertificateConfig{SavePath: dstTempDir},
-		EtcdCluster: clusterdeployment.EtcdClusterConfig{
+		Certificate: api.CertificateConfig{SavePath: dstTempDir},
+		EtcdCluster: api.EtcdClusterConfig{
 			Token:     "etcd-cluster",
 			Nodes:     nodes,
 			CertsDir:  certsTempDir,
@@ -81,7 +81,7 @@ func TestDeployEtcd(t *testing.T) {
 		t.Fatalf("generate etcd certs failed: %v", err)
 	}
 
-	if err := copyCertsAndConfigs(conf, r, &clusterdeployment.HostConfig{
+	if err := copyCertsAndConfigs(conf, r, &api.HostConfig{
 		Arch:    "aarch64",
 		Name:    "node0",
 		Address: "192.168.0.1",

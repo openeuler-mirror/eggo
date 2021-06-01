@@ -18,7 +18,7 @@ package infrastructure
 import (
 	"testing"
 
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"github.com/sirupsen/logrus"
 )
@@ -52,7 +52,7 @@ func (m *MockRunner) Close() {
 }
 
 func addNodes() {
-	hcfs := []*clusterdeployment.HostConfig{
+	hcfs := []*api.HostConfig{
 		{
 			Arch:     "x86_64",
 			Name:     "master",
@@ -60,14 +60,14 @@ func addNodes() {
 			Port:     22,
 			UserName: "root",
 			Password: "123456",
-			Type:     clusterdeployment.Master,
-			OpenPorts: []*clusterdeployment.OpenPorts{
+			Type:     api.Master,
+			OpenPorts: []*api.OpenPorts{
 				{
 					Port:     1234,
 					Protocol: "tcp",
 				},
 			},
-			Packages: map[string]clusterdeployment.Packages{
+			Packages: map[string]api.Packages{
 				"openssl": {
 					Type: "repo",
 				},
@@ -89,14 +89,14 @@ func addNodes() {
 			Port:     22,
 			UserName: "root",
 			Password: "123456",
-			Type:     clusterdeployment.Worker,
-			OpenPorts: []*clusterdeployment.OpenPorts{
+			Type:     api.Worker,
+			OpenPorts: []*api.OpenPorts{
 				{
 					Port:     2345,
 					Protocol: "udp",
 				},
 			},
-			Packages: map[string]clusterdeployment.Packages{
+			Packages: map[string]api.Packages{
 				"hostname": {
 					Type: "repo",
 				},
@@ -121,8 +121,8 @@ func addNodes() {
 			Port:     22,
 			UserName: "root",
 			Password: "123456",
-			Type:     clusterdeployment.Master | clusterdeployment.ETCD,
-			OpenPorts: []*clusterdeployment.OpenPorts{
+			Type:     api.Master | api.ETCD,
+			OpenPorts: []*api.OpenPorts{
 				{
 					Port:     12345,
 					Protocol: "tcp",
@@ -132,7 +132,7 @@ func addNodes() {
 					Protocol: "udp",
 				},
 			},
-			Packages: map[string]clusterdeployment.Packages{
+			Packages: map[string]api.Packages{
 				"ipcalc": {
 					Type: "repo",
 				},
@@ -164,8 +164,8 @@ func addNodes() {
 func TestPrepareInfrastructure(t *testing.T) {
 	addNodes()
 
-	ccfg := &clusterdeployment.ClusterConfig{
-		PackageSrc: &clusterdeployment.PackageSrcConfig{
+	ccfg := &api.ClusterConfig{
+		PackageSrc: &api.PackageSrcConfig{
 			Type:   "tar.gz",
 			ArmSrc: "/etc/eggo/arm.tar.gz",
 			X86Src: "/etc/eggo/x86.tar.gz",

@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/utils"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
@@ -33,14 +33,14 @@ import (
 var itask *task.TaskInstance
 
 type InfrastructureTask struct {
-	ccfg *clusterdeployment.ClusterConfig
+	ccfg *api.ClusterConfig
 }
 
 func (it *InfrastructureTask) Name() string {
 	return "InfrastructureTask"
 }
 
-func (it *InfrastructureTask) Run(r runner.Runner, hcg *clusterdeployment.HostConfig) error {
+func (it *InfrastructureTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 	if hcg == nil {
 		return fmt.Errorf("empty host config")
 	}
@@ -69,7 +69,7 @@ func (it *InfrastructureTask) Run(r runner.Runner, hcg *clusterdeployment.HostCo
 	return nil
 }
 
-func check(hcg *clusterdeployment.HostConfig) error {
+func check(hcg *api.HostConfig) error {
 	if !utils.IsX86Arch(hcg.Arch) && !utils.IsArmArch(hcg.Arch) {
 		return fmt.Errorf("invalid Arch %s for %s", hcg.Arch, hcg.Address)
 	}
@@ -81,7 +81,7 @@ func check(hcg *clusterdeployment.HostConfig) error {
 	return nil
 }
 
-func setHostname(r runner.Runner, hcg *clusterdeployment.HostConfig) error {
+func setHostname(r runner.Runner, hcg *api.HostConfig) error {
 	if hcg.Name == "" {
 		logrus.Warnf("no name for %s", hcg.Address)
 		return nil
@@ -95,21 +95,21 @@ func setHostname(r runner.Runner, hcg *clusterdeployment.HostConfig) error {
 	return nil
 }
 
-func addFirewallPort(r runner.Runner, hcg *clusterdeployment.HostConfig) error {
+func addFirewallPort(r runner.Runner, hcg *api.HostConfig) error {
 	var ports []string
 	masterPorts := []string{"6443/tcp", "10252/tcp", "10251/tcp"}
 	workPorts := []string{"10250/tcp", "10256/tcp"}
 	etcdPosts := []string{"2379-2381/tcp"}
 
-	if hcg.Type&clusterdeployment.Master != 0 {
+	if hcg.Type&api.Master != 0 {
 		ports = append(ports, masterPorts...)
 	}
 
-	if hcg.Type&clusterdeployment.Worker != 0 {
+	if hcg.Type&api.Worker != 0 {
 		ports = append(ports, workPorts...)
 	}
 
-	if hcg.Type&clusterdeployment.ETCD != 0 {
+	if hcg.Type&api.ETCD != 0 {
 		ports = append(ports, etcdPosts...)
 	}
 
@@ -140,7 +140,7 @@ func exposePorts(r runner.Runner, ports ...string) error {
 	return nil
 }
 
-func Init(config *clusterdeployment.ClusterConfig) error {
+func Init(config *api.ClusterConfig) error {
 	if config == nil {
 		return fmt.Errorf("empty cluster config")
 	}

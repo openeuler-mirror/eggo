@@ -13,13 +13,13 @@
  * Description: cluster deploy types
  ******************************************************************************/
 
-package clusterdeployment
+package api
 
 import (
 	"path/filepath"
 	"time"
 
-	"gitee.com/openeuler/eggo/pkg/utils"
+	"gitee.com/openeuler/eggo/pkg/constants"
 	"github.com/sirupsen/logrus"
 )
 
@@ -178,33 +178,33 @@ func (c ClusterConfig) GetConfigDir() string {
 	if c.ConfigDir != "" {
 		if !filepath.IsAbs(c.ConfigDir) {
 			logrus.Debugf("ignore invalid config dir: %s, just use default", c.ConfigDir)
-			return utils.DefaultK8SRootDir
+			return constants.DefaultK8SRootDir
 		}
 		return filepath.Clean(c.ConfigDir)
 	}
-	return utils.DefaultK8SRootDir
+	return constants.DefaultK8SRootDir
 }
 
 func (c ClusterConfig) GetCertDir() string {
 	if c.Certificate.SavePath != "" {
 		if !filepath.IsAbs(c.Certificate.SavePath) {
 			logrus.Debugf("ignore invalid certificate save path: %s, just use default", c.Certificate.SavePath)
-			return utils.DefaultK8SCertDir
+			return constants.DefaultK8SCertDir
 		}
 		return filepath.Clean(c.Certificate.SavePath)
 	}
-	return utils.DefaultK8SCertDir
+	return constants.DefaultK8SCertDir
 }
 
 func (c ClusterConfig) GetManifestDir() string {
 	if c.ConfigDir != "" {
 		if !filepath.IsAbs(c.ConfigDir) {
 			logrus.Debugf("ignore invalid config dir: %s, just use default", c.ConfigDir)
-			return utils.DefaultK8SManifestsDir
+			return constants.DefaultK8SManifestsDir
 		}
 		return filepath.Clean(c.ConfigDir)
 	}
-	return utils.DefaultK8SManifestsDir
+	return constants.DefaultK8SManifestsDir
 }
 
 type ClusterDeploymentAPI interface {

@@ -1,4 +1,4 @@
-package utils
+package constants
 
 const (
 	DefaultK8SRootDir            = "/etc/kubernetes"

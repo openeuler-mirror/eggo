@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/task"
 	"github.com/pkg/errors"
@@ -37,7 +37,7 @@ var manager = &NodeManager{
 	nodes: make(map[string]*Node, 2),
 }
 
-func RegisterNode(hcf *clusterdeployment.HostConfig, r runner.Runner) error {
+func RegisterNode(hcf *api.HostConfig, r runner.Runner) error {
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
 	if hcf == nil {
