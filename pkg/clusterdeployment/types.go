@@ -24,9 +24,10 @@ import (
 )
 
 const (
-	Master = 0x1
-	Worker = 0x2
-	ETCD   = 0x4
+	Master      = 0x1
+	Worker      = 0x2
+	ETCD        = 0x4
+	LoadBalance = 0x8
 )
 
 type OpenPorts struct {

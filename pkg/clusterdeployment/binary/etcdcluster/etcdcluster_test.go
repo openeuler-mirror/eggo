@@ -31,11 +31,10 @@ func TestDeployEtcd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create eggo config dir failed: %v", err)
 	}
-	clusterdeployment.EggoHomePath = certsTempDir
-
-	certsTempDir = clusterdeployment.GetCertificateStorePath("test-cluster")
-
 	defer os.RemoveAll(certsTempDir)
+
+	clusterdeployment.EggoHomePath = certsTempDir
+	certsTempDir = clusterdeployment.GetCertificateStorePath("test-cluster")
 
 	configsTempDir, err := ioutil.TempDir("", "etcd-test-src-configs-")
 	if err != nil {

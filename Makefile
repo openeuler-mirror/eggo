@@ -3,10 +3,12 @@ SOURCE_DATE_EPOCH ?= $(if $(shell date +%s),$(shell date +%s),$(error "date fail
 VERSION := $(shell cat ./VERSION)
 ARCH := $(shell arch)
 
-test: test-unit
-
-.PHONY: test-unit
-test-unit:
+.PHONY: eggo
+eggo:
+	@echo "build eggo starting..."
+	@go build -buildmode=pie -ldflags '-extldflags=-static' -ldflags '-linkmode=external -extldflags=-Wl,-z,relro,-z,now' -o eggo ./cmd/
+	@echo "build eggo done!"
+test:
 	@echo "Unit tests starting..."
 	@go test -race -cover -count=1 -timeout=300s  ./...
 	@echo "Units test done!"
@@ -14,3 +16,5 @@ test-unit:
 .PHONY: clean
 clean:
 	@echo "clean...."
+	@rm -f eggo
+	@echo "clean done!"
