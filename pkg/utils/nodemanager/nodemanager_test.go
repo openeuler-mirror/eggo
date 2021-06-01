@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/task"
 	"github.com/sirupsen/logrus"
@@ -53,7 +53,7 @@ type MockTask struct {
 	name string
 }
 
-func (m *MockTask) Run(r runner.Runner, hcf *clusterdeployment.HostConfig) error {
+func (m *MockTask) Run(r runner.Runner, hcf *api.HostConfig) error {
 	rand.Seed(time.Now().UnixNano())
 
 	err := r.Copy("/home/data", "/data")
@@ -78,23 +78,23 @@ func (m *MockTask) Name() string {
 }
 
 func addNodes() {
-	hcf1 := &clusterdeployment.HostConfig{
+	hcf1 := &api.HostConfig{
 		Arch:     "x86_64",
 		Name:     "master",
 		Address:  "192.168.0.1",
 		Port:     22,
 		UserName: "root",
 		Password: "123456",
-		Type:     clusterdeployment.Master,
+		Type:     api.Master,
 	}
-	hcf2 := &clusterdeployment.HostConfig{
+	hcf2 := &api.HostConfig{
 		Arch:     "arm64",
 		Name:     "work",
 		Address:  "192.168.0.2",
 		Port:     22,
 		UserName: "root",
 		Password: "123456",
-		Type:     clusterdeployment.Worker,
+		Type:     api.Worker,
 	}
 	r := &MockRunner{}
 	RegisterNode(hcf1, r)

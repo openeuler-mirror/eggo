@@ -19,7 +19,7 @@ import (
 	"strings"
 	"sync"
 
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 )
 
@@ -30,7 +30,7 @@ const (
 
 type TaskRun interface {
 	Name() string
-	Run(runner.Runner, *clusterdeployment.HostConfig) error
+	Run(runner.Runner, *api.HostConfig) error
 }
 
 type Task interface {

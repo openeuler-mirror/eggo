@@ -17,25 +17,32 @@ package clusterdeployment
 
 import (
 	"testing"
+
+	"gitee.com/openeuler/eggo/pkg/api"
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment/manager"
 )
 
 func TestRegisterControlPlaneDriver(t *testing.T) {
-	err := RegisterClusterDeploymentDriver("test", nil)
+	err := manager.RegisterClusterDeploymentDriver("test", nil)
 	if err == nil {
 		t.Fatal("expect err is not nil")
 	}
 }
 
-func MyCreator(*ClusterConfig) (ClusterDeploymentAPI, error) {
+func MyCreator(*api.ClusterConfig) (api.ClusterDeploymentAPI, error) {
 	return nil, nil
 }
 func TestGetControlPlaneDriver(t *testing.T) {
-	err := RegisterClusterDeploymentDriver("test", MyCreator)
+	err := manager.RegisterClusterDeploymentDriver("test", MyCreator)
 	if err != nil {
 		t.Fatal("expect err is nil")
 	}
 
-	if _, err = GetClusterDeploymentDriver("test"); err != nil {
+	if _, err = manager.GetClusterDeploymentDriver("test"); err != nil {
+		t.Fatal("expect err is not nil")
+	}
+
+	if _, err = manager.GetClusterDeploymentDriver("binary"); err != nil {
 		t.Fatal("expect err is not nil")
 	}
 }

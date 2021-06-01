@@ -20,10 +20,11 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
 )
 
-func cleanup(ccfg *clusterdeployment.ClusterConfig) error {
+func cleanup(ccfg *api.ClusterConfig) error {
 	// TODO: cleanup config of cluster on disk
 	return clusterdeployment.RemoveCluster(ccfg)
 }

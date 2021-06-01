@@ -7,7 +7,7 @@ import (
 	"text/template"
 	"time"
 
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	kkutil "github.com/kubesphere/kubekey/pkg/util"
 	"github.com/lithammer/dedent"
@@ -34,7 +34,7 @@ stringData:
 `
 )
 
-func CreateBootstrapToken(r runner.Runner, bconf *clusterdeployment.BootstrapTokenConfig) error {
+func CreateBootstrapToken(r runner.Runner, bconf *api.BootstrapTokenConfig) error {
 	var sb strings.Builder
 	var usages []string
 	now := time.Now()
@@ -75,7 +75,7 @@ func CreateBootstrapToken(r runner.Runner, bconf *clusterdeployment.BootstrapTok
 	return nil
 }
 
-func CreateBootstrapTokensForCluster(r runner.Runner, ccfg *clusterdeployment.ClusterConfig) error {
+func CreateBootstrapTokensForCluster(r runner.Runner, ccfg *api.ClusterConfig) error {
 	for _, token := range ccfg.BootStrapTokens {
 		if err := CreateBootstrapToken(r, token); err != nil {
 			logrus.Errorf("create bootstrap token failed: %v", err)
@@ -90,7 +90,7 @@ func GetBootstrapToken(r runner.Runner, tokenStr string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	bconf := &clusterdeployment.BootstrapTokenConfig{
+	bconf := &api.BootstrapTokenConfig{
 		Description:     "bootstrap token for eggo",
 		ID:              id,
 		Secret:          secret,

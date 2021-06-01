@@ -21,7 +21,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/api"
 )
 
 const (
@@ -76,26 +76,26 @@ func (r *fakeRunner) Close() {
 func TestCleanupCluster(t *testing.T) {
 	osfuncs = &fakeFuncs{}
 
-	pkg := clusterdeployment.Packages{
+	pkg := api.Packages{
 		Type: "repo",
 		Dst:  "/tmp/test",
 	}
-	nodes := []*clusterdeployment.HostConfig{
+	nodes := []*api.HostConfig{
 		{
 			Arch:    "amd64",
 			Name:    "node0",
 			Address: "192.168.0.1",
 			Type:    0x07,
-			Packages: map[string]clusterdeployment.Packages{
+			Packages: map[string]api.Packages{
 				"test-pkg": pkg,
 				"etcd":     pkg,
 				"coredns":  pkg,
 			},
 		},
 	}
-	conf := &clusterdeployment.ClusterConfig{
+	conf := &api.ClusterConfig{
 		ConfigDir:   "/tmp/test",
-		Certificate: clusterdeployment.CertificateConfig{SavePath: "/tmp/test/pki"},
+		Certificate: api.CertificateConfig{SavePath: "/tmp/test/pki"},
 		Nodes:       nodes,
 	}
 
@@ -108,7 +108,7 @@ func TestCleanupCluster(t *testing.T) {
 func TestRemoveWorkers(t *testing.T) {
 	osfuncs = &fakeFuncs{}
 
-	nodes := []*clusterdeployment.HostConfig{
+	nodes := []*api.HostConfig{
 		{
 			Arch:    "amd64",
 			Name:    "node0",
@@ -116,8 +116,8 @@ func TestRemoveWorkers(t *testing.T) {
 			Type:    0x07,
 		},
 	}
-	conf := &clusterdeployment.ClusterConfig{
-		Certificate: clusterdeployment.CertificateConfig{SavePath: "/tmp/test"},
+	conf := &api.ClusterConfig{
+		Certificate: api.CertificateConfig{SavePath: "/tmp/test"},
 		Nodes:       nodes,
 	}
 
@@ -130,7 +130,7 @@ func TestRemoveWorkers(t *testing.T) {
 func TestRemoveEtcds(t *testing.T) {
 	osfuncs = &fakeFuncs{}
 
-	nodes := []*clusterdeployment.HostConfig{
+	nodes := []*api.HostConfig{
 		{
 			Arch:    "amd64",
 			Name:    "node0",
@@ -138,8 +138,8 @@ func TestRemoveEtcds(t *testing.T) {
 			Type:    0x07,
 		},
 	}
-	conf := &clusterdeployment.ClusterConfig{
-		Certificate: clusterdeployment.CertificateConfig{SavePath: "/tmp/test"},
+	conf := &api.ClusterConfig{
+		Certificate: api.CertificateConfig{SavePath: "/tmp/test"},
 		Nodes:       nodes,
 	}
 

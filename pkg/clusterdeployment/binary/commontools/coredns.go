@@ -7,7 +7,7 @@ import (
 	"text/template"
 	"time"
 
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/utils/endpoint"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
@@ -103,7 +103,7 @@ subsets:
 )
 
 type CorednsServerSetupTask struct {
-	Cluster *clusterdeployment.ClusterConfig
+	Cluster *api.ClusterConfig
 	NodeIPs []string
 }
 
@@ -111,7 +111,7 @@ func (cs *CorednsServerSetupTask) Name() string {
 	return "CorednsSetupTask"
 }
 
-func (cs *CorednsServerSetupTask) Run(r runner.Runner, hcf *clusterdeployment.HostConfig) error {
+func (cs *CorednsServerSetupTask) Run(r runner.Runner, hcf *api.HostConfig) error {
 	if err := cs.createCoreServerTemplate(r); err != nil {
 		return nil
 	}
@@ -169,7 +169,7 @@ func (cs *CorednsServerSetupTask) createCoreEndpointTemplate(r runner.Runner, ip
 }
 
 type CorednsSetupTask struct {
-	Cluster *clusterdeployment.ClusterConfig
+	Cluster *api.ClusterConfig
 }
 
 func (ct *CorednsSetupTask) Name() string {
@@ -229,7 +229,7 @@ func (ct *CorednsSetupTask) createServiceTemplate(r runner.Runner) error {
 	return nil
 }
 
-func (ct *CorednsSetupTask) Run(r runner.Runner, hcf *clusterdeployment.HostConfig) error {
+func (ct *CorednsSetupTask) Run(r runner.Runner, hcf *api.HostConfig) error {
 	if err := ct.createCoreConfigTemplate(r); err != nil {
 		return err
 	}
@@ -239,8 +239,20 @@ func (ct *CorednsSetupTask) Run(r runner.Runner, hcf *clusterdeployment.HostConf
 	return nil
 }
 
-func SetUpCoredns(cluster *clusterdeployment.ClusterConfig) error {
-	masterIPs := clusterdeployment.GetMasterIPList(cluster)
+func getMasterIPList(c *api.ClusterConfig) []string {
+	var masters []string
+	for _, n := range c.Nodes {
+		if (n.Type & api.Master) != 0 {
+			masters = append(masters, n.Address)
+			continue
+		}
+	}
+
+	return masters
+}
+
+func SetUpCoredns(cluster *api.ClusterConfig) error {
+	masterIPs := getMasterIPList(cluster)
 	if len(masterIPs) == 0 {
 		return fmt.Errorf("no master host found, can not setup coredns service")
 	}

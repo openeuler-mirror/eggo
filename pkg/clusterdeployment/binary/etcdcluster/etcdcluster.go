@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/task"
@@ -44,19 +44,19 @@ type copyInfo struct {
 }
 
 type EtcdDeployEtcdsTask struct {
-	ccfg *clusterdeployment.ClusterConfig
+	ccfg *api.ClusterConfig
 }
 
 func (t *EtcdDeployEtcdsTask) Name() string {
 	return "EtcdDeployEtcdsTask"
 }
 
-func getDstEtcdCertsDir(ccfg *clusterdeployment.ClusterConfig) string {
+func getDstEtcdCertsDir(ccfg *api.ClusterConfig) string {
 	return filepath.Join(ccfg.GetCertDir(), "etcd")
 }
 
-func copyCertsAndConfigs(ccfg *clusterdeployment.ClusterConfig, r runner.Runner,
-	hostConfig *clusterdeployment.HostConfig, tempConfigsDir string, dstConf string,
+func copyCertsAndConfigs(ccfg *api.ClusterConfig, r runner.Runner,
+	hostConfig *api.HostConfig, tempConfigsDir string, dstConf string,
 	dstService string) error {
 	var copyInfos []*copyInfo
 
@@ -113,7 +113,7 @@ func copyCertsAndConfigs(ccfg *clusterdeployment.ClusterConfig, r runner.Runner,
 	return nil
 }
 
-func (t *EtcdDeployEtcdsTask) Run(r runner.Runner, hostConfig *clusterdeployment.HostConfig) error {
+func (t *EtcdDeployEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfig) error {
 	if hostConfig == nil {
 		return fmt.Errorf("empty host config")
 	}
@@ -131,7 +131,7 @@ func (t *EtcdDeployEtcdsTask) Run(r runner.Runner, hostConfig *clusterdeployment
 }
 
 type EtcdPostDeployEtcdsTask struct {
-	ccfg *clusterdeployment.ClusterConfig
+	ccfg *api.ClusterConfig
 }
 
 func (t *EtcdPostDeployEtcdsTask) Name() string {
@@ -146,7 +146,7 @@ func healthcheck(r runner.Runner, etcdCertsDir string, ip string) error {
 	return nil
 }
 
-func (t *EtcdPostDeployEtcdsTask) Run(r runner.Runner, hostConfig *clusterdeployment.HostConfig) error {
+func (t *EtcdPostDeployEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfig) error {
 	if hostConfig == nil {
 		return fmt.Errorf("empty host config")
 	}
@@ -158,7 +158,7 @@ func (t *EtcdPostDeployEtcdsTask) Run(r runner.Runner, hostConfig *clusterdeploy
 	return nil
 }
 
-func prepareEtcdConfigs(ccfg *clusterdeployment.ClusterConfig, tempConfigsDir string) error {
+func prepareEtcdConfigs(ccfg *api.ClusterConfig, tempConfigsDir string) error {
 	var peerAddresses string
 	dataDir := ccfg.EtcdCluster.DataDir
 	if dataDir == "" {
@@ -203,7 +203,7 @@ func prepareEtcdConfigs(ccfg *clusterdeployment.ClusterConfig, tempConfigsDir st
 	return nil
 }
 
-func getAllIps(nodes []*clusterdeployment.HostConfig) []string {
+func getAllIps(nodes []*api.HostConfig) []string {
 	var ips []string
 
 	for _, node := range nodes {
@@ -213,8 +213,9 @@ func getAllIps(nodes []*clusterdeployment.HostConfig) []string {
 	return ips
 }
 
-func Init(conf *clusterdeployment.ClusterConfig) error {
-	tempDir, err := ioutil.TempDir("", "etcd-conf-")
+func Init(conf *api.ClusterConfig) error {
+	var err error
+	tempDir, err = ioutil.TempDir("", "etcd-conf-")
 	if err != nil {
 		return fmt.Errorf("create tempdir for etcd config failed: %v", err)
 	}

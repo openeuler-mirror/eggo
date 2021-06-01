@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"testing"
 
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"github.com/sirupsen/logrus"
@@ -49,22 +49,22 @@ func (m *MockRunner) Close() {
 
 func TestInit(t *testing.T) {
 	lr := &runner.LocalRunner{}
-	conf := &clusterdeployment.ClusterConfig{
+	conf := &api.ClusterConfig{
 		Name: "test-cluster",
-		LocalEndpoint: clusterdeployment.APIEndpoint{
+		LocalEndpoint: api.APIEndpoint{
 			AdvertiseAddress: "192.168.1.1",
 			BindPort:         6443,
 		},
-		ControlPlane: clusterdeployment.ControlPlaneConfig{
+		ControlPlane: api.ControlPlaneConfig{
 			Endpoint: "eggo.com:6443",
-			KubeletConf: &clusterdeployment.Kubelet{
+			KubeletConf: &api.Kubelet{
 				DnsVip:          "10.32.0.10",
 				DnsDomain:       "cluster.local",
 				CniBinDir:       "/opt/cni/bin",
 				RuntimeEndpoint: "unix:///var/run/isulad.sock",
 			},
 		},
-		Nodes: []*clusterdeployment.HostConfig{
+		Nodes: []*api.HostConfig{
 			{
 				Arch:     "x86_64",
 				Name:     "master0",
@@ -72,7 +72,7 @@ func TestInit(t *testing.T) {
 				Port:     22,
 				UserName: "root",
 				Password: "123456",
-				Type:     clusterdeployment.Master,
+				Type:     api.Master,
 			},
 			{
 				Arch:     "arm64",
@@ -81,7 +81,7 @@ func TestInit(t *testing.T) {
 				Port:     22,
 				UserName: "root",
 				Password: "123456",
-				Type:     clusterdeployment.Master | clusterdeployment.Worker,
+				Type:     api.Master | api.Worker,
 			},
 		},
 	}
@@ -94,8 +94,8 @@ func TestInit(t *testing.T) {
 		nodemanager.UnRegisterAllNodes()
 	}()
 
-	clusterdeployment.EggoHomePath = "/tmp/eggo"
-	lr.RunCommand(fmt.Sprintf("sudo mkdir -p -m 0777 %s/%s/pki", clusterdeployment.EggoHomePath, conf.Name))
+	api.EggoHomePath = "/tmp/eggo"
+	lr.RunCommand(fmt.Sprintf("sudo mkdir -p -m 0777 %s/%s/pki", api.EggoHomePath, conf.Name))
 	if err := Init(conf); err != nil {
 		t.Fatalf("do bootstrap init failed: %v", err)
 	}

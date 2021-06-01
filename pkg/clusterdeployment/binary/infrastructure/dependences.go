@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"strings"
 
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/utils"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"github.com/sirupsen/logrus"
@@ -32,10 +32,10 @@ const (
 )
 
 type Dependences interface {
-	Check(r runner.Runner, hcg *clusterdeployment.HostConfig) error
-	DoInstall(r runner.Runner, hcg *clusterdeployment.HostConfig) error
+	Check(r runner.Runner, hcg *api.HostConfig) error
+	DoInstall(r runner.Runner, hcg *api.HostConfig) error
 	PostInstall(r runner.Runner) error
-	Remove(r runner.Runner, hcg *clusterdeployment.HostConfig) error
+	Remove(r runner.Runner, hcg *api.HostConfig) error
 }
 
 type InstallByRepo struct {
@@ -49,7 +49,7 @@ func NewInstallByRepo(dependences []string) Dependences {
 	}
 }
 
-func (ir *InstallByRepo) Check(r runner.Runner, hcg *clusterdeployment.HostConfig) error {
+func (ir *InstallByRepo) Check(r runner.Runner, hcg *api.HostConfig) error {
 	prmanager, err := r.RunCommand(prmT)
 	if err != nil {
 		return fmt.Errorf("get repo package manager failed: %v", err)
@@ -63,7 +63,7 @@ func (ir *InstallByRepo) Check(r runner.Runner, hcg *clusterdeployment.HostConfi
 	return nil
 }
 
-func (ir *InstallByRepo) DoInstall(r runner.Runner, hcg *clusterdeployment.HostConfig) error {
+func (ir *InstallByRepo) DoInstall(r runner.Runner, hcg *api.HostConfig) error {
 	join := strings.Join(ir.dependences, " ")
 	_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"%s install -y %s\"", ir.prmanager, join))
 	if err != nil {
@@ -77,7 +77,7 @@ func (ir *InstallByRepo) PostInstall(r runner.Runner) error {
 	return nil
 }
 
-func (ir *InstallByRepo) Remove(r runner.Runner, hcg *clusterdeployment.HostConfig) error {
+func (ir *InstallByRepo) Remove(r runner.Runner, hcg *api.HostConfig) error {
 	join := strings.Join(ir.dependences, " ")
 	_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"%s remove -y %s\"", ir.prmanager, join))
 	if err != nil {
@@ -89,12 +89,12 @@ func (ir *InstallByRepo) Remove(r runner.Runner, hcg *clusterdeployment.HostConf
 
 type InstallByLocal struct {
 	pmanager string
-	pcfg     *clusterdeployment.PackageSrcConfig
+	pcfg     *api.PackageSrcConfig
 	pkg      []string
 	binary   map[string]string
 }
 
-func NewInstallByLocal(pcfg *clusterdeployment.PackageSrcConfig, pkg []string, binary map[string]string) Dependences {
+func NewInstallByLocal(pcfg *api.PackageSrcConfig, pkg []string, binary map[string]string) Dependences {
 	return &InstallByLocal{
 		pcfg:   pcfg,
 		pkg:    pkg,
@@ -102,7 +102,7 @@ func NewInstallByLocal(pcfg *clusterdeployment.PackageSrcConfig, pkg []string, b
 	}
 }
 
-func (il *InstallByLocal) Check(r runner.Runner, hcg *clusterdeployment.HostConfig) error {
+func (il *InstallByLocal) Check(r runner.Runner, hcg *api.HostConfig) error {
 	pmanager, err := r.RunCommand(pmT)
 	if err != nil {
 		return fmt.Errorf("get package manager failed: %v", err)
@@ -122,7 +122,7 @@ func (il *InstallByLocal) Check(r runner.Runner, hcg *clusterdeployment.HostConf
 	return nil
 }
 
-func (il *InstallByLocal) DoInstall(r runner.Runner, hcg *clusterdeployment.HostConfig) error {
+func (il *InstallByLocal) DoInstall(r runner.Runner, hcg *api.HostConfig) error {
 	if err := installByLocalPkg(r, hcg, il.pmanager, il.pkg); err != nil {
 		return err
 	}
@@ -142,7 +142,7 @@ func (il *InstallByLocal) PostInstall(r runner.Runner) error {
 	return nil
 }
 
-func (il *InstallByLocal) Remove(r runner.Runner, hcg *clusterdeployment.HostConfig) error {
+func (il *InstallByLocal) Remove(r runner.Runner, hcg *api.HostConfig) error {
 	if err := removePkg(r, hcg, il.pmanager, il.pkg); err != nil {
 		return err
 	}
@@ -154,7 +154,7 @@ func (il *InstallByLocal) Remove(r runner.Runner, hcg *clusterdeployment.HostCon
 	return nil
 }
 
-func copySource(r runner.Runner, hcg *clusterdeployment.HostConfig, pcfg *clusterdeployment.PackageSrcConfig) error {
+func copySource(r runner.Runner, hcg *api.HostConfig, pcfg *api.PackageSrcConfig) error {
 	var src string
 	if utils.IsX86Arch(hcg.Arch) {
 		src = pcfg.X86Src
@@ -186,7 +186,7 @@ func copySource(r runner.Runner, hcg *clusterdeployment.HostConfig, pcfg *cluste
 	return nil
 }
 
-func installByLocalPkg(r runner.Runner, hcg *clusterdeployment.HostConfig, pmanager string, pkg []string) error {
+func installByLocalPkg(r runner.Runner, hcg *api.HostConfig, pmanager string, pkg []string) error {
 	if len(pkg) == 0 {
 		return nil
 	}
@@ -212,7 +212,7 @@ func installByLocalPkg(r runner.Runner, hcg *clusterdeployment.HostConfig, pmana
 	return nil
 }
 
-func removePkg(r runner.Runner, hcg *clusterdeployment.HostConfig, pmanager string, pkg []string) error {
+func removePkg(r runner.Runner, hcg *api.HostConfig, pmanager string, pkg []string) error {
 	if len(pkg) == 0 {
 		return nil
 	}
@@ -236,7 +236,7 @@ func removePkg(r runner.Runner, hcg *clusterdeployment.HostConfig, pmanager stri
 	return nil
 }
 
-func installByLocalBinary(r runner.Runner, hcg *clusterdeployment.HostConfig, binary map[string]string) error {
+func installByLocalBinary(r runner.Runner, hcg *api.HostConfig, binary map[string]string) error {
 	if len(binary) == 0 {
 		return nil
 	}
@@ -255,7 +255,7 @@ func installByLocalBinary(r runner.Runner, hcg *clusterdeployment.HostConfig, bi
 	return nil
 }
 
-func removeBinary(r runner.Runner, hcg *clusterdeployment.HostConfig, binary map[string]string) error {
+func removeBinary(r runner.Runner, hcg *api.HostConfig, binary map[string]string) error {
 	if len(binary) == 0 {
 		return nil
 	}
@@ -274,7 +274,7 @@ func removeBinary(r runner.Runner, hcg *clusterdeployment.HostConfig, binary map
 	return nil
 }
 
-func separateDependences(hcg *clusterdeployment.HostConfig) ([]string, []string, map[string]string, error) {
+func separateDependences(hcg *api.HostConfig) ([]string, []string, map[string]string, error) {
 	// repo, pkg, binary
 	repo := []string{}
 	pkg := []string{}
@@ -299,7 +299,7 @@ func separateDependences(hcg *clusterdeployment.HostConfig) ([]string, []string,
 	return repo, pkg, binary, nil
 }
 
-func doInstallDependences(r runner.Runner, hcg *clusterdeployment.HostConfig, dp Dependences) error {
+func doInstallDependences(r runner.Runner, hcg *api.HostConfig, dp Dependences) error {
 	if err := dp.Check(r, hcg); err != nil {
 		logrus.Errorf("check failed: %v", err)
 		return err
@@ -318,7 +318,7 @@ func doInstallDependences(r runner.Runner, hcg *clusterdeployment.HostConfig, dp
 	return nil
 }
 
-func InstallDependences(r runner.Runner, hcg *clusterdeployment.HostConfig, pcfg *clusterdeployment.PackageSrcConfig) error {
+func InstallDependences(r runner.Runner, hcg *api.HostConfig, pcfg *api.PackageSrcConfig) error {
 	repo, pkg, binary, err := separateDependences(hcg)
 	if err != nil {
 		return err
@@ -341,7 +341,7 @@ func InstallDependences(r runner.Runner, hcg *clusterdeployment.HostConfig, pcfg
 	return nil
 }
 
-func doRemoveDependences(r runner.Runner, hcg *clusterdeployment.HostConfig, dp Dependences) error {
+func doRemoveDependences(r runner.Runner, hcg *api.HostConfig, dp Dependences) error {
 	if err := dp.Check(r, hcg); err != nil {
 		logrus.Errorf("check failed: %v", err)
 		return err
@@ -355,7 +355,7 @@ func doRemoveDependences(r runner.Runner, hcg *clusterdeployment.HostConfig, dp 
 	return nil
 }
 
-func RemoveDependences(r runner.Runner, hcg *clusterdeployment.HostConfig) error {
+func RemoveDependences(r runner.Runner, hcg *api.HostConfig) error {
 	repo, pkg, binary, err := separateDependences(hcg)
 	if err != nil {
 		return err

@@ -23,10 +23,10 @@ import (
 	"strings"
 	"time"
 
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/commontools"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
-	"gitee.com/openeuler/eggo/pkg/utils"
+	"gitee.com/openeuler/eggo/pkg/constants"
 	"gitee.com/openeuler/eggo/pkg/utils/certs"
 	"gitee.com/openeuler/eggo/pkg/utils/endpoint"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
@@ -86,10 +86,10 @@ var (
 )
 
 type ControlPlaneTask struct {
-	ccfg *clusterdeployment.ClusterConfig
+	ccfg *api.ClusterConfig
 }
 
-func NewControlPlaneTask(ccf *clusterdeployment.ClusterConfig) *ControlPlaneTask {
+func NewControlPlaneTask(ccf *api.ClusterConfig) *ControlPlaneTask {
 	return &ControlPlaneTask{
 		ccfg: ccf,
 	}
@@ -99,7 +99,7 @@ func (ct *ControlPlaneTask) Name() string {
 	return "ControlplaneTask"
 }
 
-func (ct *ControlPlaneTask) Run(r runner.Runner, hcf *clusterdeployment.HostConfig) error {
+func (ct *ControlPlaneTask) Run(r runner.Runner, hcf *api.HostConfig) error {
 	if hcf == nil {
 		return fmt.Errorf("empty cluster config")
 	}
@@ -140,7 +140,7 @@ func check(r runner.Runner, savePath string) error {
 	return nil
 }
 
-func generateApiServerCertificate(savePath string, cg certs.CertGenerator, ccfg *clusterdeployment.ClusterConfig) error {
+func generateApiServerCertificate(savePath string, cg certs.CertGenerator, ccfg *api.ClusterConfig) error {
 	ips := []string{"0.0.0.0", "127.0.0.1"}
 	dnsnames := []string{"kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster", "kubernetes.default.svc.cluster.local"}
 
@@ -218,7 +218,7 @@ func generateSchedulerCertificate(savePath string, cg certs.CertGenerator) error
 	return cg.CreateCertAndKey(caCertPath, caKeyPath, controllerConfig, savePath, SchedulerKubeConfigName)
 }
 
-func generateCerts(savePath string, cg certs.CertGenerator, ccfg *clusterdeployment.ClusterConfig) (err error) {
+func generateCerts(savePath string, cg certs.CertGenerator, ccfg *api.ClusterConfig) (err error) {
 	// create certificate and keys
 
 	if err = generateApiServerCertificate(savePath, cg, ccfg); err != nil {
@@ -262,7 +262,7 @@ func prepareCAs(savePath string) error {
 	return nil
 }
 
-func generateKubeConfigs(rootPath, certPath string, cg certs.CertGenerator, ccfg *clusterdeployment.ClusterConfig) (err error) {
+func generateKubeConfigs(rootPath, certPath string, cg certs.CertGenerator, ccfg *api.ClusterConfig) (err error) {
 	// create temp certificates and keys for kubeconfigs
 	if err = generateAdminCertificate(certPath, cg); err != nil {
 		return
@@ -276,7 +276,7 @@ func generateKubeConfigs(rootPath, certPath string, cg certs.CertGenerator, ccfg
 		return
 	}
 
-	err = cg.CreateKubeConfig(rootPath, utils.KubeConfigFileNameAdmin, filepath.Join(certPath, "ca.crt"), "default-admin",
+	err = cg.CreateKubeConfig(rootPath, constants.KubeConfigFileNameAdmin, filepath.Join(certPath, "ca.crt"), "default-admin",
 		filepath.Join(certPath, "admin.key"), filepath.Join(certPath, "admin.crt"), apiEndpoint)
 	if err != nil {
 		return
@@ -285,7 +285,7 @@ func generateKubeConfigs(rootPath, certPath string, cg certs.CertGenerator, ccfg
 	if err = generateControllerManagerCertificate(certPath, cg); err != nil {
 		return
 	}
-	err = cg.CreateKubeConfig(rootPath, utils.KubeConfigFileNameController, filepath.Join(certPath, "ca.crt"), "default-controller-manager",
+	err = cg.CreateKubeConfig(rootPath, constants.KubeConfigFileNameController, filepath.Join(certPath, "ca.crt"), "default-controller-manager",
 		filepath.Join(certPath, "controller-manager.key"), filepath.Join(certPath, "controller-manager.crt"), localEndpoint)
 	if err != nil {
 		return
@@ -295,7 +295,7 @@ func generateKubeConfigs(rootPath, certPath string, cg certs.CertGenerator, ccfg
 		return
 	}
 
-	return cg.CreateKubeConfig(rootPath, utils.KubeConfigFileNameScheduler, filepath.Join(certPath, "ca.crt"), "default-scheduler",
+	return cg.CreateKubeConfig(rootPath, constants.KubeConfigFileNameScheduler, filepath.Join(certPath, "ca.crt"), "default-scheduler",
 		filepath.Join(certPath, "scheduler.key"), filepath.Join(certPath, "scheduler.crt"), localEndpoint)
 }
 
@@ -316,14 +316,14 @@ resources:
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	sb.WriteString("local ENCRYPTION_KEY=$(head -c 32 /dev/urandom | base64)")
 	encryBase64 := base64.StdEncoding.EncodeToString([]byte(encry))
-	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/%s", encryBase64, savePath, utils.EncryptionConfigName))
+	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/%s", encryBase64, savePath, constants.EncryptionConfigName))
 	sb.WriteString("\"")
 
 	_, err := r.RunCommand(sb.String())
 	return err
 }
 
-func generateCertsAndKubeConfigs(r runner.Runner, ccfg *clusterdeployment.ClusterConfig) (err error) {
+func generateCertsAndKubeConfigs(r runner.Runner, ccfg *api.ClusterConfig) (err error) {
 	rootPath := ccfg.GetConfigDir()
 	certPath := ccfg.GetCertDir()
 
@@ -346,7 +346,7 @@ func generateCertsAndKubeConfigs(r runner.Runner, ccfg *clusterdeployment.Cluste
 	return generateEncryption(r, rootPath)
 }
 
-func runKubernetesServices(r runner.Runner, ccfg *clusterdeployment.ClusterConfig, hcf *clusterdeployment.HostConfig) error {
+func runKubernetesServices(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig) error {
 	// set up api-server service
 	if err := commontools.SetupMasterServices(r, ccfg, hcf); err != nil {
 		return err
@@ -355,7 +355,7 @@ func runKubernetesServices(r runner.Runner, ccfg *clusterdeployment.ClusterConfi
 	return nil
 }
 
-func JoinMaterNode(conf *clusterdeployment.ClusterConfig, masterNode *clusterdeployment.HostConfig) error {
+func JoinMaterNode(conf *api.ClusterConfig, masterNode *api.HostConfig) error {
 	joinMasterTasks := []task.Task{
 		task.NewTaskInstance(
 			&commontools.CopyCaCertificatesTask{
@@ -382,17 +382,17 @@ func JoinMaterNode(conf *clusterdeployment.ClusterConfig, masterNode *clusterdep
 	return nil
 }
 
-func Init(conf *clusterdeployment.ClusterConfig) error {
-	var firstMaster *clusterdeployment.HostConfig
+func Init(conf *api.ClusterConfig) error {
+	var firstMaster *api.HostConfig
 	for _, node := range conf.Nodes {
-		if node.Type&clusterdeployment.Master != 0 {
+		if node.Type&api.Master != 0 {
 			firstMaster = node
 			break
 		}
 	}
 
 	// generate ca certificates in eggo
-	err := prepareCAs(clusterdeployment.GetCertificateStorePath(conf.Name))
+	err := prepareCAs(api.GetCertificateStorePath(conf.Name))
 	if err != nil {
 		logrus.Errorf("[certs] create ca certificates failed: %v", err)
 		return err
@@ -421,7 +421,7 @@ func Init(conf *clusterdeployment.ClusterConfig) error {
 }
 
 type PostControlPlaneTask struct {
-	cluster *clusterdeployment.ClusterConfig
+	cluster *api.ClusterConfig
 }
 
 func (ct *PostControlPlaneTask) Name() string {
@@ -457,7 +457,7 @@ func (ct *PostControlPlaneTask) doAdminRole(r runner.Runner) error {
 	return nil
 }
 
-func (ct *PostControlPlaneTask) Run(r runner.Runner, hcf *clusterdeployment.HostConfig) error {
+func (ct *PostControlPlaneTask) Run(r runner.Runner, hcf *api.HostConfig) error {
 	// we should setup some resources for new cluster
 
 	// 1. create admin rolebinding

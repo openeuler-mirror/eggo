@@ -21,7 +21,7 @@ import (
 )
 
 func IsX86Arch(arch string) bool {
-	if strings.HasPrefix(arch, "x86") || strings.HasPrefix(arch, "X86") {
+	if strings.HasPrefix(arch, "x86") || strings.HasPrefix(arch, "X86") || strings.HasPrefix(arch, "amd64") {
 		return true
 	}
 

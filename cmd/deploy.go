@@ -20,10 +20,11 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
 )
 
-func deploy(ccfg *clusterdeployment.ClusterConfig) error {
+func deploy(ccfg *api.ClusterConfig) error {
 	// TODO: save or load config on disk
 	return clusterdeployment.CreateCluster(ccfg)
 }

@@ -21,7 +21,7 @@ import (
 	"os/exec"
 	"time"
 
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"gitee.com/openeuler/eggo/pkg/api"
 	kkv1alpha1 "github.com/kubesphere/kubekey/apis/kubekey/v1alpha1"
 	"github.com/kubesphere/kubekey/pkg/util/ssh"
 	"github.com/sirupsen/logrus"
@@ -78,7 +78,7 @@ func connect(host *kkv1alpha1.HostCfg) (ssh.Connection, error) {
 	return ssh.NewConnection(opts)
 }
 
-func HostConfigToKKCfg(hcfg *clusterdeployment.HostConfig) *kkv1alpha1.HostCfg {
+func HostConfigToKKCfg(hcfg *api.HostConfig) *kkv1alpha1.HostCfg {
 	return &kkv1alpha1.HostCfg{
 		User:           hcfg.UserName,
 		Port:           hcfg.Port,
@@ -89,7 +89,7 @@ func HostConfigToKKCfg(hcfg *clusterdeployment.HostConfig) *kkv1alpha1.HostCfg {
 	}
 }
 
-func NewSSHRunner(hcfg *clusterdeployment.HostConfig) (Runner, error) {
+func NewSSHRunner(hcfg *api.HostConfig) (Runner, error) {
 	host := HostConfigToKKCfg(hcfg)
 	conn, err := connect(host)
 	if err != nil {
