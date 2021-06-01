@@ -140,7 +140,7 @@ func exposePorts(r runner.Runner, ports ...string) error {
 	return nil
 }
 
-func PrepareInfrastructure(config *clusterdeployment.ClusterConfig) error {
+func Init(config *clusterdeployment.ClusterConfig) error {
 	if config == nil {
 		return fmt.Errorf("empty cluster config")
 	}

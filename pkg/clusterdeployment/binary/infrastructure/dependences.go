@@ -107,12 +107,14 @@ func (il *InstallByLocal) Check(r runner.Runner, hcg *clusterdeployment.HostConf
 	if err != nil {
 		return fmt.Errorf("get package manager failed: %v", err)
 	}
-
 	if pmanager == "" {
 		return fmt.Errorf("no package manager for %s", hcg.Address)
 	}
 	il.pmanager = pmanager
 
+	if il.pcfg == nil {
+		return fmt.Errorf("empty package source config")
+	}
 	if err := copySource(r, hcg, il.pcfg); err != nil {
 		return err
 	}
@@ -374,5 +376,17 @@ func RemoveDependences(r runner.Runner, hcg *clusterdeployment.HostConfig) error
 		}
 	}
 
+	return nil
+}
+
+func CheckDependences(r runner.Runner, softwares []string) error {
+	for _, s := range softwares {
+		_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"which %s\"", s))
+		if err != nil {
+			logrus.Errorf("check software: %s, failed: %v\n", s, err)
+			return err
+		}
+		logrus.Debugf("check software: %s success\n", s)
+	}
 	return nil
 }

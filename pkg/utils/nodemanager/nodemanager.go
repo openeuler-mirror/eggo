@@ -254,3 +254,53 @@ func WaitTasksOnNodeFinished(tasks []task.Task, node string, timeout time.Durati
 		}
 	}
 }
+
+func RunTasksOnNodes(tasks []task.Task, nodes []string) error {
+	manager.lock.RLock()
+	defer manager.lock.RUnlock()
+
+	for _, n := range nodes {
+		if err := RunTasksOnNode(tasks, n); err != nil {
+			logrus.Errorf("run tasks on node %s failed: %v", n, err)
+			return fmt.Errorf("run tasks on node %s failed: %v", n, err)
+		}
+	}
+
+	return nil
+}
+
+func checkTasksOnNodesFinished(tasks []task.Task, nodes []string) (bool, error) {
+	finished := true
+	var err error
+	for _, n := range nodes {
+		for _, t := range tasks {
+			label := t.GetLabel(n)
+			if label == "" {
+				return false, nil
+			}
+			if task.IsFailed(label) {
+				err = errors.Wrapf(err, "task: %s on node: %s failed: %v", t.Name(), n, label)
+				continue
+			}
+		}
+	}
+
+	return finished, err
+}
+
+func WaitTasksOnNodesFinished(tasks []task.Task, nodes []string, timeout time.Duration) error {
+	for {
+		select {
+		case <-time.After(timeout):
+			return fmt.Errorf("timeout for wait tasks finish on nodes: %s", nodes)
+		default:
+			f, err := checkTasksOnNodesFinished(tasks, nodes)
+			if err != nil {
+				return err
+			}
+			if f {
+				return nil
+			}
+		}
+	}
+}
