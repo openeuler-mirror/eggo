@@ -36,22 +36,23 @@ type OpenPorts struct {
 }
 
 type Packages struct {
+	Name string `json:"name"`
 	Type string `json:"type"` // repo, pkg, binary
 	Dst  string `json:"dstpath"`
 }
 
 type HostConfig struct {
-	Arch           string              `json:"arch"`
-	Name           string              `json:"name"`
-	Address        string              `json:"address"`
-	Port           int                 `json:"port"`
-	ExtraIPs       []string            `json:"extra-ips"`
-	OpenPorts      []*OpenPorts        `json:"open-ports"`
-	UserName       string              `json:"username"`
-	Password       string              `json:"password"`
-	PrivateKey     string              `json:"private-key"`
-	PrivateKeyPath string              `json:"private-key-path"`
-	Packages       map[string]Packages `json:"packages"`
+	Arch           string       `json:"arch"`
+	Name           string       `json:"name"`
+	Address        string       `json:"address"`
+	Port           int          `json:"port"`
+	ExtraIPs       []string     `json:"extra-ips"`
+	OpenPorts      []*OpenPorts `json:"open-ports"`
+	UserName       string       `json:"username"`
+	Password       string       `json:"password"`
+	PrivateKey     string       `json:"private-key"`
+	PrivateKeyPath string       `json:"private-key-path"`
+	Packages       []*Packages  `json:"packages"`
 
 	// 0x1 is master, 0x2 is worker, 0x4 is etcd
 	// 0x3 is master and worker

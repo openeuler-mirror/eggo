@@ -76,20 +76,28 @@ func (r *fakeRunner) Close() {
 func TestCleanupCluster(t *testing.T) {
 	osfuncs = &fakeFuncs{}
 
-	pkg := api.Packages{
-		Type: "repo",
-		Dst:  "/tmp/test",
-	}
 	nodes := []*api.HostConfig{
 		{
 			Arch:    "amd64",
 			Name:    "node0",
 			Address: "192.168.0.1",
 			Type:    0x07,
-			Packages: map[string]api.Packages{
-				"test-pkg": pkg,
-				"etcd":     pkg,
-				"coredns":  pkg,
+			Packages: []*api.Packages{
+				{
+					Name: "test-pkg",
+					Type: "repo",
+					Dst:  "",
+				},
+				{
+					Name: "etcd",
+					Type: "repo",
+					Dst:  "",
+				},
+				{
+					Name: "coredns",
+					Type: "repo",
+					Dst:  "",
+				},
 			},
 		},
 	}
