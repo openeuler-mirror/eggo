@@ -34,7 +34,6 @@ const (
 type Dependences interface {
 	Check(r runner.Runner, hcg *api.HostConfig) error
 	DoInstall(r runner.Runner, hcg *api.HostConfig) error
-	PostInstall(r runner.Runner) error
 	Remove(r runner.Runner, hcg *api.HostConfig) error
 }
 
@@ -55,7 +54,7 @@ func (ir *InstallByRepo) Check(r runner.Runner, hcg *api.HostConfig) error {
 		return fmt.Errorf("get repo package manager failed: %v", err)
 	}
 
-	if len(prmanager) == 0 {
+	if prmanager == "" {
 		return fmt.Errorf("no package repo manager for %s", hcg.Address)
 	}
 
@@ -70,10 +69,6 @@ func (ir *InstallByRepo) DoInstall(r runner.Runner, hcg *api.HostConfig) error {
 		return fmt.Errorf("install dependences by repo failed for %s: %v", hcg.Address, err)
 	}
 
-	return nil
-}
-
-func (ir *InstallByRepo) PostInstall(r runner.Runner) error {
 	return nil
 }
 
@@ -110,33 +105,27 @@ func (il *InstallByLocal) Check(r runner.Runner, hcg *api.HostConfig) error {
 	if pmanager == "" {
 		return fmt.Errorf("no package manager for %s", hcg.Address)
 	}
+
 	il.pmanager = pmanager
-
-	if il.pcfg == nil {
-		return fmt.Errorf("empty package source config")
-	}
-	if err := copySource(r, hcg, il.pcfg); err != nil {
-		return err
-	}
-
 	return nil
 }
 
-func (il *InstallByLocal) DoInstall(r runner.Runner, hcg *api.HostConfig) error {
-	if err := installByLocalPkg(r, hcg, il.pmanager, il.pkg); err != nil {
-		return err
+func (il *InstallByLocal) DoInstall(r runner.Runner, hcg *api.HostConfig) (err error) {
+	if err = copySource(r, hcg, il.pcfg); err != nil {
+		return
+	}
+	defer func() {
+		if _, e := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"rm -rf %s\"", tmpDir)); e != nil {
+			err = fmt.Errorf("%v. And remove dir failed: %v", err, e)
+		}
+	}()
+
+	if err = installByLocalPkg(r, hcg, il.pmanager, il.pkg); err != nil {
+		return
 	}
 
-	if err := installByLocalBinary(r, hcg, il.binary); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (il *InstallByLocal) PostInstall(r runner.Runner) error {
-	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"rm -rf %s\"", tmpDir)); err != nil {
-		return err
+	if err = installByLocalBinary(r, hcg, il.binary); err != nil {
+		return
 	}
 
 	return nil
@@ -155,6 +144,10 @@ func (il *InstallByLocal) Remove(r runner.Runner, hcg *api.HostConfig) error {
 }
 
 func copySource(r runner.Runner, hcg *api.HostConfig, pcfg *api.PackageSrcConfig) error {
+	if pcfg == nil {
+		return fmt.Errorf("empty package source config")
+	}
+
 	var src string
 	if utils.IsX86Arch(hcg.Arch) {
 		src = pcfg.X86Src
@@ -307,11 +300,6 @@ func doInstallDependences(r runner.Runner, hcg *api.HostConfig, dp Dependences) 
 
 	if err := dp.DoInstall(r, hcg); err != nil {
 		logrus.Errorf("do install failed: %v", err)
-		return err
-	}
-
-	if err := dp.PostInstall(r); err != nil {
-		logrus.Errorf("post install failed: %v", err)
 		return err
 	}
 
