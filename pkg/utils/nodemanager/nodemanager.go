@@ -17,13 +17,13 @@ package nodemanager
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/task"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -99,9 +99,9 @@ func checkFinished(t task.Task, nodes []string) (bool, error) {
 		if label == "" {
 			return false, nil
 		}
-		if task.IsFailed(label) {
-			err = errors.Wrapf(err, "task: %s failed: %v", t.Name(), label)
-			break
+		if !task.IsSuccess(label) {
+			logrus.Errorf("%s", label)
+			return true, fmt.Errorf("%s", label)
 		}
 	}
 
@@ -119,8 +119,10 @@ func WaitTaskOnNodesFinished(t task.Task, nodes []string, timeout time.Duration)
 				return err
 			}
 			if f {
+				logrus.Infof("run task: %s on all nodes: '%s' success", t.Name(), strings.Join(nodes, ", "))
 				return nil
 			}
+			time.Sleep(time.Millisecond * 50)
 		}
 	}
 }
@@ -136,8 +138,8 @@ func checkAllFinished(t task.Task) (bool, error) {
 			return false, nil
 		}
 		if task.IsFailed(label) {
-			err = errors.Wrapf(err, "task: %s failed: %v", t.Name(), label)
-			continue
+			logrus.Errorf("%s", label)
+			return true, fmt.Errorf("%s", label)
 		}
 	}
 
@@ -157,6 +159,7 @@ func WaitTaskOnAllFinished(t task.Task, timeout time.Duration) error {
 			if f {
 				return nil
 			}
+			time.Sleep(time.Millisecond * 50)
 		}
 	}
 }
@@ -230,8 +233,8 @@ func checkTasksFinished(tasks []task.Task, node string) (bool, error) {
 			return false, nil
 		}
 		if task.IsFailed(label) {
-			err = errors.Wrapf(err, "task: %s failed: %v", t.Name(), label)
-			continue
+			logrus.Errorf("%s", label)
+			return true, fmt.Errorf("%s", label)
 		}
 	}
 
@@ -251,6 +254,7 @@ func WaitTasksOnNodeFinished(tasks []task.Task, node string, timeout time.Durati
 			if f {
 				return nil
 			}
+			time.Sleep(time.Millisecond * 50)
 		}
 	}
 }
@@ -279,8 +283,8 @@ func checkTasksOnNodesFinished(tasks []task.Task, nodes []string) (bool, error) 
 				return false, nil
 			}
 			if task.IsFailed(label) {
-				err = errors.Wrapf(err, "task: %s on node: %s failed: %v", t.Name(), n, label)
-				continue
+				logrus.Errorf("%s", label)
+				return true, fmt.Errorf("%s", label)
 			}
 		}
 	}
@@ -301,6 +305,7 @@ func WaitTasksOnNodesFinished(tasks []task.Task, nodes []string, timeout time.Du
 			if f {
 				return nil
 			}
+			time.Sleep(time.Millisecond * 50)
 		}
 	}
 }

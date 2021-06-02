@@ -29,6 +29,7 @@ import (
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/commontools"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/controlplane"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
+	"gitee.com/openeuler/eggo/pkg/constants"
 	"gitee.com/openeuler/eggo/pkg/utils"
 	"gitee.com/openeuler/eggo/pkg/utils/certs"
 	"gitee.com/openeuler/eggo/pkg/utils/endpoint"
@@ -51,6 +52,7 @@ var (
 
 type GetTokenTask struct {
 	tokenStr string
+	cluster  *api.ClusterConfig
 }
 
 func (gt *GetTokenTask) Name() string {
@@ -58,7 +60,7 @@ func (gt *GetTokenTask) Name() string {
 }
 
 func (gt *GetTokenTask) Run(r runner.Runner, hcg *api.HostConfig) error {
-	token, err := commontools.GetBootstrapToken(r, gt.tokenStr)
+	token, err := commontools.GetBootstrapToken(r, gt.tokenStr, filepath.Join(gt.cluster.GetConfigDir(), constants.KubeConfigFileNameAdmin))
 	if err != nil {
 		return err
 	}
@@ -422,7 +424,9 @@ func Init(config *api.ClusterConfig) error {
 	}
 
 	if tokenTask == nil {
-		tokenTask = &GetTokenTask{}
+		tokenTask = &GetTokenTask{
+			cluster: config,
+		}
 	}
 	if err := nodemanager.RunTasksOnNode([]task.Task{task.NewTaskInstance(tokenTask)}, masters[0]); err != nil {
 		return err

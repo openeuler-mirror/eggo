@@ -3,11 +3,13 @@ package commontools
 import (
 	"encoding/base64"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"text/template"
 	"time"
 
 	"gitee.com/openeuler/eggo/pkg/api"
+	"gitee.com/openeuler/eggo/pkg/constants"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	kkutil "github.com/kubesphere/kubekey/pkg/util"
 	"github.com/lithammer/dedent"
@@ -34,7 +36,7 @@ stringData:
 `
 )
 
-func CreateBootstrapToken(r runner.Runner, bconf *api.BootstrapTokenConfig) error {
+func CreateBootstrapToken(r runner.Runner, bconf *api.BootstrapTokenConfig, kubeconfig string) error {
 	var sb strings.Builder
 	var usages []string
 	now := time.Now()
@@ -61,9 +63,10 @@ func CreateBootstrapToken(r runner.Runner, bconf *api.BootstrapTokenConfig) erro
 		logrus.Errorf("rend core config failed: %v", err)
 		return err
 	}
-	sb.WriteString("sudo -E /bin/sh -c \"mkdir /tmp/.eggo")
+	sb.WriteString("sudo -E /bin/sh -c \"mkdir -p /tmp/.eggo")
 	tokenYamlBase64 := base64.StdEncoding.EncodeToString([]byte(coreConfig))
 	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > /tmp/.eggo/bootstrap_token.yaml", tokenYamlBase64))
+	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s", kubeconfig))
 	sb.WriteString(" && kubectl apply -f /tmp/.eggo/bootstrap_token.yaml")
 	sb.WriteString("\"")
 
@@ -77,7 +80,7 @@ func CreateBootstrapToken(r runner.Runner, bconf *api.BootstrapTokenConfig) erro
 
 func CreateBootstrapTokensForCluster(r runner.Runner, ccfg *api.ClusterConfig) error {
 	for _, token := range ccfg.BootStrapTokens {
-		if err := CreateBootstrapToken(r, token); err != nil {
+		if err := CreateBootstrapToken(r, token, filepath.Join(ccfg.GetConfigDir(), constants.KubeConfigFileNameAdmin)); err != nil {
 			logrus.Errorf("create bootstrap token failed: %v", err)
 			return err
 		}
@@ -85,7 +88,7 @@ func CreateBootstrapTokensForCluster(r runner.Runner, ccfg *api.ClusterConfig) e
 	return nil
 }
 
-func GetBootstrapToken(r runner.Runner, tokenStr string) (string, error) {
+func GetBootstrapToken(r runner.Runner, tokenStr string, kubeconfig string) (string, error) {
 	token, id, secret, err := ParseBootstrapTokenStr(tokenStr)
 	if err != nil {
 		return "", err
@@ -97,7 +100,7 @@ func GetBootstrapToken(r runner.Runner, tokenStr string) (string, error) {
 		Usages:          []string{"authentication", "signing"},
 		AuthExtraGroups: []string{""},
 	}
-	err = CreateBootstrapToken(r, bconf)
+	err = CreateBootstrapToken(r, bconf, kubeconfig)
 
 	return token, err
 }

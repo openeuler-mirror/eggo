@@ -129,7 +129,7 @@ func check(r runner.Runner, savePath string) error {
 		return err
 	}
 
-	for _, ca := range commontools.CommonCaCerts {
+	for _, ca := range commontools.MasterRequiredCerts {
 		_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"ls %s\"", filepath.Join(savePath, ca)))
 		if err != nil {
 			logrus.Errorf("chech ca cert: %s, failed: %v\n", ca, err)
