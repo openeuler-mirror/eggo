@@ -380,6 +380,8 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 	var etcds []*HostConfig
 	if len(conf.Etcds) == 0 {
 		etcds = conf.Masters
+	} else {
+		etcds = conf.Etcds
 	}
 	for i, etcd := range etcds {
 		hostconfig, exist = cache[etcd.Ip]
