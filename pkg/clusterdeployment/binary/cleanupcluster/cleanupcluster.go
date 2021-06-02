@@ -177,7 +177,7 @@ func cleanupLoadBalance(t *cleanupClusterTask) {
 
 func postCleanup(t *cleanupClusterTask) {
 	// save firewall config
-	if output, err := t.r.RunCommand(addSudo("firewall-cmd --zone=public --runtime-to-permanent")); err != nil {
+	if output, err := t.r.RunCommand(addSudo("firewall-cmd --runtime-to-permanent")); err != nil {
 		logrus.Errorf("save firewall config on node %v failed: %v\noutput: %v",
 			t.hostConfig.Address, err, output)
 	}
