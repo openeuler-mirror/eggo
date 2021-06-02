@@ -46,6 +46,10 @@ var (
 			Name: "coredns",
 			Type: "repo",
 		},
+		{
+			Name: "tar",
+			Type: "repo",
+		},
 	}
 
 	masterExports = []*api.OpenPorts{
@@ -84,15 +88,11 @@ var (
 			Type: "repo",
 		},
 		{
-			Name: "conntrack-tools",
+			Name: "tar",
 			Type: "repo",
 		},
 		{
-			Name: "socat",
-			Type: "repo",
-		},
-		{
-			Name: "containernetworking-plugins",
+			Name: "iSulad",
 			Type: "repo",
 		},
 	}
@@ -113,6 +113,10 @@ var (
 	etcdPackages = []*api.Packages{
 		{
 			Name: "etcd",
+			Type: "repo",
+		},
+		{
+			Name: "tar",
 			Type: "repo",
 		},
 	}
@@ -138,6 +142,10 @@ var (
 	loadbalancePackages = []*api.Packages{
 		{
 			Name: "nginx",
+			Type: "repo",
+		},
+		{
+			Name: "tar",
 			Type: "repo",
 		},
 	}
@@ -569,6 +577,10 @@ func createDeployConfigTemplate(file string) error {
 					Name: "coredns",
 					Type: "pkg",
 				},
+				&Package{
+					Name: "tar",
+					Type: "pkg",
+				},
 			},
 			"node": {
 				&Package{
@@ -591,10 +603,18 @@ func createDeployConfigTemplate(file string) error {
 					Name: "containernetworking-plugins",
 					Type: "pkg",
 				},
+				&Package{
+					Name: "tar",
+					Type: "pkg",
+				},
 			},
 			"etcd": {
 				&Package{
 					Name: "etcd",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "tar",
 					Type: "pkg",
 				},
 			},
@@ -649,6 +669,10 @@ func createDeployConfigTemplate(file string) error {
 				},
 				&Package{
 					Name: "nginx-mod-stream",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "tar",
 					Type: "pkg",
 				},
 			},
