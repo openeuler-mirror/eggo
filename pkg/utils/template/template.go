@@ -76,7 +76,7 @@ extendedKeyUsage = {{ .ExtendedKeyUsage }}
 {{- if .HaveAltNames }}
 subjectAltName = @alt_names
 {{- end }}
-	`
+`
 
 	BaseSystemdServiceTemplate = `[Unit]
 Description={{ .Description }}
@@ -93,9 +93,9 @@ EnvironmentFile=-{{ $v }}
 ExecStartPre={{ $v }}
 {{- end }}
 {{- $alen := len .Arguments }}
-ExecStart={{ .Command }}{{if ne $alen 0 }} \\{{end}}
+ExecStart={{ .Command }}{{if ne $alen 0 }} \{{end}}
 {{- range $i, $v := .Arguments }}
-		{{ $v }}{{if NotLast $i $alen }} \\{{end}}
+		{{ $v }}{{if NotLast $i $alen }} \{{end}}
 {{- end }}
 
 Restart={{ .RestartPolicy }}
@@ -103,7 +103,7 @@ LimitNOFILE={{ .LimitNoFile }}
 
 [Install]
 WantedBy={{ .WantedBy }}
-	`
+`
 )
 
 type CsrConfig struct {

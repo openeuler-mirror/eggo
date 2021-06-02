@@ -67,7 +67,7 @@ func genApiserverEtcdClientCerts(savePath string, hostnameList []string, ipList 
 				DNSNames: append(hostnameList, "localhost"),
 			},
 			Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-		}, savePath, "kube-apiserver-etcd-client")
+		}, savePath, "apiserver-etcd-client")
 }
 
 // see: https://kubernetes.io/docs/setup/best-practices/certificates/

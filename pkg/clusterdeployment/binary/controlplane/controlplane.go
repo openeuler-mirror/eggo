@@ -16,6 +16,7 @@
 package controlplane
 
 import (
+	"crypto/rand"
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
@@ -48,36 +49,36 @@ const (
 	AdminRoleConfig = `apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-	annotations:
-	rbac.authorization.kubernetes.io/autoupdate: "true"
-	labels:
-	kubernetes.io/bootstrapping: rbac-defaults
-	name: system:kube-apiserver-to-kubelet
+  annotations:
+    rbac.authorization.kubernetes.io/autoupdate: "true"
+  labels:
+    kubernetes.io/bootstrapping: rbac-defaults
+  name: system:kube-apiserver-to-kubelet
 rules:
-	- apiGroups:
-		- ""
-	resources:
-		- nodes/proxy
-		- nodes/stats
-		- nodes/log
-		- nodes/spec
-		- nodes/metrics
-	verbs:
-		- "*"
+  - apiGroups:
+      - ""
+    resources:
+      - nodes/proxy
+      - nodes/stats
+      - nodes/log
+      - nodes/spec
+      - nodes/metrics
+    verbs:
+      - "*"
 `
 	AdminRoleBindConfig = `apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-	name: system:kube-apiserver
-	namespace: ""
+  name: system:kube-apiserver
+  namespace: ""
 roleRef:
-	apiGroup: rbac.authorization.k8s.io
-	kind: ClusterRole
-	name: system:kube-apiserver-to-kubelet
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:kube-apiserver-to-kubelet
 subjects:
-	- apiGroup: rbac.authorization.k8s.io
-	kind: User
-	name: kubernetes
+  - apiGroup: rbac.authorization.k8s.io
+  kind: User
+  name: kubernetes
 `
 )
 
@@ -277,7 +278,7 @@ func generateKubeConfigs(rootPath, certPath string, cg certs.CertGenerator, ccfg
 	}
 
 	err = cg.CreateKubeConfig(rootPath, constants.KubeConfigFileNameAdmin, filepath.Join(certPath, "ca.crt"), "default-admin",
-		filepath.Join(certPath, "admin.key"), filepath.Join(certPath, "admin.crt"), apiEndpoint)
+		filepath.Join(certPath, "admin.crt"), filepath.Join(certPath, "admin.key"), apiEndpoint)
 	if err != nil {
 		return
 	}
@@ -286,7 +287,7 @@ func generateKubeConfigs(rootPath, certPath string, cg certs.CertGenerator, ccfg
 		return
 	}
 	err = cg.CreateKubeConfig(rootPath, constants.KubeConfigFileNameController, filepath.Join(certPath, "ca.crt"), "default-controller-manager",
-		filepath.Join(certPath, "controller-manager.key"), filepath.Join(certPath, "controller-manager.crt"), localEndpoint)
+		filepath.Join(certPath, "controller-manager.crt"), filepath.Join(certPath, "controller-manager.key"), localEndpoint)
 	if err != nil {
 		return
 	}
@@ -296,30 +297,46 @@ func generateKubeConfigs(rootPath, certPath string, cg certs.CertGenerator, ccfg
 	}
 
 	return cg.CreateKubeConfig(rootPath, constants.KubeConfigFileNameScheduler, filepath.Join(certPath, "ca.crt"), "default-scheduler",
-		filepath.Join(certPath, "scheduler.key"), filepath.Join(certPath, "scheduler.crt"), localEndpoint)
+		filepath.Join(certPath, "scheduler.crt"), filepath.Join(certPath, "scheduler.key"), localEndpoint)
+}
+
+func getRandSecret() (string, error) {
+	c := 32
+	b := make([]byte, c)
+	_, err := rand.Read(b)
+	if err != nil {
+		logrus.Errorf("create rand secret failed: %v", err)
+		return "", err
+	}
+	encoded := base64.StdEncoding.EncodeToString(b)
+	return encoded, nil
 }
 
 func generateEncryption(r runner.Runner, savePath string) error {
 	const encry = `kind: EncryptionConfig
 apiVersion: v1
 resources:
-	- resources:
-		- secrets
-	providers:
-		- aescbc:
-			keys:
-			- name: key1
-				secret: ${ENCRYPTION_KEY}
-		- identity: {}
+  - resources:
+      - secrets
+    providers:
+      - aescbc:
+          keys:
+            - name: key1
+              secret: HOLDER
+      - identity: {}
 `
 	var sb strings.Builder
+	randSecret, err := getRandSecret()
+	if err != nil {
+		return err
+	}
 	sb.WriteString("sudo -E /bin/sh -c \"")
-	sb.WriteString("local ENCRYPTION_KEY=$(head -c 32 /dev/urandom | base64)")
 	encryBase64 := base64.StdEncoding.EncodeToString([]byte(encry))
-	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/%s", encryBase64, savePath, constants.EncryptionConfigName))
+	sb.WriteString(fmt.Sprintf("echo \"%s\" | base64 -d > %s/%s", encryBase64, savePath, constants.EncryptionConfigName))
+	sb.WriteString(fmt.Sprintf(" && sed -i \"s#HOLDER#%s#g\" %s/%s", randSecret, savePath, constants.EncryptionConfigName))
 	sb.WriteString("\"")
 
-	_, err := r.RunCommand(sb.String())
+	_, err = r.RunCommand(sb.String())
 	return err
 }
 

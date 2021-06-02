@@ -21,18 +21,20 @@ const (
 	TokenTemplate = `apiVersion: v1
 kind: Secret
 metadata:
-	name: bootstrap-token-{{ .ID }}
-	namespace: kube-system
+  name: bootstrap-token-{{ .ID }}
+  namespace: kube-system
 type: bootstrap.kubernetes.io/token
 stringData:
-	description: "{{ .Description }}"
-	token-id: {{ .ID }}
-	token-secret: {{ .Secret }}
-	expiration: {{ .Expiration }}
-	{{- range $i, $v := .Usages }}
-	$v
-	{{- end }}
-	auth-extra-groups: {{ .AuthExtraGroups }}
+  description: "{{ .Description }}"
+  token-id: {{ .ID }}
+  token-secret: {{ .Secret }}
+  expiration: {{ .Expiration }}
+  {{- range $i, $v := .Usages }}
+  $v
+  {{- end }}
+  {{- if .AuthExtraGroups }}
+  auth-extra-groups: {{ .AuthExtraGroups }}
+  {{- end }}
 `
 )
 
