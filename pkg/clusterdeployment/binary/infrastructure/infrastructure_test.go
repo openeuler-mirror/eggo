@@ -67,18 +67,22 @@ func addNodes() {
 					Protocol: "tcp",
 				},
 			},
-			Packages: map[string]api.Packages{
-				"openssl": {
+			Packages: []*api.Packages{
+				{
+					Name: "openssl",
 					Type: "repo",
 				},
-				"kubernetes-client": {
+				{
+					Name: "kubernetes-client",
 					Type: "repo",
 				},
-				"kubernetes-master": {
+				{
+					Name: "kubernetes-master",
 					Type: "repo",
 				},
-				"coredns": {
-					Type: "pkg",
+				{
+					Name: "coredns",
+					Type: "repo",
 				},
 			},
 		},
@@ -96,19 +100,23 @@ func addNodes() {
 					Protocol: "udp",
 				},
 			},
-			Packages: map[string]api.Packages{
-				"hostname": {
+			Packages: []*api.Packages{
+				{
+					Name: "hostname",
 					Type: "repo",
 				},
-				"kubectl": {
+				{
+					Name: "kubectl",
 					Type: "binary",
 					Dst:  "/usr/bin/",
 				},
-				"kubelet": {
+				{
+					Name: "kubelet",
 					Type: "binary",
 					Dst:  "/usr/bin/",
 				},
-				"kube-proxy": {
+				{
+					Name: "kube-proxy",
 					Type: "binary",
 					Dst:  "/usr/bin/",
 				},
@@ -132,22 +140,27 @@ func addNodes() {
 					Protocol: "udp",
 				},
 			},
-			Packages: map[string]api.Packages{
-				"ipcalc": {
+			Packages: []*api.Packages{
+				{
+					Name: "ipcalc",
 					Type: "repo",
 				},
-				"etcd": {
+				{
+					Name: "etcd",
 					Type: "pkg",
 				},
-				"kube-apiserver": {
+				{
+					Name: "kube-apiserver",
 					Type: "binary",
 					Dst:  "/usr/bin/",
 				},
-				"kube-controller-manager": {
+				{
+					Name: "kube-controller-manager",
 					Type: "binary",
 					Dst:  "/usr/bin/",
 				},
-				"kube-scheduler": {
+				{
+					Name: "kube-scheduler",
 					Type: "binary",
 					Dst:  "/usr/bin/",
 				},

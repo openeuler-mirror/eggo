@@ -184,8 +184,8 @@ func postCleanup(t *cleanupClusterTask) {
 }
 
 func isPkgInstalled(t *cleanupClusterTask, pkg string) bool {
-	for k := range t.hostConfig.Packages {
-		if strings.HasPrefix(k, pkg) {
+	for _, p := range t.hostConfig.Packages {
+		if strings.HasPrefix(p.Name, pkg) {
 			return true
 		}
 	}

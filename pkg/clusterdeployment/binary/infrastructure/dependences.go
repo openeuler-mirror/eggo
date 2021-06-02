@@ -26,8 +26,8 @@ import (
 )
 
 const (
-	prmT   = "sudo -E /bin/sh -c \"which apt 1>/dev/null ; if [ $? -eq 0 ]; then echo apt ; elif which yum 1>/dev/null ; if [ $? -eq 0 ]; then echo yum ; fi\""
-	pmT    = "sudo -E /bin/sh -c \"which dpkg 1>/dev/null ; if [ $? -eq 0 ]; then echo dpkg ; elif which rpm 1>/dev/null ; if [ $? -eq 0 ]; then echo rpm ; fi\""
+	prmT   = "sudo -E /bin/sh -c \"if [ x != x$(which apt 2>/dev/null) ]; then echo apt ; elif [ x != x$(which yum 2>/dev/null) ]; then echo yum ; fi\""
+	pmT    = "sudo -E /bin/sh -c \"if [ x != x$(which dpkg 2>/dev/null) ]; then echo dpkg ; elif [ x != x$(which rpm 2>/dev/null) ]; then echo rpm ; fi\""
 	tmpDir = "/etc/.eggo/"
 )
 
@@ -225,7 +225,7 @@ func removePkg(r runner.Runner, hcg *api.HostConfig, pmanager string, pkg []stri
 	}
 
 	for _, p := range pkg {
-		sb.WriteString(fmt.Sprintf("%s* && ", p))
+		sb.WriteString(fmt.Sprintf("%s* ", p))
 	}
 
 	sb.WriteString("echo success\"")
@@ -280,19 +280,19 @@ func separateDependences(hcg *api.HostConfig) ([]string, []string, map[string]st
 	pkg := []string{}
 	binary := make(map[string]string)
 
-	for p, c := range hcg.Packages {
-		switch c.Type {
+	for _, p := range hcg.Packages {
+		switch p.Type {
 		case "repo":
-			repo = append(repo, p)
+			repo = append(repo, p.Name)
 		case "pkg":
-			pkg = append(pkg, p)
+			pkg = append(pkg, p.Name)
 		case "binary":
-			if c.Dst == "" {
-				return nil, nil, nil, fmt.Errorf("no dst for binary %s", p)
+			if p.Dst == "" {
+				return nil, nil, nil, fmt.Errorf("no dst for binary %s", p.Name)
 			}
-			binary[p] = c.Dst
+			binary[p.Name] = p.Dst
 		default:
-			return nil, nil, nil, fmt.Errorf("invalid type %s for %s", c.Type, p)
+			return nil, nil, nil, fmt.Errorf("invalid type %s for %s", p.Type, p.Name)
 		}
 	}
 

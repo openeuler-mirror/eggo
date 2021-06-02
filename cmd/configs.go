@@ -33,17 +33,21 @@ import (
 )
 
 var (
-	masterPackages = map[string]*api.Packages{
-		"kubernetes-master": {
+	masterPackages = []*api.Packages{
+		{
+			Name: "kubernetes-client",
 			Type: "repo",
 		},
-		"kubernetes-kubeadm": {
+		{
+			Name: "kubernetes-kubeadm",
 			Type: "repo",
 		},
-		"kubernetes-client": {
+		{
+			Name: "kubernetes-master",
 			Type: "repo",
 		},
-		"coredns": {
+		{
+			Name: "coredns",
 			Type: "repo",
 		},
 	}
@@ -66,20 +70,33 @@ var (
 		},
 	}
 
-	nodePackages = map[string]*api.Packages{
-		"kubernetes-node": {
+	nodePackages = []*api.Packages{
+		{
+			Name: "docker",
 			Type: "repo",
 		},
-		"kubernetes-kubelet": {
+		{
+			Name: "kubernetes-client",
 			Type: "repo",
 		},
-		"conntrack-tools": {
+		{
+			Name: "kubernetes-node",
 			Type: "repo",
 		},
-		"socat": {
+		{
+			Name: "kubernetes-kubelet",
 			Type: "repo",
 		},
-		"containernetworking-plugins": {
+		{
+			Name: "conntrack-tools",
+			Type: "repo",
+		},
+		{
+			Name: "socat",
+			Type: "repo",
+		},
+		{
+			Name: "containernetworking-plugins",
 			Type: "repo",
 		},
 	}
@@ -97,8 +114,9 @@ var (
 		},
 	}
 
-	etcdPackages = map[string]*api.Packages{
-		"etcd": {
+	etcdPackages = []*api.Packages{
+		{
+			Name: "etcd",
 			Type: "repo",
 		},
 	}
@@ -121,8 +139,9 @@ var (
 		},
 	}
 
-	loadbalancePackages = map[string]*api.Packages{
-		"nginx": {
+	loadbalancePackages = []*api.Packages{
+		{
+			Name: "nginx",
 			Type: "repo",
 		},
 	}
@@ -277,15 +296,13 @@ func portExist(openPorts []*api.OpenPorts, port *api.OpenPorts) bool {
 	return false
 }
 
-func addPackagesAndExports(hostconfig *api.HostConfig, pkgs map[string]*api.Packages,
+func addPackagesAndExports(hostconfig *api.HostConfig, pkgs []*api.Packages,
 	openPorts []*api.OpenPorts) {
 	if hostconfig.Packages == nil {
-		hostconfig.Packages = make(map[string]api.Packages)
+		hostconfig.Packages = []*api.Packages{}
 	}
 
-	for name, pkg := range pkgs {
-		hostconfig.Packages[name] = *pkg
-	}
+	hostconfig.Packages = append(hostconfig.Packages, pkgs...)
 
 	for _, port := range openPorts {
 		if portExist(hostconfig.OpenPorts, port) {
@@ -297,13 +314,15 @@ func addPackagesAndExports(hostconfig *api.HostConfig, pkgs map[string]*api.Pack
 
 func addUserPackages(hostconfig *api.HostConfig, pkgs []*Package) {
 	if hostconfig.Packages == nil {
-		hostconfig.Packages = make(map[string]api.Packages)
+		hostconfig.Packages = []*api.Packages{}
 	}
 	for _, pkg := range pkgs {
-		hostconfig.Packages[pkg.Name] = api.Packages{
+		p := &api.Packages{
+			Name: pkg.Name,
 			Type: pkg.Type,
 			Dst:  pkg.Dst,
 		}
+		hostconfig.Packages = append(hostconfig.Packages, p)
 	}
 }
 
