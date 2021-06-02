@@ -12,8 +12,8 @@ import (
 
 var (
 	ETCDRequiredCerts = []string{
-		"kube-apiserver-etcd-client.crt",
-		"kube-apiserver-etcd-client.key",
+		"apiserver-etcd-client.crt",
+		"apiserver-etcd-client.key",
 		"etcd/ca.key",
 		"etcd/ca.crt",
 	}
