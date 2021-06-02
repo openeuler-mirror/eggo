@@ -29,19 +29,6 @@ const (
 6787454327e00766, started, workder1, https://192.168.0.2:2380, https://192.168.0.2:2379, true`
 )
 
-type fakeFuncs struct {
-}
-
-func (f *fakeFuncs) unmount(target string, flags int) error {
-	logrus.Infof("unmount %v flags %v", target, flags)
-	return nil
-}
-
-func (f *fakeFuncs) removeAll(path string) error {
-	logrus.Infof("removeAll %v", path)
-	return nil
-}
-
 type fakeRunner struct {
 }
 
@@ -79,8 +66,6 @@ func (r *fakeRunner) Close() {
 }
 
 func TestCleanupCluster(t *testing.T) {
-	osfuncs = &fakeFuncs{}
-
 	nodes := []*api.HostConfig{
 		{
 			Arch:    "amd64",
@@ -119,8 +104,6 @@ func TestCleanupCluster(t *testing.T) {
 }
 
 func TestRemoveWorkers(t *testing.T) {
-	osfuncs = &fakeFuncs{}
-
 	nodes := []*api.HostConfig{
 		{
 			Arch:    "amd64",
@@ -141,8 +124,6 @@ func TestRemoveWorkers(t *testing.T) {
 }
 
 func TestRemoveEtcds(t *testing.T) {
-	osfuncs = &fakeFuncs{}
-
 	nodes := []*api.HostConfig{
 		{
 			Arch:    "amd64",

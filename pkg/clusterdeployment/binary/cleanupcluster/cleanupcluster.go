@@ -17,7 +17,6 @@ package cleanupcluster
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,13 +33,6 @@ import (
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/task"
 )
-
-var osfuncs funcs
-
-type funcs interface {
-	unmount(target string, flags int) error
-	removeAll(path string) error
-}
 
 type originFuncs struct {
 }
@@ -67,9 +59,11 @@ func isType(curType uint16, expectedType uint16) bool {
 	return curType&expectedType != 0
 }
 
-func umountKubeletSubDirs(kubeletDir string) error {
-	mounts, err := ioutil.ReadFile("/proc/mounts")
+func umountKubeletSubDirs(t *cleanupClusterTask, kubeletDir string) error {
+	output, err := t.r.RunCommand(addSudo("cat /proc/mounts"))
 	if err != nil {
+		logrus.Errorf("cat /proc/mounts on node %v failed: %v\noutput: %v",
+			t.hostConfig.Address, err, output)
 		return err
 	}
 
@@ -78,15 +72,16 @@ func umountKubeletSubDirs(kubeletDir string) error {
 		kubeletDir += "/"
 	}
 
-	lines := strings.Split(string(mounts), "\n")
+	lines := strings.Split(string(output), "\n")
 	for _, line := range lines {
 		items := strings.Split(line, " ")
 		if len(items) < 2 || !strings.HasPrefix(items[1], kubeletDir) {
 			continue
 		}
 		subDir := items[1]
-		if err := osfuncs.unmount(subDir, 0); err != nil {
-			logrus.Errorf("umount %v failed: %v", subDir, err)
+		if output, err := t.r.RunCommand(addSudo("umount " + subDir)); err != nil {
+			logrus.Errorf("umount %v on node %v failed: %v\noutput: %v",
+				subDir, t.hostConfig.Address, err, output)
 		}
 	}
 
@@ -97,10 +92,12 @@ func addSudo(cmd string) string {
 	return "sudo -E /bin/sh -c \"" + cmd + "\""
 }
 
-func removePathes(pathes []string) {
+func removePathes(t *cleanupClusterTask, pathes []string) {
 	for _, path := range pathes {
-		if err := osfuncs.removeAll(path); err != nil {
-			logrus.Errorf("remove path %v failed: %v", path, err)
+		// TODO: if user can config the path, remember to make sure not delete "/"
+		if output, err := t.r.RunCommand(addSudo("rm -rf " + path)); err != nil {
+			logrus.Errorf("remove path %v on node %v failed: %v\noutput: %v",
+				path, t.hostConfig.Address, err, output)
 		}
 	}
 }
@@ -109,7 +106,7 @@ func getKubeHomePath(savePath string) string {
 	if savePath != "" {
 		return filepath.Clean(savePath)
 	} else {
-		return constants.DefaultK8SCertDir
+		return constants.DefaultK8SRootDir
 	}
 }
 
@@ -122,17 +119,17 @@ func cleanupWorker(t *cleanupClusterTask) {
 		"/usr/lib/systemd/system/kubelet.service",
 		"/usr/lib/systemd/system/kube-proxy.service",
 	}
-	if err := umountKubeletSubDirs("/var/lib/kubelet"); err == nil {
+	if err := umountKubeletSubDirs(t, "/var/lib/kubelet"); err == nil {
 		cleanupPathes = append(cleanupPathes, "/var/lib/kubelet")
 	}
 
 	// remove directories
-	removePathes(cleanupPathes)
+	removePathes(t, cleanupPathes)
 }
 
 func cleanupMaster(t *cleanupClusterTask) {
 	// remove directories
-	removePathes([]string{
+	removePathes(t, []string{
 		getKubeHomePath(t.ccfg.Certificate.SavePath),
 		"/etc/kubernetes", "/run/kubernetes",
 		"/usr/lib/systemd/system/kube-apiserver.service",
@@ -150,7 +147,7 @@ func getEtcdDataDir(dataDir string) string {
 
 func cleanupEtcd(t *cleanupClusterTask) {
 	// remove directories
-	removePathes([]string{
+	removePathes(t, []string{
 		getKubeHomePath(t.ccfg.Certificate.SavePath),
 		getEtcdDataDir(t.ccfg.EtcdCluster.DataDir),
 		"/etc/etcd",
@@ -161,7 +158,7 @@ func cleanupEtcd(t *cleanupClusterTask) {
 
 func cleanupCoreDNS(t *cleanupClusterTask) {
 	// remove directories
-	removePathes([]string{
+	removePathes(t, []string{
 		getKubeHomePath(t.ccfg.Certificate.SavePath),
 		"/usr/lib/systemd/system/coredns.service",
 	})
@@ -169,7 +166,7 @@ func cleanupCoreDNS(t *cleanupClusterTask) {
 
 func cleanupLoadBalance(t *cleanupClusterTask) {
 	// remove directories
-	removePathes([]string{
+	removePathes(t, []string{
 		getKubeHomePath(t.ccfg.Certificate.SavePath),
 		"/etc/nginx", "/usr/lib/systemd/system/nginx.service",
 	})
@@ -413,8 +410,6 @@ func execRemoveEtcdsTask(conf *api.ClusterConfig, node string) {
 }
 
 func Init(conf *api.ClusterConfig) error {
-	osfuncs = &originFuncs{}
-
 	// remove workers from master
 	node := getFirstMaster(conf.Nodes)
 	if node != "" {
