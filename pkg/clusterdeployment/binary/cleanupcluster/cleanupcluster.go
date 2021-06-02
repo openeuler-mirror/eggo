@@ -181,6 +181,12 @@ func postCleanup(t *cleanupClusterTask) {
 		logrus.Errorf("save firewall config on node %v failed: %v\noutput: %v",
 			t.hostConfig.Address, err, output)
 	}
+
+	// daemon-reload
+	if output, err := t.r.RunCommand(addSudo("systemctl daemon-reload")); err != nil {
+		logrus.Errorf("daemon-reload on node %v failed: %v\noutput: %v",
+			t.hostConfig.Address, err, output)
+	}
 }
 
 func isPkgInstalled(t *cleanupClusterTask, pkg string) bool {
@@ -264,7 +270,7 @@ func getFirstMaster(nodes []*api.HostConfig) string {
 func runRemoveWorker(t *removeWorkersTask, worker string) {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("kubectl drain %v --delete-local-data --force --ignore-daemonsets", worker))
+	sb.WriteString(fmt.Sprintf("kubectl drain %v --delete-emptydir-data --force --ignore-daemonsets", worker))
 	sb.WriteString(fmt.Sprintf("&& kubectl delete node %v", worker))
 	if output, err := t.r.RunCommand(addSudo(sb.String())); err != nil {
 		logrus.Errorf("remove workder %v failed: %v\noutput: %v", worker, err, output)
@@ -336,7 +342,7 @@ func parseEtcdMemberList(output string) []*etcdMember {
 
 func getEtcdMembers(t *removeEtcdsTask) []*etcdMember {
 	certsOpts := getEtcdCertsOpts(t.ccfg.Certificate.SavePath)
-	cmd := fmt.Sprintf("etcdctl %v member list", certsOpts)
+	cmd := fmt.Sprintf("ETCDCTL_API=3 etcdctl %v member list", certsOpts)
 	output, err := t.r.RunCommand(addSudo(cmd))
 	if err != nil {
 		logrus.Errorf("get etcd members failed: %v\noutput: %v", err, output)
@@ -350,7 +356,7 @@ func getEtcdCertsOpts(savePath string) string {
 	if savePath != "" {
 		certsPath = savePath
 	}
-	return fmt.Sprintf("--cert-file=%v/etcd/server.crt --key-file=%v/etcd/server.key --ca-file=%v/etcd/ca.key",
+	return fmt.Sprintf("--cert=%v/etcd/server.crt --key=%v/etcd/server.key --cacert=%v/etcd/ca.key",
 		certsPath, certsPath, certsPath)
 }
 
@@ -363,7 +369,7 @@ func (t *removeEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfig) error
 			continue
 		}
 		certsOpts := getEtcdCertsOpts(t.ccfg.Certificate.SavePath)
-		cmd := fmt.Sprintf("etcdctl %v member remove %v", certsOpts, member.id)
+		cmd := fmt.Sprintf("ETCDCTL_API=3 etcdctl %v member remove %v", certsOpts, member.id)
 		if output, err := t.r.RunCommand(addSudo(cmd)); err != nil {
 			logrus.Errorf("remove workder %v failed: %v\noutput: %v", member.name, err, output)
 		}
