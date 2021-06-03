@@ -72,16 +72,16 @@ func TestDeployEtcd(t *testing.T) {
 		Nodes: nodes,
 	}
 
-	if err := prepareEtcdConfigs(conf, configsTempDir); err != nil {
+	if err = prepareEtcdConfigs(conf, configsTempDir); err != nil {
 		t.Fatalf("prepare etcd configs failed: %v", err)
 	}
 	r := &runner.LocalRunner{}
 
-	if err := generateCaAndApiserverEtcdCerts(r, conf); err != nil {
+	if err = generateCaAndApiserverEtcdCerts(r, conf); err != nil {
 		t.Fatalf("generate ca and apiserver etcd certs failed: %v", err)
 	}
 
-	if err := copyCaAndConfigs(conf, r, &api.HostConfig{
+	if err = copyCaAndConfigs(conf, r, &api.HostConfig{
 		Arch:    "aarch64",
 		Name:    "node0",
 		Address: "192.168.0.1",
@@ -89,7 +89,7 @@ func TestDeployEtcd(t *testing.T) {
 		t.Fatalf("copy etcd certs and configs failed: %v", err)
 	}
 
-	if err := generateEtcdCerts(r, conf); err != nil {
+	if err = generateEtcdCerts(r, conf, nodes[0]); err != nil {
 		t.Fatalf("generate etcd certs failed: %v", err)
 	}
 
@@ -97,7 +97,7 @@ func TestDeployEtcd(t *testing.T) {
 		"ca.crt", "healthcheck-client.crt", "peer.crt", "server.crt",
 		"ca.key", "healthcheck-client.key", "peer.key", "server.key",
 	} {
-		if _, err := os.Stat(filepath.Join(dstTempDir, "etcd", file)); err != nil {
+		if _, err = os.Stat(filepath.Join(dstTempDir, "etcd", file)); err != nil {
 			t.Fatalf("etcd file %v not found in dst dir", file)
 		}
 	}
@@ -105,7 +105,7 @@ func TestDeployEtcd(t *testing.T) {
 	for _, file := range []string{
 		"etcd.service", "etcd.conf",
 	} {
-		if _, err := os.Stat(filepath.Join(dstTempDir, file)); err != nil {
+		if _, err = os.Stat(filepath.Join(dstTempDir, file)); err != nil {
 			t.Fatalf("etcd file %v not found in dst dir", file)
 		}
 	}

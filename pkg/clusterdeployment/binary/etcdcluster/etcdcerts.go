@@ -71,25 +71,23 @@ func genApiserverEtcdClientCerts(savePath string, hostnameList []string, ipList 
 }
 
 // see: https://kubernetes.io/docs/setup/best-practices/certificates/
-func generateEtcdCerts(r runner.Runner, ccfg *api.ClusterConfig) error {
+func generateEtcdCerts(r runner.Runner, ccfg *api.ClusterConfig, hostConfig *api.HostConfig) error {
 	etcdCertsPath := filepath.Join(ccfg.GetCertDir(), "etcd")
 	cg := certs.NewOpensshBinCertGenerator(r)
 
-	for _, node := range ccfg.EtcdCluster.Nodes {
-		// generate etcd-server certificates
-		if err := genEtcdServerCerts(etcdCertsPath, node.Name, node.Address, cg, ccfg); err != nil {
-			return err
-		}
+	// generate etcd-server certificates
+	if err := genEtcdServerCerts(etcdCertsPath, hostConfig.Name, hostConfig.Address, cg, ccfg); err != nil {
+		return err
+	}
 
-		// generate etcd-peer certificates
-		if err := genEtcdPeerCerts(etcdCertsPath, node.Name, node.Address, cg, ccfg); err != nil {
-			return err
-		}
+	// generate etcd-peer certificates
+	if err := genEtcdPeerCerts(etcdCertsPath, hostConfig.Name, hostConfig.Address, cg, ccfg); err != nil {
+		return err
+	}
 
-		// generate etcd-healthcheck-client certificates
-		if err := genEtcdHealthcheckClientCerts(etcdCertsPath, node.Name, cg, ccfg); err != nil {
-			return err
-		}
+	// generate etcd-healthcheck-client certificates
+	if err := genEtcdHealthcheckClientCerts(etcdCertsPath, hostConfig.Name, cg, ccfg); err != nil {
+		return err
 	}
 
 	return nil

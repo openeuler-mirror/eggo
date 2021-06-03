@@ -17,10 +17,7 @@ package cleanupcluster
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -28,27 +25,13 @@ import (
 	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/etcdcluster"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
-	"gitee.com/openeuler/eggo/pkg/constants"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/task"
 )
 
-type originFuncs struct {
-}
-
-func (f *originFuncs) unmount(target string, flags int) error {
-	return syscall.Unmount(target, flags)
-}
-
-func (f *originFuncs) removeAll(path string) error {
-	return os.RemoveAll(path)
-}
-
 type cleanupClusterTask struct {
-	ccfg       *api.ClusterConfig
-	r          runner.Runner
-	hostConfig *api.HostConfig
+	ccfg *api.ClusterConfig
 }
 
 func (t *cleanupClusterTask) Name() string {
@@ -59,11 +42,11 @@ func isType(curType uint16, expectedType uint16) bool {
 	return curType&expectedType != 0
 }
 
-func umountKubeletSubDirs(t *cleanupClusterTask, kubeletDir string) error {
-	output, err := t.r.RunCommand(addSudo("cat /proc/mounts"))
+func umountKubeletSubDirs(r runner.Runner, hostConfig *api.HostConfig, kubeletDir string) error {
+	output, err := r.RunCommand(addSudo("cat /proc/mounts"))
 	if err != nil {
 		logrus.Errorf("cat /proc/mounts on node %v failed: %v\noutput: %v",
-			t.hostConfig.Address, err, output)
+			hostConfig.Address, err, output)
 		return err
 	}
 
@@ -79,9 +62,9 @@ func umountKubeletSubDirs(t *cleanupClusterTask, kubeletDir string) error {
 			continue
 		}
 		subDir := items[1]
-		if output, err := t.r.RunCommand(addSudo("umount " + subDir)); err != nil {
+		if output, err := r.RunCommand(addSudo("umount " + subDir)); err != nil {
 			logrus.Errorf("umount %v on node %v failed: %v\noutput: %v",
-				subDir, t.hostConfig.Address, err, output)
+				subDir, hostConfig.Address, err, output)
 		}
 	}
 
@@ -92,45 +75,39 @@ func addSudo(cmd string) string {
 	return "sudo -E /bin/sh -c \"" + cmd + "\""
 }
 
-func removePathes(t *cleanupClusterTask, pathes []string) {
+func removePathes(r runner.Runner, hostConfig *api.HostConfig, pathes []string) {
 	for _, path := range pathes {
 		// TODO: if user can config the path, remember to make sure not delete "/"
-		if output, err := t.r.RunCommand(addSudo("rm -rf " + path)); err != nil {
+		if output, err := r.RunCommand(addSudo("rm -rf " + path)); err != nil {
 			logrus.Errorf("remove path %v on node %v failed: %v\noutput: %v",
-				path, t.hostConfig.Address, err, output)
+				path, hostConfig.Address, err, output)
 		}
 	}
 }
 
-func getKubeHomePath(savePath string) string {
-	if savePath != "" {
-		return filepath.Clean(savePath)
-	} else {
-		return constants.DefaultK8SRootDir
-	}
-}
-
-func cleanupWorker(t *cleanupClusterTask) {
+func cleanupWorker(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *api.HostConfig) {
 	// umount kubelet subdirs
 	cleanupPathes := []string{
-		getKubeHomePath(t.ccfg.Certificate.SavePath),
+		ccfg.GetConfigDir(),
+		ccfg.GetCertDir(),
 		"/etc/kubernetes", "/run/kubernetes",
 		"/var/lib/cni", "/etc/cni", "/opt/cni",
 		"/usr/lib/systemd/system/kubelet.service",
 		"/usr/lib/systemd/system/kube-proxy.service",
 	}
-	if err := umountKubeletSubDirs(t, "/var/lib/kubelet"); err == nil {
+	if err := umountKubeletSubDirs(r, hostConfig, "/var/lib/kubelet"); err == nil {
 		cleanupPathes = append(cleanupPathes, "/var/lib/kubelet")
 	}
 
 	// remove directories
-	removePathes(t, cleanupPathes)
+	removePathes(r, hostConfig, cleanupPathes)
 }
 
-func cleanupMaster(t *cleanupClusterTask) {
+func cleanupMaster(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *api.HostConfig) {
 	// remove directories
-	removePathes(t, []string{
-		getKubeHomePath(t.ccfg.Certificate.SavePath),
+	removePathes(r, hostConfig, []string{
+		ccfg.GetConfigDir(),
+		ccfg.GetCertDir(),
 		"/etc/kubernetes", "/run/kubernetes",
 		"/usr/lib/systemd/system/kube-apiserver.service",
 		"/usr/lib/systemd/system/kube-scheduler.service",
@@ -145,49 +122,52 @@ func getEtcdDataDir(dataDir string) string {
 	return etcdcluster.DefaultEtcdDataDir
 }
 
-func cleanupEtcd(t *cleanupClusterTask) {
+func cleanupEtcd(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *api.HostConfig) {
 	// remove directories
-	removePathes(t, []string{
-		getKubeHomePath(t.ccfg.Certificate.SavePath),
-		getEtcdDataDir(t.ccfg.EtcdCluster.DataDir),
+	removePathes(r, hostConfig, []string{
+		ccfg.GetConfigDir(),
+		ccfg.GetCertDir(),
+		getEtcdDataDir(ccfg.EtcdCluster.DataDir),
 		"/etc/etcd",
 		"/usr/lib/systemd/system/etcd.service",
 		"/var/lib/etcd",
 	})
 }
 
-func cleanupCoreDNS(t *cleanupClusterTask) {
+func cleanupCoreDNS(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *api.HostConfig) {
 	// remove directories
-	removePathes(t, []string{
-		getKubeHomePath(t.ccfg.Certificate.SavePath),
+	removePathes(r, hostConfig, []string{
+		ccfg.GetConfigDir(),
+		ccfg.GetCertDir(),
 		"/usr/lib/systemd/system/coredns.service",
 	})
 }
 
-func cleanupLoadBalance(t *cleanupClusterTask) {
+func cleanupLoadBalance(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *api.HostConfig) {
 	// remove directories
-	removePathes(t, []string{
-		getKubeHomePath(t.ccfg.Certificate.SavePath),
+	removePathes(r, hostConfig, []string{
+		ccfg.GetConfigDir(),
+		ccfg.GetCertDir(),
 		"/etc/nginx", "/usr/lib/systemd/system/nginx.service",
 	})
 }
 
-func postCleanup(t *cleanupClusterTask) {
+func postCleanup(r runner.Runner, hostConfig *api.HostConfig) {
 	// save firewall config
-	if output, err := t.r.RunCommand(addSudo("firewall-cmd --runtime-to-permanent")); err != nil {
+	if output, err := r.RunCommand(addSudo("firewall-cmd --runtime-to-permanent")); err != nil {
 		logrus.Errorf("save firewall config on node %v failed: %v\noutput: %v",
-			t.hostConfig.Address, err, output)
+			hostConfig.Address, err, output)
 	}
 
 	// daemon-reload
-	if output, err := t.r.RunCommand(addSudo("systemctl daemon-reload")); err != nil {
+	if output, err := r.RunCommand(addSudo("systemctl daemon-reload")); err != nil {
 		logrus.Errorf("daemon-reload on node %v failed: %v\noutput: %v",
-			t.hostConfig.Address, err, output)
+			hostConfig.Address, err, output)
 	}
 }
 
-func isPkgInstalled(t *cleanupClusterTask, pkg string) bool {
-	for _, p := range t.hostConfig.Packages {
+func isPkgInstalled(hostConfig *api.HostConfig, pkg string) bool {
+	for _, p := range hostConfig.Packages {
 		if strings.HasPrefix(p.Name, pkg) {
 			return true
 		}
@@ -200,37 +180,35 @@ func (t *cleanupClusterTask) Run(r runner.Runner, hostConfig *api.HostConfig) er
 		return fmt.Errorf("empty host config")
 	}
 
-	t.r, t.hostConfig = r, hostConfig
-
 	// call infrastructure function to cleanup
 	if err := infrastructure.RemoveDependences(r, hostConfig); err != nil {
 		logrus.Errorf("remove dependences failed: %v", err)
 	}
 
 	if isType(hostConfig.Type, api.Worker) {
-		cleanupWorker(t)
+		cleanupWorker(t.ccfg, r, hostConfig)
 	}
 
 	if isType(hostConfig.Type, api.Master) {
-		cleanupMaster(t)
+		cleanupMaster(t.ccfg, r, hostConfig)
 	}
 
 	if isType(hostConfig.Type, api.ETCD) {
 		if !t.ccfg.EtcdCluster.External {
-			cleanupEtcd(t)
+			cleanupEtcd(t.ccfg, r, hostConfig)
 		} else {
 			logrus.Info("external etcd, ignore remove etcds")
 		}
 	}
 
-	if isPkgInstalled(t, "nginx") {
-		cleanupLoadBalance(t)
+	if isPkgInstalled(hostConfig, "nginx") {
+		cleanupLoadBalance(t.ccfg, r, hostConfig)
 	}
-	if isPkgInstalled(t, "coredns") {
-		cleanupCoreDNS(t)
+	if isPkgInstalled(hostConfig, "coredns") {
+		cleanupCoreDNS(t.ccfg, r, hostConfig)
 	}
 
-	postCleanup(t)
+	postCleanup(r, hostConfig)
 
 	return nil
 }
@@ -246,9 +224,7 @@ func getAllIps(nodes []*api.HostConfig) []string {
 }
 
 type removeWorkersTask struct {
-	ccfg       *api.ClusterConfig
-	r          runner.Runner
-	hostConfig *api.HostConfig
+	ccfg *api.ClusterConfig
 }
 
 func (t *removeWorkersTask) Name() string {
@@ -264,39 +240,35 @@ func getFirstMaster(nodes []*api.HostConfig) string {
 	return ""
 }
 
-func runRemoveWorker(t *removeWorkersTask, worker string) {
+func runRemoveWorker(t *removeWorkersTask, r runner.Runner, worker string) {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("kubectl drain %v --delete-emptydir-data --force --ignore-daemonsets", worker))
 	sb.WriteString(fmt.Sprintf("&& kubectl delete node %v", worker))
-	if output, err := t.r.RunCommand(addSudo(sb.String())); err != nil {
+	if output, err := r.RunCommand(addSudo(sb.String())); err != nil {
 		logrus.Errorf("remove workder %v failed: %v\noutput: %v", worker, err, output)
 	}
 }
 
-func removeWorkers(t *removeWorkersTask) {
+func removeWorkers(t *removeWorkersTask, r runner.Runner) {
 	for _, node := range t.ccfg.Nodes {
 		if isType(node.Type, api.Worker) {
-			runRemoveWorker(t, node.Name)
+			runRemoveWorker(t, r, node.Name)
 		}
 	}
 }
 
 func (t *removeWorkersTask) Run(r runner.Runner, hostConfig *api.HostConfig) error {
-	t.hostConfig, t.r = hostConfig, r
-
 	// TODO: remove system resource
 
 	// remove workers
-	removeWorkers(t)
+	removeWorkers(t, r)
 
 	return nil
 }
 
 type removeEtcdsTask struct {
-	ccfg       *api.ClusterConfig
-	r          runner.Runner
-	hostConfig *api.HostConfig
+	ccfg *api.ClusterConfig
 }
 
 func (t *removeEtcdsTask) Name() string {
@@ -337,10 +309,9 @@ func parseEtcdMemberList(output string) []*etcdMember {
 	return members
 }
 
-func getEtcdMembers(t *removeEtcdsTask) []*etcdMember {
-	certsOpts := getEtcdCertsOpts(t.ccfg.Certificate.SavePath)
-	cmd := fmt.Sprintf("ETCDCTL_API=3 etcdctl %v member list", certsOpts)
-	output, err := t.r.RunCommand(addSudo(cmd))
+func getEtcdMembers(t *removeEtcdsTask, r runner.Runner) []*etcdMember {
+	cmd := fmt.Sprintf("ETCDCTL_API=3 etcdctl %v member list", getEtcdCertsOpts(t.ccfg.GetCertDir()))
+	output, err := r.RunCommand(addSudo(cmd))
 	if err != nil {
 		logrus.Errorf("get etcd members failed: %v\noutput: %v", err, output)
 		return nil
@@ -348,26 +319,20 @@ func getEtcdMembers(t *removeEtcdsTask) []*etcdMember {
 	return parseEtcdMemberList(output)
 }
 
-func getEtcdCertsOpts(savePath string) string {
-	certsPath := constants.DefaultK8SCertDir
-	if savePath != "" {
-		certsPath = savePath
-	}
-	return fmt.Sprintf("--cert=%v/etcd/server.crt --key=%v/etcd/server.key --cacert=%v/etcd/ca.key",
+func getEtcdCertsOpts(certsPath string) string {
+	return fmt.Sprintf("--cert=%v/etcd/server.crt --key=%v/etcd/server.key --cacert=%v/etcd/ca.crt",
 		certsPath, certsPath, certsPath)
 }
 
 func (t *removeEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfig) error {
-	t.hostConfig, t.r = hostConfig, r
-
-	for _, member := range getEtcdMembers(t) {
+	for _, member := range getEtcdMembers(t, r) {
 		// do not remove etcd member on this machine currently
-		if member.name == t.hostConfig.Name {
+		if member.name == hostConfig.Name {
 			continue
 		}
-		certsOpts := getEtcdCertsOpts(t.ccfg.Certificate.SavePath)
-		cmd := fmt.Sprintf("ETCDCTL_API=3 etcdctl %v member remove %v", certsOpts, member.id)
-		if output, err := t.r.RunCommand(addSudo(cmd)); err != nil {
+		cmd := fmt.Sprintf("ETCDCTL_API=3 etcdctl %v member remove %v",
+			getEtcdCertsOpts(t.ccfg.GetCertDir()), member.id)
+		if output, err := r.RunCommand(addSudo(cmd)); err != nil {
 			logrus.Errorf("remove workder %v failed: %v\noutput: %v", member.name, err, output)
 		}
 	}
