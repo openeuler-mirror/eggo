@@ -33,6 +33,7 @@ import (
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/task"
+	"gitee.com/openeuler/eggo/pkg/utils/template"
 	"github.com/sirupsen/logrus"
 )
 
@@ -77,8 +78,8 @@ roleRef:
   name: system:kube-apiserver-to-kubelet
 subjects:
   - apiGroup: rbac.authorization.k8s.io
-  kind: User
-  name: kubernetes
+    kind: User
+    name: kubernetes
 `
 )
 
@@ -464,7 +465,7 @@ func (ct *PostControlPlaneTask) doAdminRole(r runner.Runner) error {
 	sb.WriteString(fmt.Sprintf("KUBECONFIG=%s/admin.conf", ct.cluster.GetConfigDir()))
 	rolebindBase64 := base64.StdEncoding.EncodeToString([]byte(AdminRoleBindConfig))
 	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/admin_cluster_rolebind.yaml", rolebindBase64, ct.cluster.GetManifestDir()))
-	sb.WriteString(fmt.Sprintf(" && kubectl apply --kub -f %s/admin_cluster_rolebind.yaml", ct.cluster.GetManifestDir()))
+	sb.WriteString(fmt.Sprintf(" && kubectl apply -f %s/admin_cluster_rolebind.yaml", ct.cluster.GetManifestDir()))
 	sb.WriteString("\"")
 	_, err = r.RunCommand(sb.String())
 	if err != nil {
@@ -474,8 +475,41 @@ func (ct *PostControlPlaneTask) doAdminRole(r runner.Runner) error {
 	return nil
 }
 
+func (ct *PostControlPlaneTask) waitClusterReady(r runner.Runner) error {
+	check := `
+#!/bin/bash
+KUBECONFIG={{ .KubeHomeDir }}/admin.conf
+for i in $(seq 60); do
+	kubectl get nodes
+	if [ $? -eq 0 ]; then
+		exit 0
+	fi
+	sleep 1
+done
+exit 1
+`
+	datastore := map[string]interface{}{}
+	datastore["KubeHomeDir"] = ct.cluster.GetCertDir()
+	shell, err := template.TemplateRender(check, datastore)
+	if err != nil {
+		return err
+	}
+	output, err := r.RunShell(shell, "waitcluster")
+	if err != nil {
+		logrus.Errorf("wait cluster failed: %v", err)
+		return err
+	}
+	logrus.Debugf("wait cluster success: %s", output)
+
+	return nil
+}
+
 func (ct *PostControlPlaneTask) Run(r runner.Runner, hcf *api.HostConfig) error {
 	// we should setup some resources for new cluster
+	// 0. wait cluster ready
+	if err := ct.waitClusterReady(r); err != nil {
+		return err
+	}
 
 	// 1. create admin rolebinding
 	if err := ct.doAdminRole(r); err != nil {

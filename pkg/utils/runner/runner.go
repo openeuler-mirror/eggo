@@ -16,12 +16,14 @@
 package runner
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"gitee.com/openeuler/eggo/pkg/api"
@@ -35,6 +37,8 @@ type Runner interface {
 	Copy(src, dst string) error
 	CopyDir(srcDir, dstDir string) error
 	RunCommand(cmd string) (string, error)
+	// content is what shell contain, name is file name of shell
+	RunShell(content string, name string) (string, error)
 	Reconnect() error
 	Close()
 }
@@ -63,6 +67,10 @@ func (r *LocalRunner) RunCommand(cmd string) (string, error) {
 	return string(output), err
 }
 
+func (r *LocalRunner) RunShell(shell string, name string) (string, error) {
+	return "", nil
+}
+
 func (r *LocalRunner) Reconnect() error {
 	// nothing to do
 	return nil
@@ -70,7 +78,6 @@ func (r *LocalRunner) Reconnect() error {
 
 func (r *LocalRunner) Close() {
 	// nothing to do
-	return
 }
 
 type SSHRunner struct {
@@ -86,7 +93,7 @@ func connect(host *kkv1alpha1.HostCfg) (ssh.Connection, error) {
 		Password:   host.Password,
 		PrivateKey: host.PrivateKey,
 		KeyFile:    host.PrivateKeyPath,
-		Timeout:    30 * time.Second,
+		Timeout:    30 * time.Minute,
 	}
 	return ssh.NewConnection(opts)
 }
@@ -107,6 +114,13 @@ func NewSSHRunner(hcfg *api.HostConfig) (Runner, error) {
 	conn, err := connect(host)
 	if err != nil {
 		return nil, err
+	}
+	// cleanup output by connection
+	output, err := conn.Exec("date", host)
+	if err != nil {
+		logrus.Warnf("run command on new connection of host: %s failed: %v", host.Name, err)
+	} else {
+		logrus.Debugf("host: %s, output: %s", host.Name, output)
 	}
 	return &SSHRunner{Host: host, Conn: conn}, nil
 }
@@ -184,5 +198,27 @@ func (ssh *SSHRunner) RunCommand(cmd string) (string, error) {
 	}
 
 	logrus.Debugf("run '%s' on %s success, output: %s\n", cmd, ssh.Host.Address, output)
+	return output, nil
+}
+
+func (ssh *SSHRunner) RunShell(shell string, name string) (string, error) {
+	tmpDir, err := ioutil.TempDir("", "eggo-shell-")
+	if err != nil {
+		return "", err
+	}
+	var sb strings.Builder
+	sb.WriteString("sudo -E /bin/sh -c \"")
+	sb.WriteString(fmt.Sprintf("mkdir -p %s", tmpDir))
+	roleBase64 := base64.StdEncoding.EncodeToString([]byte(shell))
+	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/%s", roleBase64, tmpDir, name))
+	sb.WriteString(fmt.Sprintf(" && chmod +x %s/%s", tmpDir, name))
+	sb.WriteString(fmt.Sprintf(" && %s/%s > /dev/null", tmpDir, name))
+	sb.WriteString(fmt.Sprintf(" && rm -rf %s", tmpDir))
+	sb.WriteString("\"")
+
+	output, err := ssh.RunCommand(sb.String())
+	if err != nil {
+		return "", err
+	}
 	return output, nil
 }

@@ -42,6 +42,11 @@ func (m *MockRunner) RunCommand(cmd string) (string, error) {
 	return "", nil
 }
 
+func (m *MockRunner) RunShell(shell string, name string) (string, error) {
+	logrus.Infof("run shell: %s", name)
+	return "", nil
+}
+
 func (m *MockRunner) Reconnect() error {
 	logrus.Infof("reconnect")
 	return nil

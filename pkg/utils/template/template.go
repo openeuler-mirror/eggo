@@ -206,3 +206,8 @@ func CreateSystemdServiceTemplate(name string, conf *SystemdServiceConfig) (stri
 
 	return kkutil.Render(tmpl, datastore)
 }
+
+func TemplateRender(temp string, datastore map[string]interface{}) (string, error) {
+	tmpl := template.Must(template.New("test").Funcs(funcMap).Parse(dedent.Dedent(temp)))
+	return kkutil.Render(tmpl, datastore)
+}
