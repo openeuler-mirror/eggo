@@ -56,6 +56,11 @@ func (r *fakeRunner) RunCommand(cmd string) (string, error) {
 	return "", nil
 }
 
+func (m *fakeRunner) RunShell(shell string, name string) (string, error) {
+	logrus.Infof("run shell: %s", name)
+	return "", nil
+}
+
 func (r *fakeRunner) Reconnect() error {
 	// nothing to do
 	return nil
