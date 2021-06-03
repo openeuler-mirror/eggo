@@ -26,6 +26,7 @@ type eggoOptions struct {
 	templateConfig string
 	deployConfig   string
 	cleanupConfig  string
+	debug          bool
 	version        bool
 }
 
