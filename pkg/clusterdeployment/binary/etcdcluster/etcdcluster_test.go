@@ -77,16 +77,20 @@ func TestDeployEtcd(t *testing.T) {
 	}
 	r := &runner.LocalRunner{}
 
-	if err := generateCerts(r, conf); err != nil {
-		t.Fatalf("generate etcd certs failed: %v", err)
+	if err := generateCaAndApiserverEtcdCerts(r, conf); err != nil {
+		t.Fatalf("generate ca and apiserver etcd certs failed: %v", err)
 	}
 
-	if err := copyCertsAndConfigs(conf, r, &api.HostConfig{
+	if err := copyCaAndConfigs(conf, r, &api.HostConfig{
 		Arch:    "aarch64",
 		Name:    "node0",
 		Address: "192.168.0.1",
 	}, configsTempDir, filepath.Join(dstTempDir, "etcd.conf"), filepath.Join(dstTempDir, "etcd.service")); err != nil {
 		t.Fatalf("copy etcd certs and configs failed: %v", err)
+	}
+
+	if err := generateEtcdCerts(r, conf); err != nil {
+		t.Fatalf("generate etcd certs failed: %v", err)
 	}
 
 	for _, file := range []string{
