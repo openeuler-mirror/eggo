@@ -33,7 +33,7 @@ func genEtcdServerCerts(savePath string, hostname string, ip string, cg certs.Ce
 			DNSNames: []string{"localhost", hostname},
 		},
 		Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-	}, savePath, hostname+"-server")
+	}, savePath, "server")
 }
 
 func genEtcdPeerCerts(savePath string, hostname string, ip string, cg certs.CertGenerator,
@@ -45,7 +45,7 @@ func genEtcdPeerCerts(savePath string, hostname string, ip string, cg certs.Cert
 			DNSNames: []string{"localhost", hostname},
 		},
 		Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-	}, savePath, hostname+"-peer")
+	}, savePath, "peer")
 }
 
 func genEtcdHealthcheckClientCerts(savePath string, hostname string, cg certs.CertGenerator,
@@ -53,7 +53,7 @@ func genEtcdHealthcheckClientCerts(savePath string, hostname string, cg certs.Ce
 	return cg.CreateCertAndKey(filepath.Join(savePath, "ca.crt"), filepath.Join(savePath, "ca.key"), &certs.CertConfig{
 		CommonName: hostname + "-healthcheck-client",
 		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-	}, savePath, hostname+"-healthcheck-client")
+	}, savePath, "healthcheck-client")
 }
 
 func genApiserverEtcdClientCerts(savePath string, hostnameList []string, ipList []string, cg certs.CertGenerator,
@@ -71,18 +71,9 @@ func genApiserverEtcdClientCerts(savePath string, hostnameList []string, ipList 
 }
 
 // see: https://kubernetes.io/docs/setup/best-practices/certificates/
-func generateCerts(r runner.Runner, ccfg *api.ClusterConfig) error {
-	savePath := api.GetCertificateStorePath(ccfg.Name)
-	etcdCertsPath := filepath.Join(savePath, "etcd")
+func generateEtcdCerts(r runner.Runner, ccfg *api.ClusterConfig) error {
+	etcdCertsPath := filepath.Join(ccfg.GetCertDir(), "etcd")
 	cg := certs.NewOpensshBinCertGenerator(r)
-
-	// generate etcd root ca
-	caConfig := &certs.CertConfig{
-		CommonName: "etcd-ca",
-	}
-	if err := cg.CreateCA(caConfig, etcdCertsPath, "ca"); err != nil {
-		return err
-	}
 
 	for _, node := range ccfg.EtcdCluster.Nodes {
 		// generate etcd-server certificates
@@ -101,11 +92,30 @@ func generateCerts(r runner.Runner, ccfg *api.ClusterConfig) error {
 		}
 	}
 
+	return nil
+}
+
+// see: https://kubernetes.io/docs/setup/best-practices/certificates/
+func generateCaAndApiserverEtcdCerts(r runner.Runner, ccfg *api.ClusterConfig) error {
+	savePath := api.GetCertificateStorePath(ccfg.Name)
+	etcdCertsPath := filepath.Join(savePath, "etcd")
+	cg := certs.NewOpensshBinCertGenerator(r)
+
+	// generate etcd root ca
+	caConfig := &certs.CertConfig{
+		CommonName: "etcd-ca",
+	}
+	if err := cg.CreateCA(caConfig, etcdCertsPath, "ca"); err != nil {
+		return err
+	}
+
 	var hostnameList []string
 	var ipList []string
 	for _, node := range ccfg.Nodes {
-		hostnameList = append(hostnameList, node.Name)
-		ipList = append(ipList, node.Address)
+		if isType(node.Type, api.Master) {
+			hostnameList = append(hostnameList, node.Name)
+			ipList = append(ipList, node.Address)
+		}
 	}
 
 	// generate apiserver-etcd-client certificates

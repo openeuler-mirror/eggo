@@ -51,11 +51,15 @@ func (t *EtcdDeployEtcdsTask) Name() string {
 	return "EtcdDeployEtcdsTask"
 }
 
+func isType(curType uint16, expectedType uint16) bool {
+	return curType&expectedType != 0
+}
+
 func getDstEtcdCertsDir(ccfg *api.ClusterConfig) string {
 	return filepath.Join(ccfg.GetCertDir(), "etcd")
 }
 
-func copyCertsAndConfigs(ccfg *api.ClusterConfig, r runner.Runner,
+func copyCaAndConfigs(ccfg *api.ClusterConfig, r runner.Runner,
 	hostConfig *api.HostConfig, tempConfigsDir string, dstConf string,
 	dstService string) error {
 	var copyInfos []*copyInfo
@@ -81,23 +85,8 @@ func copyCertsAndConfigs(ccfg *api.ClusterConfig, r runner.Runner,
 	caKey := filepath.Join(etcdDir, "ca.key")
 	copyInfos = append(copyInfos, &copyInfo{src: caKey, dst: filepath.Join(dstCertsDir, "ca.key")})
 
-	serverCrt := filepath.Join(etcdDir, hostConfig.Name+"-server.crt")
-	copyInfos = append(copyInfos, &copyInfo{src: serverCrt, dst: filepath.Join(dstCertsDir, "server.crt")})
-	serverKey := filepath.Join(etcdDir, hostConfig.Name+"-server.key")
-	copyInfos = append(copyInfos, &copyInfo{src: serverKey, dst: filepath.Join(dstCertsDir, "server.key")})
-
-	peerCrt := filepath.Join(etcdDir, hostConfig.Name+"-peer.crt")
-	copyInfos = append(copyInfos, &copyInfo{src: peerCrt, dst: filepath.Join(dstCertsDir, "peer.crt")})
-	peerKey := filepath.Join(etcdDir, hostConfig.Name+"-peer.key")
-	copyInfos = append(copyInfos, &copyInfo{src: peerKey, dst: filepath.Join(dstCertsDir, "peer.key")})
-
-	healthcheckCrt := filepath.Join(etcdDir, hostConfig.Name+"-healthcheck-client.crt")
-	copyInfos = append(copyInfos, &copyInfo{src: healthcheckCrt, dst: filepath.Join(dstCertsDir, "healthcheck-client.crt")})
-	healthcheckKey := filepath.Join(etcdDir, hostConfig.Name+"-healthcheck-client.key")
-	copyInfos = append(copyInfos, &copyInfo{src: healthcheckKey, dst: filepath.Join(dstCertsDir, "healthcheck-client.key")})
-
 	createDirsCmd := "sudo mkdir -p -m 0700 " + filepath.Dir(dstConf) +
-		" && mkdir -p -m 0700 " + dstCertsDir + " && mkdir -p " + filepath.Dir(dstService)
+		" && mkdir -p -m 0700 " + dstCertsDir
 	if output, err := r.RunCommand(createDirsCmd); err != nil {
 		return fmt.Errorf("run command on %v to create dirs failed: %v\noutput: %v",
 			hostConfig.Address, err, output)
@@ -118,7 +107,12 @@ func (t *EtcdDeployEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfig) e
 		return fmt.Errorf("empty host config")
 	}
 
-	if err := copyCertsAndConfigs(t.ccfg, r, hostConfig, tempDir, EtcdConfFile, EtcdServiceFile); err != nil {
+	if err := copyCaAndConfigs(t.ccfg, r, hostConfig, tempDir, EtcdConfFile, EtcdServiceFile); err != nil {
+		return err
+	}
+
+	// generate etcd-server etcd-peer and etcd-health-check certificates on etcd nodes
+	if err := generateEtcdCerts(r, t.ccfg); err != nil {
 		return err
 	}
 
@@ -226,8 +220,8 @@ func Init(conf *api.ClusterConfig) error {
 		return err
 	}
 
-	// generate certificates
-	if err := generateCerts(&runner.LocalRunner{}, conf); err != nil {
+	// generate ca certificates and kube-apiserver-etcd-client certificates
+	if err := generateCaAndApiserverEtcdCerts(&runner.LocalRunner{}, conf); err != nil {
 		return err
 	}
 
