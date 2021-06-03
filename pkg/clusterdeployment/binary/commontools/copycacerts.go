@@ -66,7 +66,7 @@ func getRequireCerts(hostType uint16) []string {
 		}
 	}
 	var ret []string
-	for k, _ := range tmpCerts {
+	for k := range tmpCerts {
 		ret = append(ret, k)
 	}
 	return ret

@@ -219,7 +219,7 @@ func SetupKubeletService(r runner.Runner, kcf *api.Kubelet, hcf *api.HostConfig)
 		"--bootstrap-kubeconfig":       "/etc/kubernetes/kubelet-bootstrap.kubeconfig",
 		"--register-node":              "true",
 		"--hostname-override":          hcf.Name,
-		"--container-runtime=":         "remote",
+		"--container-runtime":          "remote",
 		"--container-runtime-endpoint": "unix:///var/run/isulad.sock",
 		"--v":                          "2",
 	}

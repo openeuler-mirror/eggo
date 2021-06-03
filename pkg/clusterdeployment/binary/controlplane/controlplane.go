@@ -67,19 +67,18 @@ rules:
     verbs:
       - "*"
 `
-	AdminRoleBindConfig = `apiVersion: rbac.authorization.k8s.io/v1
+	ClusterRoleBindingTemplate = `apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: system:kube-apiserver
-  namespace: ""
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: system:kube-apiserver-to-kubelet
+  name: {{ .Name }}
 subjects:
-  - apiGroup: rbac.authorization.k8s.io
-    kind: User
-    name: kubernetes
+- kind: {{ .SubjectKind }}
+  name: {{ .SubjectName }}
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: {{ .RoleName }}
+  apiGroup: rbac.authorization.k8s.io
 `
 )
 
@@ -153,6 +152,21 @@ func generateApiServerCertificate(savePath string, cg certs.CertGenerator, ccfg 
 		ips = append(ips, ccfg.ControlPlane.ApiConf.CertSans.IPs...)
 		dnsnames = append(dnsnames, ccfg.ControlPlane.ApiConf.CertSans.DNSNames...)
 	}
+
+	host := ccfg.LoadBalancer.IP
+	if host == "" {
+		// TODO: get ready master by master status list
+		for _, n := range ccfg.Nodes {
+			if n.Type&api.Master != 0 {
+				host = n.Address
+				break
+			}
+		}
+	}
+	if host == "" {
+		return fmt.Errorf("invalid host or sport")
+	}
+	ips = append(ips, host)
 
 	apiserverConfig := &certs.CertConfig{
 		CommonName:    "kube-apiserver",
@@ -449,10 +463,9 @@ func (ct *PostControlPlaneTask) Name() string {
 func (ct *PostControlPlaneTask) doAdminRole(r runner.Runner) error {
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"")
-	sb.WriteString(fmt.Sprintf("KUBECONFIG=%s/admin.conf", ct.cluster.GetConfigDir()))
 	roleBase64 := base64.StdEncoding.EncodeToString([]byte(AdminRoleConfig))
-	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/admin_cluster_role.yaml", roleBase64, ct.cluster.GetManifestDir()))
-	sb.WriteString(fmt.Sprintf(" && kubectl apply -f %s/admin_cluster_role.yaml", ct.cluster.GetManifestDir()))
+	sb.WriteString(fmt.Sprintf(" echo %s | base64 -d > %s/admin_cluster_role.yaml", roleBase64, ct.cluster.GetManifestDir()))
+	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s/admin.conf kubectl apply -f %s/admin_cluster_role.yaml", ct.cluster.GetConfigDir(), ct.cluster.GetManifestDir()))
 	sb.WriteString("\"")
 	_, err := r.RunCommand(sb.String())
 	if err != nil {
@@ -460,27 +473,88 @@ func (ct *PostControlPlaneTask) doAdminRole(r runner.Runner) error {
 		return err
 	}
 
-	sb.Reset()
-	sb.WriteString("sudo -E /bin/sh -c \"")
-	sb.WriteString(fmt.Sprintf("KUBECONFIG=%s/admin.conf", ct.cluster.GetConfigDir()))
-	rolebindBase64 := base64.StdEncoding.EncodeToString([]byte(AdminRoleBindConfig))
-	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/admin_cluster_rolebind.yaml", rolebindBase64, ct.cluster.GetManifestDir()))
-	sb.WriteString(fmt.Sprintf(" && kubectl apply -f %s/admin_cluster_rolebind.yaml", ct.cluster.GetManifestDir()))
-	sb.WriteString("\"")
-	_, err = r.RunCommand(sb.String())
-	if err != nil {
+	adminRoleBindConfig := &api.ClusterRoleBindingConfig{
+		Name:        "system:kube-apiserver",
+		SubjectName: "kubernetes",
+		SubjectKind: "User",
+		RoleName:    "system:kube-apiserver-to-kubelet",
+	}
+
+	if err := ct.applyClusterRoleBinding(r, adminRoleBindConfig); err != nil {
 		logrus.Errorf("apply admin rolebind failed: %v", err)
 		return err
 	}
+
+	return nil
+}
+
+func (ct *PostControlPlaneTask) createBootstrapCrb() []*api.ClusterRoleBindingConfig {
+	csr := &api.ClusterRoleBindingConfig{
+		Name:        "create-csrs-for-bootstrapping",
+		SubjectName: "system:bootstrappers",
+		SubjectKind: "Group",
+		RoleName:    "system:node-bootstrapper",
+	}
+	approve := &api.ClusterRoleBindingConfig{
+		Name:        "auto-approve-csrs-for-group",
+		SubjectName: "system:bootstrappers",
+		SubjectKind: "Group",
+		RoleName:    "system:certificates.k8s.io:certificatesigningrequests:nodeclient",
+	}
+	renew := &api.ClusterRoleBindingConfig{
+		Name:        "auto-approve-renewals-for-nodes",
+		SubjectName: "system:nodes",
+		SubjectKind: "Group",
+		RoleName:    "system:certificates.k8s.io:certificatesigningrequests:selfnodeclient",
+	}
+
+	return []*api.ClusterRoleBindingConfig{csr, approve, renew}
+}
+
+func (ct *PostControlPlaneTask) applyClusterRoleBinding(r runner.Runner, crbc *api.ClusterRoleBindingConfig) error {
+	datastore := map[string]interface{}{}
+	datastore["Name"] = crbc.Name
+	datastore["SubjectName"] = crbc.SubjectName
+	datastore["SubjectKind"] = crbc.SubjectKind
+	datastore["RoleName"] = crbc.RoleName
+	crb, err := template.TemplateRender(ClusterRoleBindingTemplate, datastore)
+	if err != nil {
+		return err
+	}
+
+	var sb strings.Builder
+	sb.WriteString("sudo -E /bin/sh -c \"")
+	sb.WriteString("mkdir -p /tmp/.eggo")
+	crbYamlBase64 := base64.StdEncoding.EncodeToString([]byte(crb))
+	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > /tmp/.eggo/%s.yaml", crbYamlBase64, crbc.Name))
+	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s/admin.conf kubectl apply -f /tmp/.eggo/%s.yaml", ct.cluster.GetConfigDir(), crbc.Name))
+	sb.WriteString("\"")
+
+	_, err = r.RunCommand(sb.String())
+	if err != nil {
+		logrus.Errorf("apply crbs failed: %v", err)
+		return err
+	}
+	return nil
+}
+
+func (ct *PostControlPlaneTask) bootstrapClusterRoleBinding(r runner.Runner) error {
+	crbcs := ct.createBootstrapCrb()
+	for _, crbc := range crbcs {
+		if err := ct.applyClusterRoleBinding(r, crbc); err != nil {
+			logrus.Errorf("apply ClusterRoleBinding failed: %v", err)
+			return err
+		}
+	}
+
 	return nil
 }
 
 func (ct *PostControlPlaneTask) waitClusterReady(r runner.Runner) error {
 	check := `
 #!/bin/bash
-KUBECONFIG={{ .KubeHomeDir }}/admin.conf
 for i in $(seq 60); do
-	kubectl get nodes
+	KUBECONFIG={{ .KubeHomeDir }}/admin.conf kubectl get nodes
 	if [ $? -eq 0 ]; then
 		exit 0
 	fi
@@ -489,7 +563,7 @@ done
 exit 1
 `
 	datastore := map[string]interface{}{}
-	datastore["KubeHomeDir"] = ct.cluster.GetCertDir()
+	datastore["KubeHomeDir"] = ct.cluster.GetConfigDir()
 	shell, err := template.TemplateRender(check, datastore)
 	if err != nil {
 		return err
@@ -513,6 +587,11 @@ func (ct *PostControlPlaneTask) Run(r runner.Runner, hcf *api.HostConfig) error 
 
 	// 1. create admin rolebinding
 	if err := ct.doAdminRole(r); err != nil {
+		return err
+	}
+
+	// 2. create bootstrap clusterrolebinding
+	if err := ct.bootstrapClusterRoleBinding(r); err != nil {
 		return err
 	}
 

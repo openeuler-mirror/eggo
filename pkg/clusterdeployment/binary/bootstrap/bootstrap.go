@@ -19,7 +19,6 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
-	"net"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -36,6 +35,7 @@ import (
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/task"
+	"gitee.com/openeuler/eggo/pkg/utils/template"
 	"github.com/sirupsen/logrus"
 )
 
@@ -152,19 +152,29 @@ func prepareISulad(r runner.Runner, ccfg *api.ClusterConfig) error {
 		cniBinDir = ccfg.ControlPlane.KubeletConf.CniBinDir
 	}
 
-	var sb strings.Builder
-	sb.WriteString("sudo -E /bin/sh -c \"")
-	sb.WriteString("sed -i '/registry-mirrors/a\\    \t\"docker.io\"' /etc/isulad/daemon.json && ")
-	sb.WriteString("sed -i '/insecure-registries/a\\    \t\"quay.io\"' /etc/isulad/daemon.json && ")
-	sb.WriteString("sed -i '/insecure-registries/a\\    \t\"k8s.gcr.io\",' /etc/isulad/daemon.json && ")
-	sb.WriteString(fmt.Sprintf("sed -i 's#pod-sandbox-image\\\": \\\"#pod-sandbox-image\\\": \\\"%s#g' /etc/isulad/daemon.json && ", pauseImage))
-	sb.WriteString("sed -i 's#network-plugin\\\": \\\"#network-plugin\\\": \\\"cni#g' /etc/isulad/daemon.json && ")
-	sb.WriteString(fmt.Sprintf("sed -i 's#cni-bin-dir\\\": \\\"#cni-bin-dir\\\": \\\"%s#g' /etc/isulad/daemon.json && ", cniBinDir))
-	sb.WriteString("systemctl restart isulad\"")
-
-	if _, err := r.RunCommand(sb.String()); err != nil {
+	isuladConfig := `
+#!/bin/bash
+sed -i "/registry-mirrors/a\    \t\"docker.io\"" /etc/isulad/daemon.json
+sed -i "/insecure-registries/a\    \t\"quay.io\"" /etc/isulad/daemon.json
+sed -i "/insecure-registries/a\    \t\"k8s.gcr.io\"," /etc/isulad/daemon.json
+sed -i "s#pod-sandbox-image\": \"#pod-sandbox-image\": \"{{ .pauseImage }}#g" /etc/isulad/daemon.json
+sed -i "s#network-plugin\": \"#network-plugin\": \"cni#g" /etc/isulad/daemon.json
+sed -i "s#cni-bin-dir\": \"#cni-bin-dir\": \"{{ .cniBinDir }}#g" /etc/isulad/daemon.json
+systemctl restart isulad
+`
+	datastore := map[string]interface{}{}
+	datastore["pauseImage"] = pauseImage
+	datastore["cniBinDir"] = cniBinDir
+	shell, err := template.TemplateRender(isuladConfig, datastore)
+	if err != nil {
 		return err
 	}
+	output, err := r.RunShell(shell, "isuladShell")
+	if err != nil {
+		logrus.Errorf("modify isulad daemon.json failed: %v", err)
+		return err
+	}
+	logrus.Debugf("modify isulad daemon.json success: %s", output)
 
 	return nil
 }
@@ -190,7 +200,7 @@ func genConfig(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig, to
 		return err
 	}
 
-	if err := genProxyCertAndConfig(r, ccfg, apiEndpoint); err != nil {
+	if err := genProxyCertAndConfig(r, ccfg, hcf, apiEndpoint); err != nil {
 		logrus.Errorf("generate proxy cert and kubeconfig failed: %v", err)
 		return err
 	}
@@ -199,8 +209,8 @@ func genConfig(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig, to
 }
 
 func getEndpoint(ccfg *api.ClusterConfig) (string, error) {
-	host, sport, err := net.SplitHostPort(ccfg.ControlPlane.Endpoint)
-	if err != nil {
+	host, sport := ccfg.LoadBalancer.IP, ccfg.LoadBalancer.Port
+	if host == "" || sport == "" {
 		// TODO: get ready master by master status list
 		for _, n := range ccfg.Nodes {
 			if n.Type&api.Master != 0 {
@@ -253,7 +263,7 @@ func genKubeletBootstrap(r runner.Runner, ccfg *api.ClusterConfig, token, apiEnd
 		" --kubeconfig=kubelet-bootstrap.kubeconfig")
 	sb.WriteString(" && ")
 	sb.WriteString("kubectl config use-context default" +
-		" --kubelet-bootstrap.kubeconfig")
+		" --kubeconfig=kubelet-bootstrap.kubeconfig")
 	sb.WriteString("\"")
 
 	if _, err := r.RunCommand(sb.String()); err != nil {
@@ -279,7 +289,7 @@ clusterDNS:
 - ` + ccfg.ControlPlane.KubeletConf.DnsVip + `
 clusterDomain: ` + ccfg.ControlPlane.KubeletConf.DnsDomain + `
 runtimeRequestTimeout: "15m"
-	`
+`
 
 	var sb strings.Builder
 	cfgBase64 := base64.StdEncoding.EncodeToString([]byte(kubeletConfig))
@@ -290,61 +300,74 @@ runtimeRequestTimeout: "15m"
 	return nil
 }
 
-func genProxyCertAndConfig(r runner.Runner, ccfg *api.ClusterConfig, apiEndpoint string) (err error) {
-	rootPath := ccfg.GetConfigDir()
-	certPath := ccfg.GetCertDir()
-
-	cg := certs.NewOpensshBinCertGenerator(r)
-	defer func() {
-		if err != nil {
-			cg.CleanAll(rootPath)
-		}
-	}()
-
-	if err = genProxyCert(certPath, cg); err != nil {
-		logrus.Errorf("generate proxy cert failed: %v", err)
-		return
+func genProxyCertAndConfig(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig, apiEndpoint string) error {
+	if err := genProxyCert(r, ccfg, hcf); err != nil {
+		logrus.Errorf("generate kube-proxy certs failed: %v", err)
+		return err
 	}
 
-	err = cg.CreateKubeConfig(rootPath, KubeConfigFileNameKubeProxy, filepath.Join(certPath, "ca.crt"), "default-kube-proxy",
-		filepath.Join(certPath, "kube-proxy.key"), filepath.Join(certPath, "kube-proxy.crt"), apiEndpoint)
-	if err != nil {
-		logrus.Errorf("generate proxy kube config failed: %v", err)
-		return
-	}
-
-	if err = genProxyConfig(r, ccfg); err != nil {
+	if err := genProxyConfig(r, ccfg, apiEndpoint); err != nil {
 		logrus.Errorf("generate proxy config failed: %v", err)
-		return
+		return err
 	}
 
-	return
+	return nil
 }
 
-func genProxyCert(savePath string, cg certs.CertGenerator) error {
+func genProxyCert(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig) error {
 	// TODO:
 	//		generate kube proxy CSR and key on worker
 	// 		transfer CSR to CA(eggo)
 	//		CA generate cert by CSR and ca.key
 	//		transfer cert to worker
 
+	certPath := ccfg.GetCertDir()
+	certPrefix := KubeProxyKubeConfigName + "-" + hcf.Name
+	certGen := certs.NewLocalCertGenerator()
+
 	proxyConfig := &certs.CertConfig{
 		CommonName: "system:kube-proxy",
 		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 	}
-	caCertPath := fmt.Sprintf("%s/%s.crt", savePath, RootCAName)
-	caKeyPath := fmt.Sprintf("%s/%s.key", savePath, RootCAName)
-	return cg.CreateCertAndKey(caCertPath, caKeyPath, proxyConfig, savePath, KubeProxyKubeConfigName)
+	caCertPath := fmt.Sprintf("%s/%s.crt", certPath, RootCAName)
+	caKeyPath := fmt.Sprintf("%s/%s.key", certPath, RootCAName)
+	if err := certGen.CreateCertAndKey(caCertPath, caKeyPath, proxyConfig, certPath, certPrefix); err != nil {
+		logrus.Errorf("generate proxy cert and key failed for node %s: %v", hcf.Address, err)
+		return err
+	}
+
+	if err := r.Copy(filepath.Join(certPath, certPrefix+".key"), filepath.Join(ccfg.Certificate.SavePath, KubeProxyKubeConfigName+".key")); err != nil {
+		logrus.Errorf("copy cert: %s to host: %s failed: %v", certPrefix+".key", hcf.Name, err)
+		return err
+	}
+
+	if err := r.Copy(filepath.Join(certPath, certPrefix+".crt"), filepath.Join(ccfg.Certificate.SavePath, KubeProxyKubeConfigName+".crt")); err != nil {
+		logrus.Errorf("copy cert: %s to host: %s failed: %v", certPrefix+".key", hcf.Name, err)
+		return err
+	}
+	logrus.Infof("copy certs to host: %s success", hcf.Name)
+
+	return nil
 }
 
-func genProxyConfig(r runner.Runner, ccfg *api.ClusterConfig) error {
+func genProxyConfig(r runner.Runner, ccfg *api.ClusterConfig, apiEndpoint string) error {
 	proxyConfig := `kind: KubeProxyConfiguration
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 clientConnection:
   kubeconfig: /etc/kubernetes/kube-proxy.conf
 clusterCIDR: ` + ccfg.Network.PodCIDR + `
 mode: "iptables"
-		`
+`
+
+	rootPath := ccfg.GetConfigDir()
+	certPath := ccfg.GetCertDir()
+	configGen := certs.NewOpensshBinCertGenerator(r)
+	err := configGen.CreateKubeConfig(rootPath, KubeConfigFileNameKubeProxy, filepath.Join(certPath, "ca.crt"), "default-kube-proxy",
+		filepath.Join(certPath, "kube-proxy.key"), filepath.Join(certPath, "kube-proxy.crt"), apiEndpoint)
+	if err != nil {
+		logrus.Errorf("generate proxy kube config failed: %v", err)
+		return err
+	}
 
 	var sb strings.Builder
 	cfgBase64 := base64.StdEncoding.EncodeToString([]byte(proxyConfig))
