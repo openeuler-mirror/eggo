@@ -502,43 +502,53 @@ func toClusterdeploymentConfig(conf *deployConfig) *api.ClusterConfig {
 	return ccfg
 }
 
+func getHostconfigs(format string, ips []string) []*HostConfig {
+	var confs []*HostConfig
+	for i, ip := range ips {
+		confs = append(confs, &HostConfig{
+			Name: fmt.Sprintf(format, i),
+			Ip:   ip,
+			Port: 22,
+			Arch: "amd64",
+		})
+	}
+	return confs
+}
+
 func createDeployConfigTemplate(file string) error {
+	var masters, nodes, etcds, lbs []*HostConfig
+	masterIP := []string{"192.168.0.2"}
+	if opts.masters != nil {
+		masterIP = opts.masters
+	}
+	nodesIP := []string{"192.168.0.3", "192.168.0.4"}
+	if opts.nodes != nil {
+		nodesIP = opts.nodes
+	}
+	lbsIP := []string{"192.168.0.1"}
+	if opts.loadbalancer != nil {
+		lbsIP = opts.loadbalancer
+	}
+	etcdsIP := masterIP
+	if opts.etcds != nil {
+		etcdsIP = opts.etcds
+	}
+	masters = getHostconfigs("k8s-master-%d", masterIP)
+	nodes = getHostconfigs("k8s-node-%d", nodesIP)
+	etcds = getHostconfigs("etcd-%d", etcdsIP)
+	lbs = getHostconfigs("k8s-loadbalance-%d", lbsIP)
+	if etcds == nil {
+		etcds = masters
+	}
+
 	conf := &deployConfig{
-		ClusterID: "k8s-cluster",
-		Username:  "root",
-		Password:  "password",
-		Masters: []*HostConfig{
-			{
-				Name: "k8s-master-0",
-				Ip:   "192.168.0.11",
-				Port: 22,
-				Arch: "amd64",
-			},
-		},
-		Nodes: []*HostConfig{
-			{
-				Name: "k8s-node-0",
-				Ip:   "192.168.0.12",
-				Port: 22,
-				Arch: "amd64",
-			},
-		},
-		Etcds: []*HostConfig{
-			{
-				Name: "etcd-0",
-				Ip:   "192.168.0.13",
-				Port: 22,
-				Arch: "amd64",
-			},
-		},
-		LoadBalances: []*HostConfig{
-			{
-				Name: "k8s-loadbalance-0",
-				Ip:   "192.168.0.14",
-				Port: 22,
-				Arch: "amd64",
-			},
-		},
+		ClusterID:      opts.name,
+		Username:       opts.username,
+		Password:       opts.password,
+		Masters:        masters,
+		Nodes:          nodes,
+		Etcds:          etcds,
+		LoadBalances:   lbs,
 		ConfigDir:      constants.DefaultK8SRootDir,
 		CertificateDir: constants.DefaultK8SCertDir,
 		ExternalCA:     false,
@@ -552,7 +562,7 @@ func createDeployConfigTemplate(file string) error {
 			PodCIDR:    "10.244.64.0/16",
 			PluginArgs: make(map[string]string),
 		},
-		ApiServerEndpoint: "https://192.168.0.11:6443",
+		ApiServerEndpoint: fmt.Sprintf("https://%s:6443", lbs[0].Ip),
 		ApiServerCertSans: api.Sans{},
 		ApiServerTimeout:  "120s",
 		EtcdExternal:      false,
