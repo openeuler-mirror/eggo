@@ -18,12 +18,25 @@ package main
 import (
 	"fmt"
 	"os"
+	"path"
+	"runtime"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 func showVersion() {
 	fmt.Println("eggo version 0.0.1")
+}
+
+func initLog() {
+	logrus.SetLevel(logrus.DebugLevel)
+	logrus.SetReportCaller(true)
+	logrus.SetFormatter(&logrus.TextFormatter{
+		CallerPrettyfier: func(f *runtime.Frame) (string, string) {
+			return fmt.Sprintf("%s()", path.Base(f.Function)), fmt.Sprintf("%s:%d", path.Base(f.File), f.Line)
+		},
+	})
 }
 
 func NewEggoCmd() *cobra.Command {
@@ -41,6 +54,7 @@ func NewEggoCmd() *cobra.Command {
 			return nil
 		},
 	}
+	eggoCmd.PersistentFlags().BoolVarP(&opts.debug, "debug", "d", false, "Run debug mode")
 
 	setupEggoCmdOpts(eggoCmd)
 

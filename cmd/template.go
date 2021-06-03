@@ -20,6 +20,9 @@ import (
 )
 
 func createTemplate(cmd *cobra.Command, args []string) error {
+	if opts.debug {
+		initLog()
+	}
 	return createDeployConfigTemplate(opts.templateConfig)
 }
 

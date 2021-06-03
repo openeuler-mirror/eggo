@@ -49,21 +49,30 @@ type LocalRunner struct {
 func (r *LocalRunner) CopyDir(srcDir, dstDir string) error {
 	output, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("sudo cp -rf %v %v", srcDir, dstDir)).CombinedOutput()
 	if err != nil {
-		logrus.Errorf("copy %s to %s failed: %v\noutput: %v\n", srcDir, dstDir, err, string(output))
+		logrus.Errorf("[local] copy %s to %s failed: %v\noutput: %v\n", srcDir, dstDir, err, string(output))
+		return err
 	}
-	return err
+	logrus.Debugf("[local] copy %s to %s success", srcDir, dstDir)
+	return nil
 }
 
 func (r *LocalRunner) Copy(src, dst string) error {
 	output, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("sudo cp -f %v %v", src, dst)).CombinedOutput()
 	if err != nil {
-		logrus.Errorf("copy %s to %s failed: %v\noutput: %v\n", src, dst, err, string(output))
+		logrus.Errorf("[local] copy %s to %s failed: %v\noutput: %v\n", src, dst, err, string(output))
+	} else {
+		logrus.Debugf("[local] copy %s to %s success", src, dst)
 	}
 	return err
 }
 
 func (r *LocalRunner) RunCommand(cmd string) (string, error) {
 	output, err := exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
+	if err != nil {
+		logrus.Errorf("[local] run command: %s, failed: %v", cmd, err)
+	} else {
+		logrus.Debugf("[local] run command: %s, success", cmd)
+	}
 	return string(output), err
 }
 
@@ -100,6 +109,7 @@ func connect(host *kkv1alpha1.HostCfg) (ssh.Connection, error) {
 
 func HostConfigToKKCfg(hcfg *api.HostConfig) *kkv1alpha1.HostCfg {
 	return &kkv1alpha1.HostCfg{
+		Name:           hcfg.Name,
 		User:           hcfg.UserName,
 		Port:           hcfg.Port,
 		Address:        hcfg.Address,
@@ -118,9 +128,9 @@ func NewSSHRunner(hcfg *api.HostConfig) (Runner, error) {
 	// cleanup output by connection
 	output, err := conn.Exec("date", host)
 	if err != nil {
-		logrus.Warnf("run command on new connection of host: %s failed: %v", host.Name, err)
+		logrus.Warnf("[%s] run command on new connection failed: %v", host.Name, err)
 	} else {
-		logrus.Debugf("host: %s, output: %s", host.Name, output)
+		logrus.Debugf("[%s] output: %s", host.Name, output)
 	}
 	return &SSHRunner{Host: host, Conn: conn}, nil
 }
@@ -141,28 +151,29 @@ func (ssh *SSHRunner) Reconnect() error {
 
 func (ssh *SSHRunner) Copy(src, dst string) error {
 	if ssh.Conn == nil {
-		return errors.New("SSH runner is not connected")
+		return fmt.Errorf("[%s] SSH runner is not connected", ssh.Host.Name)
 	}
 	err := ssh.Conn.Scp(src, dst)
 	if err != nil {
-		logrus.Errorf("Copy %s to %s:%s failed\n", src, ssh.Host.Address, dst)
+		logrus.Errorf("[%s] Copy %s to %s failed", ssh.Host.Name, src, dst)
 		return err
 	}
-	logrus.Debugf("Copy %s to %s:%s success\n", src, ssh.Host.Address, dst)
+	logrus.Debugf("[%s] Copy %s to %s success\n", ssh.Host.Name, src, dst)
 	return nil
 }
 
 func (ssh *SSHRunner) CopyDir(srcDir, dstDir string) error {
 	fi, err := os.Stat(srcDir)
 	if err != nil {
-		logrus.Errorf("check src dir: %s failed: %v", srcDir, err)
+		logrus.Errorf("[%s] check src dir: %s failed: %v", ssh.Host.Name, srcDir, err)
 		return err
 	}
 	if !fi.IsDir() {
-		return fmt.Errorf("src dir %s is not a directory", srcDir)
+		return fmt.Errorf("[%s] src dir %s is not a directory", ssh.Host.Name, srcDir)
 	}
 	tmpDir, err := ioutil.TempDir("", "eggo-certs-")
 	if err != nil {
+		logrus.Errorf("[%s] create tempdir failed: %v", ssh.Host.Name, err)
 		return err
 	}
 	tmpCert := filepath.Join(tmpDir, "pki.tar.gz")
@@ -170,21 +181,23 @@ func (ssh *SSHRunner) CopyDir(srcDir, dstDir string) error {
 	// tar src dir
 	_, err = lr.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"mkdir -p %s && cd %s && tar -cf %s *\"", tmpDir, srcDir, tmpCert))
 	if err != nil {
-		logrus.Errorf("create cert tmp tar failed: %v", err)
+		logrus.Errorf("[%s] create cert tmp tar failed: %v", ssh.Host.Name, err)
 		return err
 	}
 	// scp to dist
 	err = ssh.Copy(tmpCert, filepath.Join(dstDir, "pki.tar.gz"))
 	if err != nil {
-		logrus.Errorf("copy tmp tar failed: %v", err)
+		logrus.Errorf("[%s] copy tmp tar failed: %v", ssh.Host.Name, err)
 		return err
 	}
 	// untar tmp file
 	_, err = ssh.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"cd %s && tar -xf %s && rm -f %s\"", dstDir, "pki.tar.gz", "pki.tar.gz"))
 	if err != nil {
-		logrus.Errorf("untar tmp tar failed: %v", err)
+		logrus.Errorf("[%s] untar tmp tar failed: %v", ssh.Host.Name, err)
+		return err
 	}
-	return err
+	logrus.Debugf("[%s] copy dir '%s' to '%s' success", ssh.Host.Name, srcDir, dstDir)
+	return nil
 }
 
 func (ssh *SSHRunner) RunCommand(cmd string) (string, error) {
@@ -193,11 +206,11 @@ func (ssh *SSHRunner) RunCommand(cmd string) (string, error) {
 	}
 	output, err := ssh.Conn.Exec(cmd, ssh.Host)
 	if err != nil {
-		logrus.Errorf("run '%s' on %s failed: %v\n", cmd, ssh.Host.Address, err)
+		logrus.Errorf("[%s] run '%s' failed: %v\n", ssh.Host.Name, cmd, err)
 		return "", err
 	}
 
-	logrus.Debugf("run '%s' on %s success, output: %s\n", cmd, ssh.Host.Address, output)
+	logrus.Debugf("[%s] run '%s' success, output: %s\n", ssh.Host.Name, cmd, output)
 	return output, nil
 }
 
@@ -218,7 +231,9 @@ func (ssh *SSHRunner) RunShell(shell string, name string) (string, error) {
 
 	output, err := ssh.RunCommand(sb.String())
 	if err != nil {
+		logrus.Errorf("[%s] run shell '%s' failed: %v", ssh.Host.Name, name, err)
 		return "", err
 	}
+	logrus.Debugf("[%s] run shell '%s' failed: %v", ssh.Host.Name, name, output)
 	return output, nil
 }
