@@ -23,7 +23,14 @@ import (
 )
 
 type eggoOptions struct {
+	name           string
 	templateConfig string
+	masters        []string
+	nodes          []string
+	etcds          []string
+	loadbalancer   []string
+	username       string
+	password       string
 	deployConfig   string
 	cleanupConfig  string
 	debug          bool
@@ -59,5 +66,12 @@ func setupCleanupCmdOpts(cleanupCmd *cobra.Command) {
 
 func setupTemplateCmdOpts(templateCmd *cobra.Command) {
 	flags := templateCmd.Flags()
+	flags.StringVarP(&opts.name, "name", "n", "k8s-cluster", "set cluster name")
+	flags.StringVarP(&opts.username, "user", "u", "root", "user to login all node")
+	flags.StringVarP(&opts.password, "password", "p", "123456", "password to login all node")
+	flags.StringArrayVarP(&opts.masters, "masters", "", []string{"192.168.0.2"}, "set master ips")
+	flags.StringArrayVarP(&opts.nodes, "nodes", "", []string{"192.168.0.3", "192.168.0.4"}, "set worker ips")
+	flags.StringArrayVarP(&opts.etcds, "etcds", "", nil, "set etcd node ips")
+	flags.StringArrayVarP(&opts.loadbalancer, "loadbalancer", "l", []string{"192.168.0.1"}, "set loadbalancer node")
 	flags.StringVarP(&opts.templateConfig, "file", "f", "template.yaml", "location of eggo's template config file, default $(current)/template.yaml")
 }
