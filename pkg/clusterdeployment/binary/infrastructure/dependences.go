@@ -20,16 +20,23 @@ import (
 	"strings"
 
 	"gitee.com/openeuler/eggo/pkg/api"
+	"gitee.com/openeuler/eggo/pkg/constants"
 	"gitee.com/openeuler/eggo/pkg/utils"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"github.com/sirupsen/logrus"
 )
 
 const (
-	prmT   = "sudo -E /bin/sh -c \"if [ x != x$(which apt 2>/dev/null) ]; then echo apt ; elif [ x != x$(which yum 2>/dev/null) ]; then echo yum ; fi\""
-	pmT    = "sudo -E /bin/sh -c \"if [ x != x$(which dpkg 2>/dev/null) ]; then echo dpkg ; elif [ x != x$(which rpm 2>/dev/null) ]; then echo rpm ; fi\""
-	tmpDir = "/etc/.eggo/"
+	prmT = "sudo -E /bin/sh -c \"if [ x != x$(which apt 2>/dev/null) ]; then echo apt ; elif [ x != x$(which yum 2>/dev/null) ]; then echo yum ; fi\""
+	pmT  = "sudo -E /bin/sh -c \"if [ x != x$(which dpkg 2>/dev/null) ]; then echo dpkg ; elif [ x != x$(which rpm 2>/dev/null) ]; then echo rpm ; fi\""
 )
+
+func getPkgDistPath(confPath string) string {
+	if confPath == "" {
+		return constants.DefaultPkgUntarPath
+	}
+	return confPath
+}
 
 type Dependences interface {
 	Check(r runner.Runner, hcg *api.HostConfig) error
@@ -115,16 +122,16 @@ func (il *InstallByLocal) DoInstall(r runner.Runner, hcg *api.HostConfig) (err e
 		return
 	}
 	defer func() {
-		if _, e := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"rm -rf %s\"", tmpDir)); e != nil {
+		if _, e := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"rm -rf %s\"", getPkgDistPath(il.pcfg.DistPath))); e != nil {
 			err = fmt.Errorf("%v. And remove dir failed: %v", err, e)
 		}
 	}()
 
-	if err = installByLocalPkg(r, hcg, il.pmanager, il.pkg); err != nil {
+	if err = installByLocalPkg(r, hcg, il.pcfg, il.pmanager, il.pkg); err != nil {
 		return
 	}
 
-	if err = installByLocalBinary(r, hcg, il.binary); err != nil {
+	if err = installByLocalBinary(r, hcg, il.pcfg, il.binary); err != nil {
 		return
 	}
 
@@ -158,6 +165,7 @@ func copySource(r runner.Runner, hcg *api.HostConfig, pcfg *api.PackageSrcConfig
 		return fmt.Errorf("invalid srcpath for %s", hcg.Address)
 	}
 
+	tmpDir := getPkgDistPath(pcfg.DistPath)
 	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"mkdir -p %s\"", tmpDir)); err != nil {
 		return err
 	}
@@ -179,7 +187,7 @@ func copySource(r runner.Runner, hcg *api.HostConfig, pcfg *api.PackageSrcConfig
 	return nil
 }
 
-func installByLocalPkg(r runner.Runner, hcg *api.HostConfig, pmanager string, pkg []string) error {
+func installByLocalPkg(r runner.Runner, hcg *api.HostConfig, pcfg *api.PackageSrcConfig, pmanager string, pkg []string) error {
 	if len(pkg) == 0 {
 		return nil
 	}
@@ -194,7 +202,7 @@ func installByLocalPkg(r runner.Runner, hcg *api.HostConfig, pmanager string, pk
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	for _, p := range pkg {
-		sb.WriteString(fmt.Sprintf("%s %s/%s* && ", pmCommand, tmpDir, p))
+		sb.WriteString(fmt.Sprintf("%s %s/%s* && ", pmCommand, getPkgDistPath(pcfg.DistPath), p))
 	}
 
 	sb.WriteString("echo success\"")
@@ -229,7 +237,7 @@ func removePkg(r runner.Runner, hcg *api.HostConfig, pmanager string, pkg []stri
 	return nil
 }
 
-func installByLocalBinary(r runner.Runner, hcg *api.HostConfig, binary map[string]string) error {
+func installByLocalBinary(r runner.Runner, hcg *api.HostConfig, pcfg *api.PackageSrcConfig, binary map[string]string) error {
 	if len(binary) == 0 {
 		return nil
 	}
@@ -237,7 +245,7 @@ func installByLocalBinary(r runner.Runner, hcg *api.HostConfig, binary map[strin
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	for b, d := range binary {
-		sb.WriteString(fmt.Sprintf("cp %s/%s* %s && ", tmpDir, b, d))
+		sb.WriteString(fmt.Sprintf("cp -r %s/%s %s && ", getPkgDistPath(pcfg.DistPath), b, d))
 	}
 
 	sb.WriteString("echo success\"")

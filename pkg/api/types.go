@@ -121,9 +121,10 @@ type ServiceClusterConfig struct {
 }
 
 type PackageSrcConfig struct {
-	Type   string `json:"type"` // tar.gz...
-	ArmSrc string `json:"arm-srcpath"`
-	X86Src string `json:"x86-srcPath"`
+	Type     string `json:"type"`      // tar.gz...
+	DistPath string `json:"dist-path"` // on dist node, untar path
+	ArmSrc   string `json:"arm-srcpath"`
+	X86Src   string `json:"x86-srcPath"`
 }
 
 type EtcdClusterConfig struct {
@@ -163,6 +164,11 @@ type LoadBalancer struct {
 	Port string `json:"port"`
 }
 
+type AddonConfig struct {
+	Type     string `json:"type"`
+	Filename string `json:"filename"`
+}
+
 type ClusterConfig struct {
 	Name            string                  `json:"name"`
 	DeployDriver    string                  `json:"deploy-driver"` // default is binary
@@ -177,6 +183,8 @@ type ClusterConfig struct {
 	Nodes           []*HostConfig           `json:"nodes,omitempty"`
 	BootStrapTokens []*BootstrapTokenConfig `json:"bootstrap-tokens"`
 	LoadBalancer    LoadBalancer            `json:"loadBalancer"`
+	Addons          []*AddonConfig          `json:"addons"`
+
 	// TODO: add other configurations at here
 }
 

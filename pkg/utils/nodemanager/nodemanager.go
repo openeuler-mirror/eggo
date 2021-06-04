@@ -309,3 +309,20 @@ func WaitTasksOnNodesFinished(tasks []task.Task, nodes []string, timeout time.Du
 		}
 	}
 }
+
+func RunTaskOnOneNode(t task.Task, nodes []string) (string, error) {
+	manager.lock.RLock()
+	defer manager.lock.RUnlock()
+
+	for _, id := range nodes {
+		n, ok := manager.nodes[id]
+		if !ok {
+			logrus.Warnf("unkown node %s for task %s", id, t.Name())
+			continue
+		}
+		if n.PushTask(t) {
+			return n.host.Address, nil
+		}
+	}
+	return "", fmt.Errorf("all nodes are busy for task %s", t.Name())
+}

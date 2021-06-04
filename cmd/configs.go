@@ -201,6 +201,7 @@ type deployConfig struct {
 	Runtime           string                   `yaml:"runtime"`
 	RuntimeEndpoint   string                   `yaml:"runtime-endpoint"`
 	ConfigExtraArgs   []*ConfigExtraArgs       `yaml:"config-extra-args"`
+	Addons            []*api.AddonConfig       `yaml:"addons"`
 	PackageSrc        api.PackageSrcConfig     `yaml:"package-src"`
 	Packages          map[string][]*Package    `yaml:"pacakges"` // key: master, node, etcd, loadbalance
 }
@@ -525,6 +526,8 @@ func toClusterdeploymentConfig(conf *deployConfig) *api.ClusterConfig {
 	setIfStrConfigNotEmpty(&ccfg.ControlPlane.KubeletConf.CniBinDir, conf.CniBinDir)
 	setIfStrConfigNotEmpty(&ccfg.ControlPlane.KubeletConf.Runtime, conf.Runtime)
 	setIfStrConfigNotEmpty(&ccfg.ControlPlane.KubeletConf.RuntimeEndpoint, conf.RuntimeEndpoint)
+
+	ccfg.Addons = append(ccfg.Addons, conf.Addons...)
 
 	return ccfg
 }

@@ -23,6 +23,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"gitee.com/openeuler/eggo/pkg/api"
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/addons"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/etcdcluster"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
@@ -375,6 +376,11 @@ func execRemoveEtcdsTask(conf *api.ClusterConfig, node string) {
 }
 
 func Init(conf *api.ClusterConfig) error {
+	// first cleanup addons
+	if err := addons.CleanupAddons(conf); err != nil {
+		logrus.Errorf("cleanup addons failed: %v", err)
+	}
+
 	// remove workers from master
 	node := getFirstMaster(conf.Nodes)
 	if node != "" {

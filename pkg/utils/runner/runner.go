@@ -234,6 +234,6 @@ func (ssh *SSHRunner) RunShell(shell string, name string) (string, error) {
 		logrus.Errorf("[%s] run shell '%s' failed: %v", ssh.Host.Name, name, err)
 		return "", err
 	}
-	logrus.Debugf("[%s] run shell '%s' failed: %v", ssh.Host.Name, name, output)
+	logrus.Debugf("[%s] run shell '%s' success, output: %s", ssh.Host.Name, name, output)
 	return output, nil
 }
