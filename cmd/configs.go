@@ -43,6 +43,10 @@ var (
 			Type: "repo",
 		},
 		{
+			Name: "kubernetes-kubeadm",
+			Type: "repo",
+		},
+		{
 			Name: "coredns",
 			Type: "repo",
 		},
@@ -274,7 +278,7 @@ func getDefaultClusterdeploymentConfig() *api.ClusterConfig {
 		},
 		EtcdCluster: api.EtcdClusterConfig{
 			Token:    "etcd-cluster",
-			DataDir:  "/var/lib/datadir",
+			DataDir:  "/var/lib/etcd/default.etcd",
 			CertsDir: constants.DefaultK8SCertDir,
 			External: false,
 		},
@@ -590,7 +594,7 @@ func createDeployConfigTemplate(file string) error {
 		ApiServerTimeout:  "120s",
 		EtcdExternal:      false,
 		EtcdToken:         "etcd-cluster",
-		EtcdDataDir:       "/var/lib/datadir",
+		EtcdDataDir:       "/var/lib/etcd/default.etcd",
 		DnsVip:            "10.32.0.10",
 		DnsDomain:         "cluster.local",
 		PauseImage:        "k8s.gcr.io/pause:3.2",
@@ -598,11 +602,10 @@ func createDeployConfigTemplate(file string) error {
 		CniBinDir:         "/usr/libexec/cni",
 		Runtime:           "iSulad",
 		RuntimeEndpoint:   "unix:///var/run/isulad.sock",
-
 		PackageSrc: api.PackageSrcConfig{
 			Type:   "tar.gz",
-			ArmSrc: "./pacakges-arm.tar.gz",
-			X86Src: "./packages-x86.tar.gz",
+			ArmSrc: "/root/pkgs/pacakges-arm.tar.gz",
+			X86Src: "/root/pkgs/packages-x86.tar.gz",
 		},
 		Packages: map[string][]*Package{
 			"master": {
@@ -612,6 +615,10 @@ func createDeployConfigTemplate(file string) error {
 				},
 				&Package{
 					Name: "kubernetes-client",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "kubernetes-kubeadm",
 					Type: "pkg",
 				},
 				&Package{
@@ -646,6 +653,86 @@ func createDeployConfigTemplate(file string) error {
 				},
 				&Package{
 					Name: "tar",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "iSulad",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "clibcni",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "emacs-filesystem",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "gflags",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "gpm-libs",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "grpc",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "http-parser",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "lcr",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "libwebsockets",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "lxc",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "lxc-libs",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "protobuf",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "protobuf-devel",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "re2",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "rsync",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "vim-common",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "vim-enhanced",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "vim-filesystem",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "yajl",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "zlib-devel",
 					Type: "pkg",
 				},
 			},
