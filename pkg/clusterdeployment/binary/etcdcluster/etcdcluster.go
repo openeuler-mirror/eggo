@@ -31,7 +31,7 @@ import (
 const (
 	EtcdConfFile       = "/etc/etcd/etcd.conf"
 	EtcdServiceFile    = "/usr/lib/systemd/system/etcd.service"
-	DefaultEtcdDataDir = "/var/lib/etcd"
+	DefaultEtcdDataDir = "/var/lib/etcd/default.etcd"
 )
 
 var (
@@ -112,7 +112,7 @@ func (t *EtcdDeployEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfig) e
 	}
 
 	// generate etcd-server etcd-peer and etcd-health-check certificates on etcd nodes
-	if err := generateEtcdCerts(r, t.ccfg); err != nil {
+	if err := generateEtcdCerts(r, t.ccfg, hostConfig); err != nil {
 		return err
 	}
 
