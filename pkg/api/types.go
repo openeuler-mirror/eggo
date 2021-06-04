@@ -151,6 +151,13 @@ type BootstrapTokenConfig struct {
 	AuthExtraGroups []string       `json:"auth_extra_groups"`
 }
 
+type ClusterRoleBindingConfig struct {
+	Name        string `json:"Name"`
+	SubjectName string `json:"SubjectName"`
+	SubjectKind string `json:"SubjectKind"`
+	RoleName    string `json:"RoleName"`
+}
+
 type LoadBalancer struct {
 	IP   string `json:"ip"`
 	Port string `json:"port"`
@@ -169,6 +176,7 @@ type ClusterConfig struct {
 	EtcdCluster     EtcdClusterConfig       `json:"etcdcluster,omitempty"`
 	Nodes           []*HostConfig           `json:"nodes,omitempty"`
 	BootStrapTokens []*BootstrapTokenConfig `json:"bootstrap-tokens"`
+	LoadBalancer    LoadBalancer            `json:"loadBalancer"`
 	// TODO: add other configurations at here
 }
 

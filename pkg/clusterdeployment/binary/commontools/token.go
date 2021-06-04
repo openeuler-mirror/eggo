@@ -30,7 +30,7 @@ stringData:
   token-secret: {{ .Secret }}
   expiration: {{ .Expiration }}
   {{- range $i, $v := .Usages }}
-  $v
+  {{ $v }}
   {{- end }}
   {{- if .AuthExtraGroups }}
   auth-extra-groups: {{ .AuthExtraGroups }}
@@ -54,7 +54,7 @@ func CreateBootstrapToken(r runner.Runner, bconf *api.BootstrapTokenConfig, kube
 	}
 	datastore["Expiration"] = now.Add(ttl).Format(time.RFC3339)
 	for _, usage := range bconf.Usages {
-		usages = append(usages, fmt.Sprintf("usage-bootstrap-%s: true", usage))
+		usages = append(usages, fmt.Sprintf("usage-bootstrap-%s: \"true\"", usage))
 	}
 	datastore["Usages"] = usages
 	if len(bconf.AuthExtraGroups) > 0 {
@@ -68,8 +68,7 @@ func CreateBootstrapToken(r runner.Runner, bconf *api.BootstrapTokenConfig, kube
 	sb.WriteString("sudo -E /bin/sh -c \"mkdir -p /tmp/.eggo")
 	tokenYamlBase64 := base64.StdEncoding.EncodeToString([]byte(coreConfig))
 	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > /tmp/.eggo/bootstrap_token.yaml", tokenYamlBase64))
-	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s", kubeconfig))
-	sb.WriteString(" && kubectl apply -f /tmp/.eggo/bootstrap_token.yaml")
+	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s kubectl apply -f /tmp/.eggo/bootstrap_token.yaml", kubeconfig))
 	sb.WriteString("\"")
 
 	_, err = r.RunCommand(sb.String())
@@ -100,7 +99,7 @@ func GetBootstrapToken(r runner.Runner, tokenStr string, kubeconfig string) (str
 		ID:              id,
 		Secret:          secret,
 		Usages:          []string{"authentication", "signing"},
-		AuthExtraGroups: []string{""},
+		AuthExtraGroups: []string{"system:bootstrappers:worker,system:bootstrappers:ingress"},
 	}
 	err = CreateBootstrapToken(r, bconf, kubeconfig)
 

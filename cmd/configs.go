@@ -189,6 +189,13 @@ type deployConfig struct {
 	EtcdExternal      bool                     `yaml:"etcd-external"`
 	EtcdToken         string                   `yaml:"etcd-token"`
 	EtcdDataDir       string                   `yaml:"etcd-data-dir"`
+	DnsVip            string                   `yaml:"dns-vip"`
+	DnsDomain         string                   `yaml:"dns-domain"`
+	PauseImage        string                   `yaml:"pause-image"`
+	NetworkPlugin     string                   `yaml:"network-plugin"`
+	CniBinDir         string                   `yaml:"cni-bin-dir"`
+	Runtime           string                   `yaml:"runtime"`
+	RuntimeEndpoint   string                   `yaml:"runtime-endpoint"`
 	ConfigExtraArgs   []*ConfigExtraArgs       `yaml:"config-extra-args"`
 	PackageSrc        api.PackageSrcConfig     `yaml:"package-src"`
 	Packages          map[string][]*Package    `yaml:"pacakges"` // key: master, node, etcd, loadbalance
@@ -249,6 +256,15 @@ func getDefaultClusterdeploymentConfig() *api.ClusterConfig {
 		ControlPlane: api.ControlPlaneConfig{
 			ApiConf: &api.ApiServer{
 				Timeout: "120s",
+			},
+			KubeletConf: &api.Kubelet{
+				DnsVip:          "10.32.0.10",
+				DnsDomain:       "cluster.local",
+				PauseImage:      "k8s.gcr.io/pause:3.2",
+				NetworkPlugin:   "cni",
+				CniBinDir:       "/usr/libexec/cni",
+				Runtime:         "iSulad",
+				RuntimeEndpoint: "unix:///var/run/isulad.sock",
 			},
 		},
 		PackageSrc: &api.PackageSrcConfig{
@@ -498,6 +514,13 @@ func toClusterdeploymentConfig(conf *deployConfig) *api.ClusterConfig {
 	setIfStrConfigNotEmpty(&ccfg.PackageSrc.Type, conf.PackageSrc.Type)
 	setIfStrConfigNotEmpty(&ccfg.PackageSrc.ArmSrc, conf.PackageSrc.ArmSrc)
 	setIfStrConfigNotEmpty(&ccfg.PackageSrc.X86Src, conf.PackageSrc.X86Src)
+	setIfStrConfigNotEmpty(&ccfg.ControlPlane.KubeletConf.DnsVip, conf.DnsVip)
+	setIfStrConfigNotEmpty(&ccfg.ControlPlane.KubeletConf.DnsDomain, conf.DnsDomain)
+	setIfStrConfigNotEmpty(&ccfg.ControlPlane.KubeletConf.PauseImage, conf.PauseImage)
+	setIfStrConfigNotEmpty(&ccfg.ControlPlane.KubeletConf.NetworkPlugin, conf.NetworkPlugin)
+	setIfStrConfigNotEmpty(&ccfg.ControlPlane.KubeletConf.CniBinDir, conf.CniBinDir)
+	setIfStrConfigNotEmpty(&ccfg.ControlPlane.KubeletConf.Runtime, conf.Runtime)
+	setIfStrConfigNotEmpty(&ccfg.ControlPlane.KubeletConf.RuntimeEndpoint, conf.RuntimeEndpoint)
 
 	return ccfg
 }
@@ -568,6 +591,14 @@ func createDeployConfigTemplate(file string) error {
 		EtcdExternal:      false,
 		EtcdToken:         "etcd-cluster",
 		EtcdDataDir:       "/var/lib/datadir",
+		DnsVip:            "10.32.0.10",
+		DnsDomain:         "cluster.local",
+		PauseImage:        "k8s.gcr.io/pause:3.2",
+		NetworkPlugin:     "cni",
+		CniBinDir:         "/usr/libexec/cni",
+		Runtime:           "iSulad",
+		RuntimeEndpoint:   "unix:///var/run/isulad.sock",
+
 		PackageSrc: api.PackageSrcConfig{
 			Type:   "tar.gz",
 			ArmSrc: "./pacakges-arm.tar.gz",

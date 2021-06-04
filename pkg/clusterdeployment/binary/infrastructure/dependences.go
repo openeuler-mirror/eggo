@@ -185,10 +185,10 @@ func installByLocalPkg(r runner.Runner, hcg *api.HostConfig, pmanager string, pk
 	}
 
 	var pmCommand string
-	if pmanager == "rpm" {
-		pmCommand = "rpm -ivh"
-	} else {
+	if pmanager == "dpkg" {
 		pmCommand = "dpkg -i"
+	} else {
+		pmCommand = "rpm -ivh"
 	}
 
 	var sb strings.Builder
@@ -211,10 +211,10 @@ func removePkg(r runner.Runner, hcg *api.HostConfig, pmanager string, pkg []stri
 	}
 
 	var sb strings.Builder
-	if pmanager == "rpm" {
-		sb.WriteString("sudo -E /bin/sh -c \"yum remove -y ")
-	} else {
+	if pmanager == "dpkg" {
 		sb.WriteString("sudo -E /bin/sh -c \"apt remove -y ")
+	} else {
+		sb.WriteString("sudo -E /bin/sh -c \"yum remove -y ")
 	}
 
 	for _, p := range pkg {
