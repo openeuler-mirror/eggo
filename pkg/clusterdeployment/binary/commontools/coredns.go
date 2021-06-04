@@ -192,7 +192,7 @@ func (ct *CorednsSetupTask) createCoreConfigTemplate(r runner.Runner) error {
 		logrus.Errorf("rend core config failed: %v", err)
 		return err
 	}
-	sb.WriteString("sudo -E /bin/sh -c \"mkdir /etc/dns")
+	sb.WriteString("sudo -E /bin/sh -c \"mkdir -p /etc/dns")
 	coreBase64 := base64.StdEncoding.EncodeToString([]byte(coreConfig))
 	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > /etc/dns/Corefile", coreBase64))
 	sb.WriteString("\"")

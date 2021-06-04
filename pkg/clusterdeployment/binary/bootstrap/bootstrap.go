@@ -180,19 +180,15 @@ systemctl restart isulad
 }
 
 func prepareConfig(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig) error {
-	if err := genConfig(r, ccfg, hcf, getTokenString()); err != nil {
-		logrus.Errorf("generate config failed: %v", err)
-		return err
-	}
-
-	return nil
-}
-
-func genConfig(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig, token string) error {
 	apiEndpoint, err := getEndpoint(ccfg)
 	if err != nil {
 		logrus.Errorf("get api server endpoint failed: %v", err)
 		return err
+	}
+
+	token := getTokenString()
+	if token == "" {
+		return fmt.Errorf("get token failed")
 	}
 
 	if err := genKubeletBootstrapAndConfig(r, ccfg, token, apiEndpoint); err != nil {
@@ -204,6 +200,7 @@ func genConfig(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig, to
 		logrus.Errorf("generate proxy cert and kubeconfig failed: %v", err)
 		return err
 	}
+	logrus.Debug("prepare bootstrap config success")
 
 	return nil
 }
@@ -321,7 +318,7 @@ func genProxyCert(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig)
 	//		CA generate cert by CSR and ca.key
 	//		transfer cert to worker
 
-	certPath := ccfg.GetCertDir()
+	certPath := api.GetCertificateStorePath(ccfg.Name)
 	certPrefix := KubeProxyKubeConfigName + "-" + hcf.Name
 	certGen := certs.NewLocalCertGenerator()
 
@@ -450,9 +447,14 @@ func Init(config *api.ClusterConfig) error {
 		tokenTask = &GetTokenTask{
 			cluster: config,
 		}
-	}
-	if err := nodemanager.RunTasksOnNode([]task.Task{task.NewTaskInstance(tokenTask)}, masters[0]); err != nil {
-		return err
+
+		tasks := []task.Task{task.NewTaskInstance(tokenTask)}
+		if err := nodemanager.RunTasksOnNode(tasks, masters[0]); err != nil {
+			return err
+		}
+		if err := nodemanager.WaitTasksOnNodeFinished(tasks, masters[0], time.Minute*2); err != nil {
+			return err
+		}
 	}
 
 	return JoinNode(config, masters[1:], workers)
