@@ -17,6 +17,7 @@ package cleanupcluster
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -174,6 +175,8 @@ func isPkgInstalled(hostConfig *api.HostConfig, pkg string) bool {
 }
 
 func (t *cleanupClusterTask) Run(r runner.Runner, hostConfig *api.HostConfig) error {
+	ports := []string{}
+
 	if hostConfig == nil {
 		return fmt.Errorf("empty host config")
 	}
@@ -185,19 +188,28 @@ func (t *cleanupClusterTask) Run(r runner.Runner, hostConfig *api.HostConfig) er
 
 	if utils.IsType(hostConfig.Type, api.Worker) {
 		cleanupWorker(t.ccfg, r, hostConfig)
+		ports = append(ports, infrastructure.WorkPorts...)
 	}
 
 	if utils.IsType(hostConfig.Type, api.Master) {
 		cleanupMaster(t.ccfg, r, hostConfig)
+		ports = append(ports, infrastructure.MasterPorts...)
 	}
 
 	if utils.IsType(hostConfig.Type, api.ETCD) {
 		if !t.ccfg.EtcdCluster.External {
 			cleanupEtcd(t.ccfg, r, hostConfig)
+			ports = append(ports, infrastructure.EtcdPosts...)
 		} else {
 			logrus.Info("external etcd, ignore remove etcds")
 		}
 	}
+
+	for _, p := range hostConfig.OpenPorts {
+		port := strconv.Itoa(p.Port) + "/" + p.Protocol
+		ports = append(ports, port)
+	}
+	shieldPorts(r, ports...)
 
 	if isPkgInstalled(hostConfig, "nginx") {
 		cleanupLoadBalance(t.ccfg, r, hostConfig)
@@ -209,6 +221,19 @@ func (t *cleanupClusterTask) Run(r runner.Runner, hostConfig *api.HostConfig) er
 	postCleanup(r, hostConfig)
 
 	return nil
+}
+
+func shieldPorts(r runner.Runner, ports ...string) {
+	var sb strings.Builder
+	sb.WriteString("sudo -E /bin/sh -c \"")
+	for _, p := range ports {
+		sb.WriteString(fmt.Sprintf("firewall-cmd --zone=public --remove-port=%s && ", p))
+	}
+
+	sb.WriteString("firewall-cmd --runtime-to-permanent \"")
+	if _, err := r.RunCommand(sb.String()); err != nil {
+		logrus.Errorf("shield port failed: %v", err)
+	}
 }
 
 func getAllIps(nodes []*api.HostConfig) []string {

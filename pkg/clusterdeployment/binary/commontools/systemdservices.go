@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"gitee.com/openeuler/eggo/pkg/api"
+	"gitee.com/openeuler/eggo/pkg/utils"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/template"
 	"github.com/sirupsen/logrus"
@@ -225,25 +226,25 @@ func SetupMasterServices(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.Host
 
 func SetupKubeletService(r runner.Runner, kcf *api.Kubelet, hcf *api.HostConfig) error {
 	defaultArgs := map[string]string{
-		"--config":                     "/etc/kubernetes/kubelet_config.yaml",
-		"--network-plugin":             "cni",
-		"--cni-bin-dir":                "/usr/libexec/cni/",
-		"--pod-infra-container-image":  "k8s.gcr.io/pause:3.2",
-		"--kubeconfig":                 "/etc/kubernetes/kubelet.kubeconfig",
-		"--bootstrap-kubeconfig":       "/etc/kubernetes/kubelet-bootstrap.kubeconfig",
-		"--register-node":              "true",
-		"--hostname-override":          hcf.Name,
-		"--container-runtime":          "remote",
-		"--container-runtime-endpoint": "unix:///var/run/isulad.sock",
-		"--v":                          "2",
+		"--config":               "/etc/kubernetes/kubelet_config.yaml",
+		"--network-plugin":       "cni",
+		"--kubeconfig":           "/etc/kubernetes/kubelet.kubeconfig",
+		"--bootstrap-kubeconfig": "/etc/kubernetes/kubelet-bootstrap.kubeconfig",
+		"--register-node":        "true",
+		"--hostname-override":    hcf.Name,
+		"--v":                    "2",
 	}
 
 	if kcf != nil {
 		configArgs := map[string]string{
-			"--network-plugin":             kcf.NetworkPlugin,
-			"--cni-bin-dir":                kcf.CniBinDir,
-			"--pod-infra-container-image":  kcf.PauseImage,
-			"--container-runtime-endpoint": kcf.RuntimeEndpoint,
+			"--network-plugin":            kcf.NetworkPlugin,
+			"--cni-bin-dir":               kcf.CniBinDir,
+			"--pod-infra-container-image": kcf.PauseImage,
+		}
+
+		if !utils.IsDocker(kcf.Runtime) {
+			configArgs["--container-runtime"] = "remote"
+			configArgs["--container-runtime-endpoint"] = kcf.RuntimeEndpoint
 		}
 
 		for k, v := range kcf.ExtraArgs {

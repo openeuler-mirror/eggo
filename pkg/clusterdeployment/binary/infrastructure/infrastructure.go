@@ -37,9 +37,9 @@ var itask *task.TaskInstance
 
 var (
 	// TODO: coredns open ports should be config by user
-	masterPorts = []string{"6443/tcp", "10252/tcp", "10251/tcp", "53/tcp", "53/udp", "9153/tcp"}
-	workPorts   = []string{"10250/tcp", "10256/tcp"}
-	etcdPosts   = []string{"2379-2381/tcp"}
+	MasterPorts = []string{"6443/tcp", "10252/tcp", "10251/tcp", "53/tcp", "53/udp", "9153/tcp"}
+	WorkPorts   = []string{"10250/tcp", "10256/tcp"}
+	EtcdPosts   = []string{"2379-2381/tcp"}
 )
 
 type InfrastructureTask struct {
@@ -70,34 +70,39 @@ func loadImages(r runner.Runner, conf *api.PackageSrcConfig) error {
 	return nil
 }
 
-func (it *InfrastructureTask) Run(r runner.Runner, hcg *api.HostConfig) error {
+func (it *InfrastructureTask) Run(r runner.Runner, hcg *api.HostConfig) (err error) {
 	if hcg == nil {
 		return fmt.Errorf("empty host config")
 	}
 
 	// TODO: prepare loadbalancer
-	if err := check(hcg); err != nil {
+	if err = check(hcg); err != nil {
 		logrus.Errorf("check failed: %v", err)
-		return err
+		return
 	}
 
-	if err := InstallDependences(r, hcg, it.ccfg.PackageSrc); err != nil {
+	defer func() {
+		if _, e := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"rm -rf %s\"", getPkgDistPath(it.ccfg.PackageSrc.DistPath))); e != nil {
+			err = fmt.Errorf("%v. And remove dir failed: %v", err, e)
+		}
+	}()
+	if err = InstallDependences(r, hcg, it.ccfg.PackageSrc); err != nil {
 		logrus.Errorf("install dependences failed: %v", err)
 		return err
 	}
 
-	if err := setHostname(r, hcg); err != nil {
+	if err = setHostname(r, hcg); err != nil {
 		logrus.Errorf("set hostname failed: %v", err)
 		return err
 	}
 
-	if err := addFirewallPort(r, hcg); err != nil {
+	if err = addFirewallPort(r, hcg); err != nil {
 		logrus.Errorf("add firewall port failed: %v", err)
 		return err
 	}
 
 	if utils.IsType(hcg.Type, api.Worker) {
-		if err := loadImages(r, it.ccfg.PackageSrc); err != nil {
+		if err = loadImages(r, it.ccfg.PackageSrc); err != nil {
 			logrus.Errorf("load images failed: %v", err)
 			return err
 		}
@@ -133,23 +138,27 @@ func setHostname(r runner.Runner, hcg *api.HostConfig) error {
 }
 
 func addFirewallPort(r runner.Runner, hcg *api.HostConfig) error {
-	var ports []string
+	ports := []string{}
 
 	if hcg.Type&api.Master != 0 {
-		ports = append(ports, masterPorts...)
+		ports = append(ports, MasterPorts...)
 	}
 
 	if hcg.Type&api.Worker != 0 {
-		ports = append(ports, workPorts...)
+		ports = append(ports, WorkPorts...)
 	}
 
 	if hcg.Type&api.ETCD != 0 {
-		ports = append(ports, etcdPosts...)
+		ports = append(ports, EtcdPosts...)
 	}
 
 	for _, p := range hcg.OpenPorts {
 		port := strconv.Itoa(p.Port) + "/" + p.Protocol
 		ports = append(ports, port)
+	}
+
+	if len(ports) == 0 {
+		logrus.Warnf("no expose port for %s", hcg.Address)
 	}
 
 	if err := exposePorts(r, ports...); err != nil {

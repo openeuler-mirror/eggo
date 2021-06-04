@@ -121,11 +121,6 @@ func (il *InstallByLocal) DoInstall(r runner.Runner, hcg *api.HostConfig) (err e
 	if err = copySource(r, hcg, il.pcfg); err != nil {
 		return
 	}
-	defer func() {
-		if _, e := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"rm -rf %s\"", getPkgDistPath(il.pcfg.DistPath))); e != nil {
-			err = fmt.Errorf("%v. And remove dir failed: %v", err, e)
-		}
-	}()
 
 	if err = installByLocalPkg(r, hcg, il.pcfg, il.pmanager, il.pkg); err != nil {
 		return
