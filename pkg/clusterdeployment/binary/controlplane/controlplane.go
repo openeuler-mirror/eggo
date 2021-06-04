@@ -112,7 +112,7 @@ func (ct *ControlPlaneTask) Run(r runner.Runner, hcf *api.HostConfig) error {
 	}
 
 	// generate certificates and kubeconfigs
-	if err = generateCertsAndKubeConfigs(r, ct.ccfg); err != nil {
+	if err = generateCertsAndKubeConfigs(r, ct.ccfg, hcf); err != nil {
 		return err
 	}
 
@@ -141,7 +141,7 @@ func check(r runner.Runner, savePath string) error {
 	return nil
 }
 
-func generateApiServerCertificate(savePath string, cg certs.CertGenerator, ccfg *api.ClusterConfig) error {
+func generateApiServerCertificate(savePath string, cg certs.CertGenerator, ccfg *api.ClusterConfig, hcf *api.HostConfig) error {
 	ips := []string{"0.0.0.0", "127.0.0.1"}
 	dnsnames := []string{"kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster", "kubernetes.default.svc.cluster.local"}
 
@@ -152,21 +152,7 @@ func generateApiServerCertificate(savePath string, cg certs.CertGenerator, ccfg 
 		ips = append(ips, ccfg.ControlPlane.ApiConf.CertSans.IPs...)
 		dnsnames = append(dnsnames, ccfg.ControlPlane.ApiConf.CertSans.DNSNames...)
 	}
-
-	host := ccfg.LoadBalancer.IP
-	if host == "" {
-		// TODO: get ready master by master status list
-		for _, n := range ccfg.Nodes {
-			if n.Type&api.Master != 0 {
-				host = n.Address
-				break
-			}
-		}
-	}
-	if host == "" {
-		return fmt.Errorf("invalid host or sport")
-	}
-	ips = append(ips, host)
+	ips = append(ips, hcf.Address)
 
 	apiserverConfig := &certs.CertConfig{
 		CommonName:    "kube-apiserver",
@@ -234,10 +220,10 @@ func generateSchedulerCertificate(savePath string, cg certs.CertGenerator) error
 	return cg.CreateCertAndKey(caCertPath, caKeyPath, controllerConfig, savePath, SchedulerKubeConfigName)
 }
 
-func generateCerts(savePath string, cg certs.CertGenerator, ccfg *api.ClusterConfig) (err error) {
+func generateCerts(savePath string, cg certs.CertGenerator, ccfg *api.ClusterConfig, hcf *api.HostConfig) (err error) {
 	// create certificate and keys
 
-	if err = generateApiServerCertificate(savePath, cg, ccfg); err != nil {
+	if err = generateApiServerCertificate(savePath, cg, ccfg, hcf); err != nil {
 		return
 	}
 
@@ -355,7 +341,7 @@ resources:
 	return err
 }
 
-func generateCertsAndKubeConfigs(r runner.Runner, ccfg *api.ClusterConfig) (err error) {
+func generateCertsAndKubeConfigs(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig) (err error) {
 	rootPath := ccfg.GetConfigDir()
 	certPath := ccfg.GetCertDir()
 
@@ -367,7 +353,7 @@ func generateCertsAndKubeConfigs(r runner.Runner, ccfg *api.ClusterConfig) (err 
 	}()
 
 	// clean generated certifactes
-	if err = generateCerts(certPath, cg, ccfg); err != nil {
+	if err = generateCerts(certPath, cg, ccfg, hcf); err != nil {
 		return
 	}
 
