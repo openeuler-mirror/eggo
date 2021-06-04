@@ -131,7 +131,7 @@ func (cs *CorednsServerSetupTask) createCoreServerTemplate(r runner.Runner) erro
 	}
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	serverBase64 := base64.StdEncoding.EncodeToString([]byte(serverConfig))
-	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/coredns_server.yaml", serverBase64, cs.Cluster.GetManifestDir()))
+	sb.WriteString(fmt.Sprintf("echo %s | base64 -d > %s/coredns_server.yaml", serverBase64, cs.Cluster.GetManifestDir()))
 	sb.WriteString("\"")
 
 	_, err = r.RunCommand(sb.String())
@@ -157,7 +157,7 @@ func (cs *CorednsServerSetupTask) createCoreEndpointTemplate(r runner.Runner, ip
 	}
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	epBase64 := base64.StdEncoding.EncodeToString([]byte(epConfig))
-	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/coredns_ep.yaml", epBase64, cs.Cluster.GetManifestDir()))
+	sb.WriteString(fmt.Sprintf("echo %s | base64 -d > %s/coredns_ep.yaml", epBase64, cs.Cluster.GetManifestDir()))
 	sb.WriteString("\"")
 
 	_, err = r.RunCommand(sb.String())
@@ -218,7 +218,7 @@ func (ct *CorednsSetupTask) createServiceTemplate(r runner.Runner) error {
 	}
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	serviceBase64 := base64.StdEncoding.EncodeToString([]byte(serviceConfig))
-	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > /usr/lib/systemd/system/coredns.service", serviceBase64))
+	sb.WriteString(fmt.Sprintf("echo %s | base64 -d > /usr/lib/systemd/system/coredns.service", serviceBase64))
 	sb.WriteString("\"")
 
 	_, err = r.RunCommand(sb.String())

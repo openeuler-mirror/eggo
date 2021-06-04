@@ -18,6 +18,7 @@ import (
 	"sync"
 
 	"gitee.com/openeuler/eggo/pkg/api"
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/addons"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/bootstrap"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/cleanupcluster"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/commontools"
@@ -164,9 +165,7 @@ func (bcp *BinaryClusterDeployment) ApplyAddons() error {
 		return err
 	}
 
-	// TODO: apply all addons at here
-
-	return nil
+	return addons.SetupAddons(bcp.config)
 }
 
 func (bcp *BinaryClusterDeployment) ClusterStatus() (*api.ClusterStatus, error) {

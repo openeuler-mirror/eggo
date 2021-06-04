@@ -90,6 +90,7 @@ func CreateBootstrapTokensForCluster(r runner.Runner, ccfg *api.ClusterConfig) e
 }
 
 func GetBootstrapToken(r runner.Runner, tokenStr string, kubeconfig string) (string, error) {
+	// TODO: check exist token first
 	token, id, secret, err := ParseBootstrapTokenStr(tokenStr)
 	if err != nil {
 		return "", err
