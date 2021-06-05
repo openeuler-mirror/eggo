@@ -76,7 +76,7 @@ var (
 
 	nodePackages = []*api.Packages{
 		{
-			Name: "docker",
+			Name: "docker-engine",
 			Type: "repo",
 		},
 		{
@@ -636,7 +636,7 @@ func createDeployConfigTemplate(file string) error {
 				},
 				&Package{
 					Name: "tar",
-					Type: "pkg",
+					Type: "repo",
 				},
 				&Package{
 					Name: "addons",
@@ -650,7 +650,19 @@ func createDeployConfigTemplate(file string) error {
 					Type: "pkg",
 				},
 				&Package{
+					Name: "kubernetes-client",
+					Type: "pkg",
+				},
+				&Package{
 					Name: "kubernetes-kubelet",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "docker-engine",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "libcgroup",
 					Type: "pkg",
 				},
 				&Package{
@@ -667,7 +679,7 @@ func createDeployConfigTemplate(file string) error {
 				},
 				&Package{
 					Name: "tar",
-					Type: "pkg",
+					Type: "repo",
 				},
 				&Package{
 					Name: "iSulad",
@@ -757,10 +769,10 @@ func createDeployConfigTemplate(file string) error {
 				},
 				&Package{
 					Name: "tar",
-					Type: "pkg",
+					Type: "repo",
 				},
 			},
-			"nginx": {
+			"loadbalance": {
 				&Package{
 					Name: "nginx",
 					Type: "pkg",
@@ -815,7 +827,7 @@ func createDeployConfigTemplate(file string) error {
 				},
 				&Package{
 					Name: "tar",
-					Type: "pkg",
+					Type: "repo",
 				},
 			},
 		},
