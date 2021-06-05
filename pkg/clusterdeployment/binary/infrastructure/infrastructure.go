@@ -17,11 +17,14 @@ package infrastructure
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"gitee.com/openeuler/eggo/pkg/api"
+	"gitee.com/openeuler/eggo/pkg/constants"
 	"gitee.com/openeuler/eggo/pkg/utils"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
@@ -38,6 +41,26 @@ type InfrastructureTask struct {
 
 func (it *InfrastructureTask) Name() string {
 	return "InfrastructureTask"
+}
+
+func loadImages(r runner.Runner, conf *api.PackageSrcConfig) error {
+	if conf == nil {
+		return fmt.Errorf("can not found dist path failed")
+	}
+
+	imagePkgPath := filepath.Join(getPkgDistPath(conf.DistPath), constants.DefaultImagePkgName)
+
+	if _, err := os.Stat(imagePkgPath); err != nil {
+		logrus.Debugf("no image package found on path %v", imagePkgPath)
+		return nil
+	}
+
+	_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"isula load -i %s\"", imagePkgPath))
+	if err != nil {
+		return fmt.Errorf("isula load -i %v failed: %v", imagePkgPath, err)
+	}
+
+	return nil
 }
 
 func (it *InfrastructureTask) Run(r runner.Runner, hcg *api.HostConfig) error {
@@ -64,6 +87,13 @@ func (it *InfrastructureTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 	if err := addFirewallPort(r, hcg); err != nil {
 		logrus.Errorf("add firewall port failed: %v", err)
 		return err
+	}
+
+	if utils.IsType(hcg.Type, api.Worker) {
+		if err := loadImages(r, it.ccfg.PackageSrc); err != nil {
+			logrus.Errorf("load images failed: %v", err)
+			return err
+		}
 	}
 
 	return nil

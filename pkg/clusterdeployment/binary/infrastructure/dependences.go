@@ -351,7 +351,7 @@ func doRemoveDependences(r runner.Runner, hcg *api.HostConfig, dp Dependences) e
 	return nil
 }
 
-func RemoveDependences(r runner.Runner, hcg *api.HostConfig) error {
+func RemoveDependences(r runner.Runner, hcg *api.HostConfig, pkgSrcConf *api.PackageSrcConfig) error {
 	repo, pkg, binary, err := separateDependences(hcg)
 	if err != nil {
 		return err
@@ -359,7 +359,7 @@ func RemoveDependences(r runner.Runner, hcg *api.HostConfig) error {
 
 	if len(repo) != 0 {
 		ir := NewInstallByRepo(repo)
-		if err := doRemoveDependences(r, hcg, ir); err != nil {
+		if err = doRemoveDependences(r, hcg, ir); err != nil {
 			return err
 		}
 	}
@@ -367,8 +367,16 @@ func RemoveDependences(r runner.Runner, hcg *api.HostConfig) error {
 	if len(pkg) != 0 || len(binary) != 0 {
 		// do remove dependences without package source config
 		il := NewInstallByLocal(nil, pkg, binary)
-		if err := doRemoveDependences(r, hcg, il); err != nil {
+		if err = doRemoveDependences(r, hcg, il); err != nil {
 			return err
+		}
+	}
+
+	if pkgSrcConf != nil {
+		// TODO: if user can config the untar path, remember make sure not delele system pathes
+		if _, e := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"rm -rf %s\"",
+			constants.DefaultPkgUntarPath)); e != nil {
+			return fmt.Errorf("remove pkg dist path %vv failed: %v", constants.DefaultPkgUntarPath, err)
 		}
 	}
 

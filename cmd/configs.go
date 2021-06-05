@@ -605,6 +605,12 @@ func createDeployConfigTemplate(file string) error {
 		CniBinDir:         "/usr/libexec/cni",
 		Runtime:           "iSulad",
 		RuntimeEndpoint:   "unix:///var/run/isulad.sock",
+		Addons: []*api.AddonConfig{
+			{
+				Type:     "file",
+				Filename: "calico.yaml",
+			},
+		},
 		PackageSrc: api.PackageSrcConfig{
 			Type:   "tar.gz",
 			ArmSrc: "/root/pkgs/pacakges-arm.tar.gz",
@@ -631,6 +637,11 @@ func createDeployConfigTemplate(file string) error {
 				&Package{
 					Name: "tar",
 					Type: "pkg",
+				},
+				&Package{
+					Name: "addons",
+					Type: "binary",
+					Dst:  "/etc/kubernetes",
 				},
 			},
 			"node": {

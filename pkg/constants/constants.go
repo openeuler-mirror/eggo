@@ -14,4 +14,5 @@ const (
 
 	// package manager relate constants
 	DefaultPkgUntarPath = "/tmp/.eggo/"
+	DefaultImagePkgName = "images.tar"
 )

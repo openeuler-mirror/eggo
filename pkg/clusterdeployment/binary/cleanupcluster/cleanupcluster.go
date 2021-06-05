@@ -26,6 +26,7 @@ import (
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/addons"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/etcdcluster"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
+	"gitee.com/openeuler/eggo/pkg/utils"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/task"
@@ -37,10 +38,6 @@ type cleanupClusterTask struct {
 
 func (t *cleanupClusterTask) Name() string {
 	return "cleanupClusterTask"
-}
-
-func isType(curType uint16, expectedType uint16) bool {
-	return curType&expectedType != 0
 }
 
 func umountKubeletSubDirs(r runner.Runner, hostConfig *api.HostConfig, kubeletDir string) error {
@@ -182,19 +179,19 @@ func (t *cleanupClusterTask) Run(r runner.Runner, hostConfig *api.HostConfig) er
 	}
 
 	// call infrastructure function to cleanup
-	if err := infrastructure.RemoveDependences(r, hostConfig); err != nil {
+	if err := infrastructure.RemoveDependences(r, hostConfig, t.ccfg.PackageSrc); err != nil {
 		logrus.Errorf("remove dependences failed: %v", err)
 	}
 
-	if isType(hostConfig.Type, api.Worker) {
+	if utils.IsType(hostConfig.Type, api.Worker) {
 		cleanupWorker(t.ccfg, r, hostConfig)
 	}
 
-	if isType(hostConfig.Type, api.Master) {
+	if utils.IsType(hostConfig.Type, api.Master) {
 		cleanupMaster(t.ccfg, r, hostConfig)
 	}
 
-	if isType(hostConfig.Type, api.ETCD) {
+	if utils.IsType(hostConfig.Type, api.ETCD) {
 		if !t.ccfg.EtcdCluster.External {
 			cleanupEtcd(t.ccfg, r, hostConfig)
 		} else {
@@ -234,7 +231,7 @@ func (t *removeWorkersTask) Name() string {
 
 func getFirstMaster(nodes []*api.HostConfig) string {
 	for _, node := range nodes {
-		if isType(node.Type, api.Master) {
+		if utils.IsType(node.Type, api.Master) {
 			return node.Address
 		}
 	}
@@ -253,7 +250,7 @@ func runRemoveWorker(t *removeWorkersTask, r runner.Runner, worker string) {
 
 func removeWorkers(t *removeWorkersTask, r runner.Runner) {
 	for _, node := range t.ccfg.Nodes {
-		if isType(node.Type, api.Worker) {
+		if utils.IsType(node.Type, api.Worker) {
 			runRemoveWorker(t, r, node.Name)
 		}
 	}
@@ -278,7 +275,7 @@ func (t *removeEtcdsTask) Name() string {
 
 func getFirstEtcd(nodes []*api.HostConfig) string {
 	for _, node := range nodes {
-		if isType(node.Type, api.ETCD) {
+		if utils.IsType(node.Type, api.ETCD) {
 			return node.Address
 		}
 	}
