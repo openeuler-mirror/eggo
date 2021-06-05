@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gitee.com/openeuler/eggo/pkg/api"
+	"gitee.com/openeuler/eggo/pkg/constants"
 	"gitee.com/openeuler/eggo/pkg/utils/endpoint"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
@@ -57,48 +58,48 @@ WantedBy=multi-user.target
 	ServerConfTemp = `apiVersion: v1
 kind: Service
 metadata:
-	name: kube-dns
-	namespace: kube-system
-	annotations:
-	prometheus.io/port: "9153"
-	prometheus.io/scrape: "true"
-	labels:
-	k8s-app: kube-dns
-	kubernetes.io/cluster-service: "true"
-	kubernetes.io/name: "CoreDNS"
+  name: kube-dns
+  namespace: kube-system
+  annotations:
+    prometheus.io/port: "9153"
+    prometheus.io/scrape: "true"
+  labels:
+    k8s-app: kube-dns
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "CoreDNS"
 spec:
-	clusterIP: {{ .DNSHostAddr }}
-	ports:
-	- name: dns
-	port: 53
-	protocol: UDP
-	- name: dns-tcp
-	port: 53
-	protocol: TCP
-	- name: metrics
-	port: 9153
-	protocol: TCP
+  clusterIP: {{ .DNSHostAddr }}
+  ports:
+  - name: dns
+    port: 53
+    protocol: UDP
+  - name: dns-tcp
+    port: 53
+    protocol: TCP
+  - name: metrics
+    port: 9153
+    protocol: TCP
 `
 	EndpointTemp = `apiVersion: v1
 kind: Endpoints
 metadata:
-	name: kube-dns
-	namespace: kube-system
+  name: kube-dns
+  namespace: kube-system
 subsets:
-	- addresses:
-		{{- range $i, $v := .HostIPs }}
-		- ip: {{ $v }}
-		{{- end }}
-	ports:
-		- name: dns-tcp
-		port: 53
-		protocol: TCP
-		- name: dns
-		port: 53
-		protocol: UDP
-		- name: metrics
-		port: 9153
-		protocol: TCP
+  - addresses:
+{{- range $i, $v := .HostIPs }}
+      - ip: {{ $v }}
+{{- end }}
+    ports:
+      - name: dns-tcp
+        port: 53
+        protocol: TCP
+      - name: dns
+        port: 53
+        protocol: UDP
+      - name: metrics
+        port: 9153
+        protocol: TCP
 `
 )
 
@@ -123,7 +124,7 @@ func (cs *CorednsServerSetupTask) createCoreServerTemplate(r runner.Runner) erro
 	var sb strings.Builder
 	tmpl := template.Must(template.New("CoreServer").Parse(dedent.Dedent(ServerConfTemp)))
 	datastore := map[string]interface{}{}
-	datastore["HostIP"] = cs.Cluster.ServiceCluster.DNSAddr
+	datastore["DNSHostAddr"] = cs.Cluster.ServiceCluster.DNSAddr
 	serverConfig, err := kkutil.Render(tmpl, datastore)
 	if err != nil {
 		logrus.Errorf("rend core dns server failed: %v", err)
@@ -132,6 +133,7 @@ func (cs *CorednsServerSetupTask) createCoreServerTemplate(r runner.Runner) erro
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	serverBase64 := base64.StdEncoding.EncodeToString([]byte(serverConfig))
 	sb.WriteString(fmt.Sprintf("echo %s | base64 -d > %s/coredns_server.yaml", serverBase64, cs.Cluster.GetManifestDir()))
+	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s kubectl apply -f %s/coredns_server.yaml", fmt.Sprintf("%s/%s", cs.Cluster.GetConfigDir(), constants.KubeConfigFileNameAdmin), cs.Cluster.GetManifestDir()))
 	sb.WriteString("\"")
 
 	_, err = r.RunCommand(sb.String())
@@ -158,6 +160,7 @@ func (cs *CorednsServerSetupTask) createCoreEndpointTemplate(r runner.Runner, ip
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	epBase64 := base64.StdEncoding.EncodeToString([]byte(epConfig))
 	sb.WriteString(fmt.Sprintf("echo %s | base64 -d > %s/coredns_ep.yaml", epBase64, cs.Cluster.GetManifestDir()))
+	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s kubectl apply -f %s/coredns_ep.yaml", fmt.Sprintf("%s/%s", cs.Cluster.GetConfigDir(), constants.KubeConfigFileNameAdmin), cs.Cluster.GetManifestDir()))
 	sb.WriteString("\"")
 
 	_, err = r.RunCommand(sb.String())
@@ -186,7 +189,7 @@ func (ct *CorednsSetupTask) createCoreConfigTemplate(r runner.Runner) error {
 		return err
 	}
 	datastore["Endpoint"] = useEndPoint
-	datastore["AdminConf"] = fmt.Sprintf("%s/%s", ct.Cluster.Certificate.SavePath, "admin.conf")
+	datastore["AdminConf"] = fmt.Sprintf("%s/%s", ct.Cluster.GetConfigDir(), constants.KubeConfigFileNameAdmin)
 	coreConfig, err := kkutil.Render(tmpl, datastore)
 	if err != nil {
 		logrus.Errorf("rend core config failed: %v", err)
@@ -219,6 +222,8 @@ func (ct *CorednsSetupTask) createServiceTemplate(r runner.Runner) error {
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	serviceBase64 := base64.StdEncoding.EncodeToString([]byte(serviceConfig))
 	sb.WriteString(fmt.Sprintf("echo %s | base64 -d > /usr/lib/systemd/system/coredns.service", serviceBase64))
+	sb.WriteString(" && systemctl enable coredns")
+	sb.WriteString(" && systemctl start coredns")
 	sb.WriteString("\"")
 
 	_, err = r.RunCommand(sb.String())
@@ -268,7 +273,7 @@ func SetUpCoredns(cluster *api.ClusterConfig) error {
 		return err
 	}
 
-	if err := nodemanager.WaitTaskOnNodesFinished(st, masterIPs, time.Minute*5); err != nil {
+	if err = nodemanager.WaitTaskOnNodesFinished(st, masterIPs, time.Minute*5); err != nil {
 		logrus.Errorf("wait to coredns service running failed: %v", err)
 		return err
 	}
