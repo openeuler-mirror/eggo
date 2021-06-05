@@ -360,7 +360,7 @@ mode: "iptables"
 	certPath := ccfg.GetCertDir()
 	configGen := certs.NewOpensshBinCertGenerator(r)
 	err := configGen.CreateKubeConfig(rootPath, KubeConfigFileNameKubeProxy, filepath.Join(certPath, "ca.crt"), "default-kube-proxy",
-		filepath.Join(certPath, "kube-proxy.key"), filepath.Join(certPath, "kube-proxy.crt"), apiEndpoint)
+		filepath.Join(certPath, "kube-proxy.crt"), filepath.Join(certPath, "kube-proxy.key"), apiEndpoint)
 	if err != nil {
 		logrus.Errorf("generate proxy kube config failed: %v", err)
 		return err

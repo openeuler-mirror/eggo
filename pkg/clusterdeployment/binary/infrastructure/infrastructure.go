@@ -35,6 +35,13 @@ import (
 
 var itask *task.TaskInstance
 
+var (
+	// TODO: coredns open ports should be config by user
+	masterPorts = []string{"6443/tcp", "10252/tcp", "10251/tcp", "53/tcp", "53/udp", "9153/tcp"}
+	workPorts   = []string{"10250/tcp", "10256/tcp"}
+	etcdPosts   = []string{"2379-2381/tcp"}
+)
+
 type InfrastructureTask struct {
 	ccfg *api.ClusterConfig
 }
@@ -127,9 +134,6 @@ func setHostname(r runner.Runner, hcg *api.HostConfig) error {
 
 func addFirewallPort(r runner.Runner, hcg *api.HostConfig) error {
 	var ports []string
-	masterPorts := []string{"6443/tcp", "10252/tcp", "10251/tcp"}
-	workPorts := []string{"10250/tcp", "10256/tcp"}
-	etcdPosts := []string{"2379-2381/tcp"}
 
 	if hcg.Type&api.Master != 0 {
 		ports = append(ports, masterPorts...)

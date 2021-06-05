@@ -276,10 +276,10 @@ func SetupKubeletService(r runner.Runner, kcf *api.Kubelet, hcf *api.HostConfig)
 
 func SetupProxyService(r runner.Runner, kpcf *api.KubeProxy, hcf *api.HostConfig) error {
 	defaultArgs := map[string]string{
-		"--config":      "/etc/kubernetes/kube-proxy-config.yaml",
-		"--hostname":    hcf.Name,
-		"--logtostderr": "true",
-		"--v":           "2",
+		"--config":            "/etc/kubernetes/kube-proxy-config.yaml",
+		"--hostname-override": hcf.Name,
+		"--logtostderr":       "true",
+		"--v":                 "2",
 	}
 	if kpcf != nil {
 		for k, v := range kpcf.ExtraArgs {

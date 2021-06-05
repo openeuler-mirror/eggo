@@ -61,8 +61,8 @@ func TestInit(t *testing.T) {
 	conf := &api.ClusterConfig{
 		Name: "test-cluster",
 		ServiceCluster: api.ServiceClusterConfig{
-			CIDR:    "10.244.0.0/16",
-			Gateway: "10.244.0.1",
+			CIDR:    "10.32.0.0/16",
+			Gateway: "10.32.0.1",
 		},
 		LocalEndpoint: api.APIEndpoint{
 			AdvertiseAddress: "192.168.1.1",

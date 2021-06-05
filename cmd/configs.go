@@ -246,9 +246,9 @@ func getDefaultClusterdeploymentConfig() *api.ClusterConfig {
 			SavePath: constants.DefaultK8SCertDir,
 		},
 		ServiceCluster: api.ServiceClusterConfig{
-			CIDR:    "10.244.0.0/16",
+			CIDR:    "10.32.0.0/16",
 			DNSAddr: "10.32.0.10",
-			Gateway: "10.244.0.1",
+			Gateway: "10.32.0.1",
 		},
 		Network: api.NetworkConfig{
 			PodCIDR:    "10.244.64.0/16",
@@ -584,9 +584,9 @@ func createDeployConfigTemplate(file string) error {
 		ExternalCA:     false,
 		ExternalCAPath: "/opt/externalca",
 		Service: api.ServiceClusterConfig{
-			CIDR:    "10.244.0.0/16",
+			CIDR:    "10.32.0.0/16",
 			DNSAddr: "10.32.0.10",
-			Gateway: "10.244.0.1",
+			Gateway: "10.32.0.1",
 		},
 		NetWork: api.NetworkConfig{
 			PodCIDR:    "10.244.64.0/16",
