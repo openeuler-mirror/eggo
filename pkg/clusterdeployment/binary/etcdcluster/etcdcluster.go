@@ -51,10 +51,6 @@ func (t *EtcdDeployEtcdsTask) Name() string {
 	return "EtcdDeployEtcdsTask"
 }
 
-func isType(curType uint16, expectedType uint16) bool {
-	return curType&expectedType != 0
-}
-
 func getDstEtcdCertsDir(ccfg *api.ClusterConfig) string {
 	return filepath.Join(ccfg.GetCertDir(), "etcd")
 }

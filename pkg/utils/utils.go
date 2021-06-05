@@ -58,3 +58,7 @@ func IsDocker(engine string) bool {
 
 	return false
 }
+
+func IsType(curType uint16, expectedType uint16) bool {
+	return curType&expectedType != 0
+}

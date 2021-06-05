@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 
 	"gitee.com/openeuler/eggo/pkg/api"
+	"gitee.com/openeuler/eggo/pkg/utils"
 	"gitee.com/openeuler/eggo/pkg/utils/certs"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 )
@@ -110,7 +111,7 @@ func generateCaAndApiserverEtcdCerts(r runner.Runner, ccfg *api.ClusterConfig) e
 	var hostnameList []string
 	var ipList []string
 	for _, node := range ccfg.Nodes {
-		if isType(node.Type, api.Master) {
+		if utils.IsType(node.Type, api.Master) {
 			hostnameList = append(hostnameList, node.Name)
 			ipList = append(ipList, node.Address)
 		}
