@@ -196,16 +196,16 @@ func installByLocalPkg(r runner.Runner, hcg *api.HostConfig, pcfg *api.PackageSr
 	if pmanager == "dpkg" {
 		pmCommand = "dpkg -i"
 	} else {
-		pmCommand = "rpm -ivh"
+		pmCommand = "rpm -Uvh --force"
 	}
 
 	var sb strings.Builder
-	sb.WriteString("sudo -E /bin/sh -c \"")
+	sb.WriteString(fmt.Sprintf("sudo -E /bin/sh -c \"%s ", pmCommand))
 	for _, p := range pkg {
-		sb.WriteString(fmt.Sprintf("%s %s/%s* && ", pmCommand, getPkgDistPath(pcfg.DistPath), p))
+		sb.WriteString(fmt.Sprintf("%s/%s* ", getPkgDistPath(pcfg.DistPath), p))
 	}
 
-	sb.WriteString("echo success\"")
+	sb.WriteString("&& echo success\"")
 	if _, err := r.RunCommand(sb.String()); err != nil {
 		return fmt.Errorf("install local pkg failed: %v", err)
 	}

@@ -80,6 +80,10 @@ var (
 			Type: "repo",
 		},
 		{
+			Name: "iSulad",
+			Type: "repo",
+		},
+		{
 			Name: "kubernetes-client",
 			Type: "repo",
 		},
@@ -93,10 +97,6 @@ var (
 		},
 		{
 			Name: "tar",
-			Type: "repo",
-		},
-		{
-			Name: "iSulad",
 			Type: "repo",
 		},
 	}
@@ -323,17 +323,27 @@ func portExist(openPorts []*api.OpenPorts, port *api.OpenPorts) bool {
 
 func addPackagesAndExports(hostconfig *api.HostConfig, pkgs []*api.Packages,
 	openPorts []*api.OpenPorts) {
-	if hostconfig.Packages == nil {
-		hostconfig.Packages = []*api.Packages{}
-	}
-
-	hostconfig.Packages = append(hostconfig.Packages, pkgs...)
-
 	for _, port := range openPorts {
 		if portExist(hostconfig.OpenPorts, port) {
 			continue
 		}
 		hostconfig.OpenPorts = append(hostconfig.OpenPorts, port)
+	}
+
+	if hostconfig.Packages == nil {
+		hostconfig.Packages = []*api.Packages{}
+	}
+
+	noDupPkgs := make(map[string]bool, len(hostconfig.Packages))
+	for _, p := range hostconfig.Packages {
+		noDupPkgs[p.Name] = true
+	}
+
+	for _, pkg := range pkgs {
+		if _, ok := noDupPkgs[pkg.Name]; ok {
+			continue
+		}
+		hostconfig.Packages = append(hostconfig.Packages, pkg)
 	}
 }
 
@@ -394,8 +404,8 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 	for i, master := range conf.Masters {
 		hostconfig = createCommonHostConfig(master, "k8s-master-"+strconv.Itoa(i), conf.Username, conf.Password)
 		hostconfig.Type |= api.Master
-		addPackagesAndExports(hostconfig, masterPackages, masterExports)
 		addUserPackages(hostconfig, conf.Packages["master"])
+		addPackagesAndExports(hostconfig, masterPackages, masterExports)
 		cache[hostconfig.Address] = hostconfig
 	}
 
@@ -406,8 +416,8 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 				conf.Password)
 		}
 		hostconfig.Type |= api.Worker
-		addPackagesAndExports(hostconfig, nodePackages, nodeExports)
 		addUserPackages(hostconfig, conf.Packages["node"])
+		addPackagesAndExports(hostconfig, nodePackages, nodeExports)
 		cache[hostconfig.Address] = hostconfig
 	}
 
@@ -424,8 +434,8 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 			hostconfig = createCommonHostConfig(etcd, "etcd-"+strconv.Itoa(i), conf.Username, conf.Password)
 		}
 		hostconfig.Type |= api.ETCD
-		addPackagesAndExports(hostconfig, etcdPackages, etcdExports)
 		addUserPackages(hostconfig, conf.Packages["etcd"])
+		addPackagesAndExports(hostconfig, etcdPackages, etcdExports)
 		cache[hostconfig.Address] = hostconfig
 	}
 
@@ -437,13 +447,13 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 		}
 		hostconfig.Type |= api.LoadBalance
 
+		addUserPackages(hostconfig, conf.Packages["loadbalance"])
 		addPackagesAndExports(hostconfig, loadbalancePackages, []*api.OpenPorts{
 			{
 				Port:     getPortFromEndPoint(conf.ApiServerEndpoint),
 				Protocol: "tcp",
 			},
 		})
-		addUserPackages(hostconfig, conf.Packages["loadbalance"])
 		cache[hostconfig.Address] = hostconfig
 	}
 
@@ -619,11 +629,11 @@ func createDeployConfigTemplate(file string) error {
 		Packages: map[string][]*Package{
 			"master": {
 				&Package{
-					Name: "kubernetes-master",
+					Name: "kubernetes-client",
 					Type: "pkg",
 				},
 				&Package{
-					Name: "kubernetes-client",
+					Name: "kubernetes-master",
 					Type: "pkg",
 				},
 				&Package{
@@ -646,26 +656,6 @@ func createDeployConfigTemplate(file string) error {
 			},
 			"node": {
 				&Package{
-					Name: "kubernetes-node",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "kubernetes-client",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "kubernetes-kubelet",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "docker-engine",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "libcgroup",
-					Type: "pkg",
-				},
-				&Package{
 					Name: "conntrack-tools",
 					Type: "pkg",
 				},
@@ -682,14 +672,6 @@ func createDeployConfigTemplate(file string) error {
 					Type: "repo",
 				},
 				&Package{
-					Name: "iSulad",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "clibcni",
-					Type: "pkg",
-				},
-				&Package{
 					Name: "emacs-filesystem",
 					Type: "pkg",
 				},
@@ -702,35 +684,11 @@ func createDeployConfigTemplate(file string) error {
 					Type: "pkg",
 				},
 				&Package{
-					Name: "grpc",
-					Type: "pkg",
-				},
-				&Package{
 					Name: "http-parser",
 					Type: "pkg",
 				},
 				&Package{
-					Name: "lcr",
-					Type: "pkg",
-				},
-				&Package{
 					Name: "libwebsockets",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "lxc",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "lxc-libs",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "protobuf",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "protobuf-devel",
 					Type: "pkg",
 				},
 				&Package{
@@ -742,6 +700,10 @@ func createDeployConfigTemplate(file string) error {
 					Type: "pkg",
 				},
 				&Package{
+					Name: "vim-filesystem",
+					Type: "pkg",
+				},
+				&Package{
 					Name: "vim-common",
 					Type: "pkg",
 				},
@@ -750,15 +712,63 @@ func createDeployConfigTemplate(file string) error {
 					Type: "pkg",
 				},
 				&Package{
-					Name: "vim-filesystem",
-					Type: "pkg",
-				},
-				&Package{
 					Name: "yajl",
 					Type: "pkg",
 				},
 				&Package{
 					Name: "zlib-devel",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "protobuf",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "protobuf-devel",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "grpc",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "lxc",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "lxc-libs",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "lcr",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "clibcni",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "libcgroup",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "docker-engine",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "iSulad",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "kubernetes-client",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "kubernetes-node",
+					Type: "pkg",
+				},
+				&Package{
+					Name: "kubernetes-kubelet",
 					Type: "pkg",
 				},
 			},
