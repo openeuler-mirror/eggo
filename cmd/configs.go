@@ -263,13 +263,11 @@ func getDefaultClusterdeploymentConfig() *api.ClusterConfig {
 				Timeout: "120s",
 			},
 			KubeletConf: &api.Kubelet{
-				DnsVip:          "10.32.0.10",
-				DnsDomain:       "cluster.local",
-				PauseImage:      "k8s.gcr.io/pause:3.2",
-				NetworkPlugin:   "cni",
-				CniBinDir:       "/usr/libexec/cni",
-				Runtime:         "iSulad",
-				RuntimeEndpoint: "unix:///var/run/isulad.sock",
+				DnsVip:        "10.32.0.10",
+				DnsDomain:     "cluster.local",
+				PauseImage:    "k8s.gcr.io/pause:3.2",
+				NetworkPlugin: "cni",
+				CniBinDir:     "/usr/libexec/cni",
 			},
 		},
 		PackageSrc: &api.PackageSrcConfig{
