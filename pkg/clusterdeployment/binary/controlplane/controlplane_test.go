@@ -102,7 +102,11 @@ func TestInit(t *testing.T) {
 	}()
 
 	api.EggoHomePath = "/tmp/eggo"
-	lr.RunCommand(fmt.Sprintf("sudo mkdir -p -m 0777 %s/%s/pki", api.EggoHomePath, conf.Name))
+	// generate api server etcd client ceritifaces for testing
+	lr.RunCommand(fmt.Sprintf("sudo mkdir -p -m 0777 %s/%s/pki/etcd", api.EggoHomePath, conf.Name))
+	lr.RunCommand(fmt.Sprintf("sudo touch %s/%s/pki/apiserver-etcd-client.crt", api.EggoHomePath, conf.Name))
+	lr.RunCommand(fmt.Sprintf("sudo touch %s/%s/pki/apiserver-etcd-client.key", api.EggoHomePath, conf.Name))
+	lr.RunCommand(fmt.Sprintf("sudo touch %s/%s/pki/etcd/ca.crt", api.EggoHomePath, conf.Name))
 	if err := Init(conf); err != nil {
 		t.Fatalf("do control plane init failed: %v", err)
 	}

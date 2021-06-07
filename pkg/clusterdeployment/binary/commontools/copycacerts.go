@@ -30,6 +30,7 @@ var (
 		"etcd/ca.crt",
 	}
 	MasterRequiredCerts = []string{
+		"etcd/ca.crt",
 		"apiserver-etcd-client.crt",
 		"apiserver-etcd-client.key",
 		"sa.pub",
@@ -54,8 +55,8 @@ func (ct *CopyCaCertificatesTask) Name() string {
 
 func checkCaExists(cluster string, requireCerts []string) bool {
 	for _, cert := range requireCerts {
-		_, err := os.Lstat(filepath.Join(api.GetCertificateStorePath(cluster), cert))
-		if os.IsNotExist(err) {
+		if _, err := os.Lstat(filepath.Join(api.GetCertificateStorePath(cluster), cert)); err != nil {
+			logrus.Errorf("check ca: %s failed: %v", cert, err)
 			return false
 		}
 	}
@@ -92,7 +93,7 @@ func (ct *CopyCaCertificatesTask) Run(r runner.Runner, hcf *api.HostConfig) erro
 		return fmt.Errorf("[certs] cannot find ca certificates")
 	}
 	cmd := fmt.Sprintf("sudo -E /bin/sh -c \"mkdir -p %s\"", ct.Cluster.Certificate.SavePath)
-	if (hcf.Type & api.ETCD) != 0 {
+	if (hcf.Type&api.ETCD) != 0 || (hcf.Type&api.Master) != 0 {
 		cmd = fmt.Sprintf("sudo -E /bin/sh -c \"mkdir -p %s/etcd\"", ct.Cluster.Certificate.SavePath)
 	}
 
