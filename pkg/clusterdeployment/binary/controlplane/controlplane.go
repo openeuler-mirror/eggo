@@ -348,6 +348,7 @@ func generateCertsAndKubeConfigs(r runner.Runner, ccfg *api.ClusterConfig, hcf *
 	cg := certs.NewOpensshBinCertGenerator(r)
 	defer func() {
 		if err != nil {
+			// TODO: dot not delete user configed directory, delete directories and files we addded only
 			cg.CleanAll(rootPath)
 		}
 	}()
@@ -416,7 +417,7 @@ func Init(conf *api.ClusterConfig) error {
 		return err
 	}
 
-	if err := JoinMaterNode(conf, firstMaster); err != nil {
+	if err = JoinMaterNode(conf, firstMaster); err != nil {
 		return err
 	}
 

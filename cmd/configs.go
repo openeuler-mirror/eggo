@@ -72,6 +72,21 @@ var (
 			Port:     10252,
 			Protocol: "tcp",
 		},
+		// coredns
+		{
+			Port:     53,
+			Protocol: "tcp",
+		},
+		// coredns
+		{
+			Port:     53,
+			Protocol: "udp",
+		},
+		// coredns
+		{
+			Port:     9153,
+			Protocol: "tcp",
+		},
 	}
 
 	nodePackages = []*api.Packages{
