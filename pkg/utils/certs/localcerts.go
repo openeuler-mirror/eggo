@@ -4,6 +4,8 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"fmt"
+	"io/ioutil"
 	"math"
 	"math/big"
 	"os"
@@ -13,6 +15,8 @@ import (
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
 	keyutil "k8s.io/client-go/util/keyutil"
 )
@@ -173,11 +177,72 @@ func (l *LocalCertGenerator) CreateCertAndKey(caCertPath, caKeyPath string, conf
 	return nil
 }
 
-func (l *LocalCertGenerator) CreateKubeConfig(savePath, filename string, caCertPath, credName, certPath, keyPath string, enpoint string) error {
-	logrus.Info("TODO: do not need CreateKubeConfig for LocalCertGenerator now.")
-	return nil
+func (l *LocalCertGenerator) CreateKubeConfig(savePath, filename string, caCertPath, credName, certPath, keyPath string, endpoint string) error {
+	writeFile := filepath.Join(savePath, filename)
+	cfg := &CreateKubeConfig{
+		clusterName:    "default-cluster",
+		server:         endpoint,
+		caPath:         caCertPath,
+		credName:       credName,
+		clientKeyPath:  keyPath,
+		clientCertPath: certPath,
+	}
+	return createKubeConfig(cfg, writeFile)
 }
 
 func (l *LocalCertGenerator) CleanAll(savePath string) error {
 	return os.RemoveAll(savePath)
+}
+
+type CreateKubeConfig struct {
+	clusterName    string
+	server         string
+	caPath         string
+	credName       string
+	clientKeyPath  string
+	clientCertPath string
+}
+
+func createKubeConfig(conf *CreateKubeConfig, filename string) error {
+	if conf == nil {
+		return fmt.Errorf("require config for kubeconfig")
+	}
+	caData, err := ioutil.ReadFile(conf.caPath)
+	if err != nil {
+		return err
+	}
+	keyData, err := ioutil.ReadFile(conf.clientKeyPath)
+	if err != nil {
+		return err
+	}
+	certData, err := ioutil.ReadFile(conf.clientCertPath)
+	if err != nil {
+		return err
+	}
+	cfg := clientcmdapi.Config{
+		CurrentContext: "default-system",
+		Contexts: map[string]*clientcmdapi.Context{
+			"default-system": {
+				Cluster:  conf.clusterName,
+				AuthInfo: conf.credName,
+			},
+		},
+		Clusters: map[string]*clientcmdapi.Cluster{
+			conf.clusterName: {
+				Server:                   conf.server,
+				CertificateAuthorityData: caData,
+			},
+		},
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			conf.credName: {
+				ClientKeyData:         keyData,
+				ClientCertificateData: certData,
+			},
+		},
+	}
+	err = clientcmd.WriteToFile(cfg, filename)
+	if err != nil {
+		return err
+	}
+	return nil
 }
