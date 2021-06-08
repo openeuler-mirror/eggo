@@ -27,6 +27,7 @@ import (
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/addons"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/etcdcluster"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
+	"gitee.com/openeuler/eggo/pkg/constants"
 	"gitee.com/openeuler/eggo/pkg/utils"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
@@ -266,8 +267,8 @@ func getFirstMaster(nodes []*api.HostConfig) string {
 func runRemoveWorker(t *removeWorkersTask, r runner.Runner, worker string) {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("kubectl drain %v --delete-emptydir-data --force --ignore-daemonsets", worker))
-	sb.WriteString(fmt.Sprintf("&& kubectl delete node %v", worker))
+	sb.WriteString(fmt.Sprintf("KUBECONFIG=%s/%s kubectl delete node %v --force --grace-period=0",
+		t.ccfg.GetManifestDir(), constants.KubeConfigFileNameAdmin, worker))
 	if output, err := r.RunCommand(addSudo(sb.String())); err != nil {
 		logrus.Errorf("remove workder %v failed: %v\noutput: %v", worker, err, output)
 	}
@@ -308,8 +309,9 @@ func getFirstEtcd(nodes []*api.HostConfig) string {
 }
 
 type etcdMember struct {
-	id   string
-	name string
+	id     string
+	name   string
+	leader bool
 }
 
 // output:
@@ -317,15 +319,20 @@ type etcdMember struct {
 // 6787454327e00766, started, workder1, https://192.168.0.2:2380, https://192.168.0.2:2379, true
 func parseEtcdMemberList(output string) []*etcdMember {
 	var members []*etcdMember
+	var leader bool
 
 	for _, line := range strings.Split(output, "\n") {
 		items := strings.Split(line, ",")
 		if len(items) < 3 {
 			continue
 		}
+		if strings.TrimSpace(items[len(items)-1]) == "true" {
+			leader = true
+		}
 		members = append(members, &etcdMember{
-			id:   items[0],
-			name: items[2],
+			id:     items[0],
+			name:   items[2],
+			leader: leader,
 		})
 	}
 
@@ -348,11 +355,21 @@ func getEtcdCertsOpts(certsPath string) string {
 }
 
 func (t *removeEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfig) error {
-	for _, member := range getEtcdMembers(t, r) {
-		// do not remove etcd member on this machine currently
-		if member.name == hostConfig.Name {
+	var foundLeader bool
+
+	etcds := getEtcdMembers(t, r)
+	for i, member := range etcds {
+		// do not remove etcd leader
+		if member.leader {
+			foundLeader = true
 			continue
 		}
+
+		// can not remove itself if only one etcd member exist
+		if !foundLeader && i == len(etcds)-1 {
+			continue
+		}
+
 		cmd := fmt.Sprintf("ETCDCTL_API=3 etcdctl %v member remove %v",
 			getEtcdCertsOpts(t.ccfg.GetCertDir()), member.id)
 		if output, err := r.RunCommand(addSudo(cmd)); err != nil {
