@@ -17,7 +17,6 @@ package infrastructure
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -50,24 +49,46 @@ func (it *InfrastructureTask) Name() string {
 	return "InfrastructureTask"
 }
 
-func loadImages(r runner.Runner, conf *api.PackageSrcConfig) error {
+func loadImages(r runner.Runner, conf *api.PackageSrcConfig, runtime string) error {
 	if conf == nil {
 		return fmt.Errorf("can not found dist path failed")
 	}
 
 	imagePkgPath := filepath.Join(getPkgDistPath(conf.DistPath), constants.DefaultImagePkgName)
 
-	if _, err := os.Stat(imagePkgPath); err != nil {
+	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"stat %s\"", imagePkgPath)); err != nil {
 		logrus.Debugf("no image package found on path %v", imagePkgPath)
 		return nil
 	}
 
-	_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"isula load -i %s\"", imagePkgPath))
-	if err != nil {
+	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"%s load -i %s\"", runtime, imagePkgPath)); err != nil {
 		return fmt.Errorf("isula load -i %v failed: %v", imagePkgPath, err)
 	}
 
 	return nil
+}
+
+func getRuntimeClient(kubeletConf *api.Kubelet) string {
+	if kubeletConf == nil {
+		return "docker"
+	}
+
+	runtimeClients := map[string]string{
+		"isula":   "isula",
+		"isulad":  "isula",
+		"iSula":   "isula",
+		"iSulad":  "isula",
+		"docker":  "docker",
+		"dockerd": "docker",
+		"Dockerd": "docker",
+		"Docker":  "docker",
+	}
+
+	if v, ok := runtimeClients[kubeletConf.Runtime]; ok {
+		return v
+	}
+
+	return "docker"
 }
 
 func (it *InfrastructureTask) Run(r runner.Runner, hcg *api.HostConfig) (err error) {
@@ -82,6 +103,7 @@ func (it *InfrastructureTask) Run(r runner.Runner, hcg *api.HostConfig) (err err
 	}
 
 	defer func() {
+		// TODO: dot not delete user configed directory, delete directories and files we addded only
 		if _, e := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"rm -rf %s\"", getPkgDistPath(it.ccfg.PackageSrc.DistPath))); e != nil {
 			err = fmt.Errorf("%v. And remove dir failed: %v", err, e)
 		}
@@ -102,7 +124,7 @@ func (it *InfrastructureTask) Run(r runner.Runner, hcg *api.HostConfig) (err err
 	}
 
 	if utils.IsType(hcg.Type, api.Worker) {
-		if err = loadImages(r, it.ccfg.PackageSrc); err != nil {
+		if err = loadImages(r, it.ccfg.PackageSrc, getRuntimeClient(it.ccfg.ControlPlane.KubeletConf)); err != nil {
 			logrus.Errorf("load images failed: %v", err)
 			return err
 		}

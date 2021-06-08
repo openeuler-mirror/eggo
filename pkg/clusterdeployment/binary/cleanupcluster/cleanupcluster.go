@@ -76,7 +76,7 @@ func addSudo(cmd string) string {
 
 func removePathes(r runner.Runner, hostConfig *api.HostConfig, pathes []string) {
 	for _, path := range pathes {
-		// TODO: if user can config the path, remember to make sure not delete "/"
+		// TODO: dot not delete user configed directory, delete directories and files we addded only
 		if output, err := r.RunCommand(addSudo("rm -rf " + path)); err != nil {
 			logrus.Errorf("remove path %v on node %v failed: %v\noutput: %v",
 				path, hostConfig.Address, err, output)
