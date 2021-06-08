@@ -29,13 +29,11 @@ import (
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/controlplane"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
 	"gitee.com/openeuler/eggo/pkg/constants"
-	"gitee.com/openeuler/eggo/pkg/utils"
 	"gitee.com/openeuler/eggo/pkg/utils/certs"
 	"gitee.com/openeuler/eggo/pkg/utils/endpoint"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/task"
-	"gitee.com/openeuler/eggo/pkg/utils/template"
 	"github.com/sirupsen/logrus"
 )
 
@@ -87,13 +85,14 @@ func (it *BootstrapTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 	logrus.Info("do join new worker...\n")
 
 	// check worker dependences
-	if err := check(r, it.ccfg); err != nil {
+	runtime, err := check(r, it.ccfg)
+	if err != nil {
 		logrus.Errorf("check failed: %v", err)
 		return err
 	}
 
-	if err := prepareISulad(r, it.ccfg); err != nil {
-		logrus.Errorf("prepare Env failed: %v", err)
+	if err := runtime.PrepareRuntimeJson(r, it.ccfg); err != nil {
+		logrus.Errorf("prepare container engine json failed: %v", err)
 		return err
 	}
 
@@ -111,72 +110,30 @@ func (it *BootstrapTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 	return nil
 }
 
-func check(r runner.Runner, ccfg *api.ClusterConfig) error {
-	if ccfg.ControlPlane.KubeletConf == nil {
-		return fmt.Errorf("empty kubeletconf")
+func check(r runner.Runner, ccfg *api.ClusterConfig) (Runtime, error) {
+	if ccfg.WorkerConfig.KubeletConf == nil {
+		return nil, fmt.Errorf("empty kubeletconf")
+	}
+	if ccfg.WorkerConfig.ContainerEngineConf == nil {
+		return nil, fmt.Errorf("empty container engine conf")
 	}
 
-	var softwares []string
-	if utils.IsISulad(ccfg.ControlPlane.KubeletConf.Runtime) {
-		softwares = append(KubeWorkerSoftwares, "isula", "isulad")
-	} else if utils.IsDocker(ccfg.ControlPlane.KubeletConf.Runtime) {
-		softwares = append(KubeWorkerSoftwares, "docker", "dockerd")
-	} else {
-		return fmt.Errorf("invalid container engine %s", ccfg.ControlPlane.KubeletConf.Runtime)
+	runtime := GetRuntime(ccfg.WorkerConfig.ContainerEngineConf.Runtime)
+	if runtime == nil {
+		return nil, fmt.Errorf("unsupport container engine %s", ccfg.WorkerConfig.ContainerEngineConf.Runtime)
 	}
 
-	if err := infrastructure.CheckDependences(r, softwares); err != nil {
-		return err
+	if err := infrastructure.CheckDependences(r, runtime.GetRuntimeSoftwares()); err != nil {
+		return nil, err
 	}
 
 	_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"ls %s\"", filepath.Join(ccfg.Certificate.SavePath, "ca.crt")))
 	if err != nil {
 		logrus.Errorf("chech ca cert failed: %v\n", err)
-		return err
+		return nil, err
 	}
 
-	return nil
-}
-
-func prepareISulad(r runner.Runner, ccfg *api.ClusterConfig) error {
-	if !utils.IsISulad(ccfg.ControlPlane.KubeletConf.Runtime) {
-		return nil
-	}
-
-	pauseImage, cniBinDir := "k8s.gcr.io/pause:3.2", "/usr/libexec/cni"
-	if ccfg.ControlPlane.KubeletConf.PauseImage != "" {
-		pauseImage = ccfg.ControlPlane.KubeletConf.PauseImage
-	}
-
-	if ccfg.ControlPlane.KubeletConf.CniBinDir != "" {
-		cniBinDir = ccfg.ControlPlane.KubeletConf.CniBinDir
-	}
-
-	isuladConfig := `
-#!/bin/bash
-sed -i "/registry-mirrors/a\    \t\"docker.io\"" /etc/isulad/daemon.json
-sed -i "/insecure-registries/a\    \t\"quay.io\"" /etc/isulad/daemon.json
-sed -i "/insecure-registries/a\    \t\"k8s.gcr.io\"," /etc/isulad/daemon.json
-sed -i "s#pod-sandbox-image\": \"#pod-sandbox-image\": \"{{ .pauseImage }}#g" /etc/isulad/daemon.json
-sed -i "s#network-plugin\": \"#network-plugin\": \"cni#g" /etc/isulad/daemon.json
-sed -i "s#cni-bin-dir\": \"#cni-bin-dir\": \"{{ .cniBinDir }}#g" /etc/isulad/daemon.json
-systemctl restart isulad
-`
-	datastore := map[string]interface{}{}
-	datastore["pauseImage"] = pauseImage
-	datastore["cniBinDir"] = cniBinDir
-	shell, err := template.TemplateRender(isuladConfig, datastore)
-	if err != nil {
-		return err
-	}
-	output, err := r.RunShell(shell, "isuladShell")
-	if err != nil {
-		logrus.Errorf("modify isulad daemon.json failed: %v", err)
-		return err
-	}
-	logrus.Debugf("modify isulad daemon.json success: %s", output)
-
-	return nil
+	return runtime, nil
 }
 
 func prepareConfig(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig) error {
@@ -283,8 +240,8 @@ authentication:
 authorization:
   mode: Webhook
 clusterDNS:
-- ` + ccfg.ControlPlane.KubeletConf.DnsVip + `
-clusterDomain: ` + ccfg.ControlPlane.KubeletConf.DnsDomain + `
+- ` + ccfg.WorkerConfig.KubeletConf.DnsVip + `
+clusterDomain: ` + ccfg.WorkerConfig.KubeletConf.DnsDomain + `
 runtimeRequestTimeout: "15m"
 `
 

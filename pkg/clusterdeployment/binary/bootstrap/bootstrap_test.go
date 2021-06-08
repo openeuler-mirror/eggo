@@ -67,10 +67,15 @@ func TestInit(t *testing.T) {
 		},
 		ControlPlane: api.ControlPlaneConfig{
 			Endpoint: "eggo.com:6443",
+		},
+		WorkerConfig: api.WorkerConfig{
 			KubeletConf: &api.Kubelet{
-				DnsVip:          "10.32.0.10",
-				DnsDomain:       "cluster.local",
-				CniBinDir:       "/opt/cni/bin",
+				DnsVip:    "10.32.0.10",
+				DnsDomain: "cluster.local",
+				CniBinDir: "/opt/cni/bin",
+			},
+			ContainerEngineConf: &api.ContainerEngine{
+				Runtime:         "iSulad",
 				RuntimeEndpoint: "unix:///var/run/isulad.sock",
 			},
 		},

@@ -44,19 +44,12 @@ func GetSysHome() string {
 }
 
 func IsISulad(engine string) bool {
-	if engine == "isula" || engine == "iSula" || engine == "isulad" || engine == "iSulad" || engine == "" {
-		return true
-	}
-
-	return false
+	return strings.ToLower(engine) == "isulad"
 }
 
 func IsDocker(engine string) bool {
-	if engine == "docker" || engine == "Docker" || engine == "dockerd" || engine == "Dockerd" {
-		return true
-	}
-
-	return false
+	// default engine
+	return engine == "" || strings.ToLower(engine) == "docker"
 }
 
 func IsType(curType uint16, expectedType uint16) bool {
