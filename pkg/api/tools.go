@@ -10,6 +10,10 @@ var (
 	EggoHomePath = "/etc/eggo/"
 )
 
+func GetClusterHomePath(cluster string) string {
+	return filepath.Join(EggoHomePath, cluster)
+}
+
 func GetCertificateStorePath(cluster string) string {
 	return filepath.Join(EggoHomePath, cluster, "pki")
 }

@@ -20,6 +20,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -234,9 +235,7 @@ func generateCerts(savePath string, cg certs.CertGenerator, ccfg *api.ClusterCon
 	return generateFrontProxyClientCertificate(savePath, cg)
 }
 
-func prepareCAs(savePath string) error {
-	lcg := certs.NewLocalCertGenerator()
-
+func prepareCAs(lcg certs.CertGenerator, savePath string) error {
 	if _, err := lcg.RunCommand(fmt.Sprintf("sudo mkdir -p -m 0700 %s", savePath)); err != nil {
 		logrus.Errorf("prepare certificates store path failed: %v", err)
 		return err
@@ -262,6 +261,42 @@ func prepareCAs(savePath string) error {
 	}
 
 	return nil
+}
+
+func createAdminKubeConfigForEggo(lcg certs.CertGenerator, caPath string, savePath string, ccfg *api.ClusterConfig) error {
+	caCertPath := fmt.Sprintf("%s/ca.crt", caPath)
+	caKeyPath := fmt.Sprintf("%s/ca.key", caPath)
+	adminConfig := &certs.CertConfig{
+		CommonName:    "kubernetes-admin",
+		Organizations: []string{"system:masters"},
+		Usages:        []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+	}
+	if err := lcg.CreateCertAndKey(caCertPath, caKeyPath, adminConfig, savePath, "admin"); err != nil {
+		return err
+	}
+	defer func() {
+		os.Remove(filepath.Join(savePath, "admin.key"))
+		os.Remove(filepath.Join(savePath, "admin.crt"))
+	}()
+	apiEndpoint, err := endpoint.GetAPIServerEndpoint(ccfg.ControlPlane.Endpoint, ccfg.LocalEndpoint)
+	if err != nil {
+		return err
+	}
+	err = lcg.CreateKubeConfig(savePath, constants.KubeConfigFileNameAdmin, caCertPath, "default-admin",
+		filepath.Join(savePath, "admin.crt"), filepath.Join(savePath, "admin.key"), apiEndpoint)
+	if err != nil {
+		logrus.Errorf("create admin kubeconfig for eggo failed: %v", err)
+	}
+	return err
+}
+
+func prepareCredentials(clusterName string, ccfg *api.ClusterConfig) error {
+	lcg := certs.NewLocalCertGenerator()
+	caPath := api.GetCertificateStorePath(clusterName)
+	if err := prepareCAs(lcg, caPath); err != nil {
+		return err
+	}
+	return createAdminKubeConfigForEggo(lcg, caPath, api.GetClusterHomePath(clusterName), ccfg)
 }
 
 func generateKubeConfigs(rootPath, certPath string, cg certs.CertGenerator, ccfg *api.ClusterConfig) (err error) {
@@ -411,7 +446,7 @@ func Init(conf *api.ClusterConfig) error {
 	}
 
 	// generate ca certificates in eggo
-	err := prepareCAs(api.GetCertificateStorePath(conf.Name))
+	err := prepareCredentials(conf.Name, conf)
 	if err != nil {
 		logrus.Errorf("[certs] create ca certificates failed: %v", err)
 		return err
