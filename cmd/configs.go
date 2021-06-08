@@ -189,36 +189,38 @@ type HostConfig struct {
 }
 
 type deployConfig struct {
-	ClusterID         string                   `yaml:"cluster-id"`
-	Username          string                   `yaml:"username"`
-	Password          string                   `yaml:"password"`
-	Masters           []*HostConfig            `yaml:"masters"`
-	Nodes             []*HostConfig            `yaml:"nodes"`
-	Etcds             []*HostConfig            `yaml:"etcds"`
-	LoadBalances      []*HostConfig            `yaml:"loadbalances"`
-	ConfigDir         string                   `yaml:"config-dir"`
-	CertificateDir    string                   `yaml:"certificate-dir"`
-	ExternalCA        bool                     `yaml:"external-ca"`
-	ExternalCAPath    string                   `yaml:"external-ca-path"`
-	Service           api.ServiceClusterConfig `yaml:"service"`
-	NetWork           api.NetworkConfig        `yaml:"network"`
-	ApiServerEndpoint string                   `yaml:"apiserver-endpoint"`
-	ApiServerCertSans api.Sans                 `yaml:"apiserver-cert-sans"`
-	ApiServerTimeout  string                   `yaml:"apiserver-timeout"`
-	EtcdExternal      bool                     `yaml:"etcd-external"`
-	EtcdToken         string                   `yaml:"etcd-token"`
-	EtcdDataDir       string                   `yaml:"etcd-data-dir"`
-	DnsVip            string                   `yaml:"dns-vip"`
-	DnsDomain         string                   `yaml:"dns-domain"`
-	PauseImage        string                   `yaml:"pause-image"`
-	NetworkPlugin     string                   `yaml:"network-plugin"`
-	CniBinDir         string                   `yaml:"cni-bin-dir"`
-	Runtime           string                   `yaml:"runtime"`
-	RuntimeEndpoint   string                   `yaml:"runtime-endpoint"`
-	ConfigExtraArgs   []*ConfigExtraArgs       `yaml:"config-extra-args"`
-	Addons            []*api.AddonConfig       `yaml:"addons"`
-	PackageSrc        api.PackageSrcConfig     `yaml:"package-src"`
-	Packages          map[string][]*Package    `yaml:"pacakges"` // key: master, node, etcd, loadbalance
+	ClusterID          string                   `yaml:"cluster-id"`
+	Username           string                   `yaml:"username"`
+	Password           string                   `yaml:"password"`
+	Masters            []*HostConfig            `yaml:"masters"`
+	Nodes              []*HostConfig            `yaml:"nodes"`
+	Etcds              []*HostConfig            `yaml:"etcds"`
+	LoadBalances       []*HostConfig            `yaml:"loadbalances"`
+	ConfigDir          string                   `yaml:"config-dir"`
+	CertificateDir     string                   `yaml:"certificate-dir"`
+	ExternalCA         bool                     `yaml:"external-ca"`
+	ExternalCAPath     string                   `yaml:"external-ca-path"`
+	Service            api.ServiceClusterConfig `yaml:"service"`
+	NetWork            api.NetworkConfig        `yaml:"network"`
+	ApiServerEndpoint  string                   `yaml:"apiserver-endpoint"`
+	ApiServerCertSans  api.Sans                 `yaml:"apiserver-cert-sans"`
+	ApiServerTimeout   string                   `yaml:"apiserver-timeout"`
+	EtcdExternal       bool                     `yaml:"etcd-external"`
+	EtcdToken          string                   `yaml:"etcd-token"`
+	EtcdDataDir        string                   `yaml:"etcd-data-dir"`
+	DnsVip             string                   `yaml:"dns-vip"`
+	DnsDomain          string                   `yaml:"dns-domain"`
+	PauseImage         string                   `yaml:"pause-image"`
+	NetworkPlugin      string                   `yaml:"network-plugin"`
+	CniBinDir          string                   `yaml:"cni-bin-dir"`
+	Runtime            string                   `yaml:"runtime"`
+	RuntimeEndpoint    string                   `yaml:"runtime-endpoint"`
+	RegistryMirrors    []string                 `yaml:"registry-mirrors"`
+	InsecureRegistries []string                 `yaml:"insecure-registries"`
+	ConfigExtraArgs    []*ConfigExtraArgs       `yaml:"config-extra-args"`
+	Addons             []*api.AddonConfig       `yaml:"addons"`
+	PackageSrc         api.PackageSrcConfig     `yaml:"package-src"`
+	Packages           map[string][]*Package    `yaml:"pacakges"` // key: master, node, etcd, loadbalance
 }
 
 func getEggoDir() string {
@@ -277,6 +279,8 @@ func getDefaultClusterdeploymentConfig() *api.ClusterConfig {
 			ApiConf: &api.ApiServer{
 				Timeout: "120s",
 			},
+		},
+		WorkerConfig: api.WorkerConfig{
 			KubeletConf: &api.Kubelet{
 				DnsVip:        "10.32.0.10",
 				DnsDomain:     "cluster.local",
@@ -284,6 +288,7 @@ func getDefaultClusterdeploymentConfig() *api.ClusterConfig {
 				NetworkPlugin: "cni",
 				CniBinDir:     "/usr/libexec/cni",
 			},
+			ContainerEngineConf: &api.ContainerEngine{},
 		},
 		PackageSrc: &api.PackageSrcConfig{
 			Type:   "tar.gz",
@@ -542,13 +547,15 @@ func toClusterdeploymentConfig(conf *deployConfig) *api.ClusterConfig {
 	setIfStrConfigNotEmpty(&ccfg.PackageSrc.Type, conf.PackageSrc.Type)
 	setIfStrConfigNotEmpty(&ccfg.PackageSrc.ArmSrc, conf.PackageSrc.ArmSrc)
 	setIfStrConfigNotEmpty(&ccfg.PackageSrc.X86Src, conf.PackageSrc.X86Src)
-	setIfStrConfigNotEmpty(&ccfg.ControlPlane.KubeletConf.DnsVip, conf.DnsVip)
-	setIfStrConfigNotEmpty(&ccfg.ControlPlane.KubeletConf.DnsDomain, conf.DnsDomain)
-	setIfStrConfigNotEmpty(&ccfg.ControlPlane.KubeletConf.PauseImage, conf.PauseImage)
-	setIfStrConfigNotEmpty(&ccfg.ControlPlane.KubeletConf.NetworkPlugin, conf.NetworkPlugin)
-	setIfStrConfigNotEmpty(&ccfg.ControlPlane.KubeletConf.CniBinDir, conf.CniBinDir)
-	setIfStrConfigNotEmpty(&ccfg.ControlPlane.KubeletConf.Runtime, conf.Runtime)
-	setIfStrConfigNotEmpty(&ccfg.ControlPlane.KubeletConf.RuntimeEndpoint, conf.RuntimeEndpoint)
+	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.KubeletConf.DnsVip, conf.DnsVip)
+	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.KubeletConf.DnsDomain, conf.DnsDomain)
+	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.KubeletConf.PauseImage, conf.PauseImage)
+	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.KubeletConf.NetworkPlugin, conf.NetworkPlugin)
+	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.KubeletConf.CniBinDir, conf.CniBinDir)
+	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.ContainerEngineConf.Runtime, conf.Runtime)
+	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.ContainerEngineConf.RuntimeEndpoint, conf.RuntimeEndpoint)
+	setStrArray(ccfg.WorkerConfig.ContainerEngineConf.RegistryMirrors, conf.RegistryMirrors)
+	setStrArray(ccfg.WorkerConfig.ContainerEngineConf.InsecureRegistries, conf.InsecureRegistries)
 
 	ccfg.Addons = append(ccfg.Addons, conf.Addons...)
 

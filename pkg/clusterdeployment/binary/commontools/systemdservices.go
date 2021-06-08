@@ -224,7 +224,7 @@ func SetupMasterServices(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.Host
 	return nil
 }
 
-func SetupKubeletService(r runner.Runner, kcf *api.Kubelet, hcf *api.HostConfig) error {
+func SetupKubeletService(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig) error {
 	defaultArgs := map[string]string{
 		"--config":               "/etc/kubernetes/kubelet_config.yaml",
 		"--network-plugin":       "cni",
@@ -235,25 +235,23 @@ func SetupKubeletService(r runner.Runner, kcf *api.Kubelet, hcf *api.HostConfig)
 		"--v":                    "2",
 	}
 
-	if kcf != nil {
-		configArgs := map[string]string{
-			"--network-plugin":            kcf.NetworkPlugin,
-			"--cni-bin-dir":               kcf.CniBinDir,
-			"--pod-infra-container-image": kcf.PauseImage,
-		}
+	configArgs := map[string]string{
+		"--network-plugin":            ccfg.WorkerConfig.KubeletConf.NetworkPlugin,
+		"--cni-bin-dir":               ccfg.WorkerConfig.KubeletConf.CniBinDir,
+		"--pod-infra-container-image": ccfg.WorkerConfig.KubeletConf.PauseImage,
+	}
 
-		if !utils.IsDocker(kcf.Runtime) {
-			configArgs["--container-runtime"] = "remote"
-			configArgs["--container-runtime-endpoint"] = kcf.RuntimeEndpoint
-		}
+	if !utils.IsDocker(ccfg.WorkerConfig.ContainerEngineConf.Runtime) {
+		configArgs["--container-runtime"] = "remote"
+		configArgs["--container-runtime-endpoint"] = ccfg.WorkerConfig.ContainerEngineConf.RuntimeEndpoint
+	}
 
-		for k, v := range kcf.ExtraArgs {
+	for k, v := range ccfg.WorkerConfig.KubeletConf.ExtraArgs {
+		defaultArgs[k] = v
+	}
+	for k, v := range configArgs {
+		if v != "" {
 			defaultArgs[k] = v
-		}
-		for k, v := range configArgs {
-			if v != "" {
-				defaultArgs[k] = v
-			}
 		}
 	}
 
@@ -334,12 +332,12 @@ func SetupProxyService(r runner.Runner, kpcf *api.KubeProxy, hcf *api.HostConfig
 
 func SetupWorkerServices(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig) error {
 	// set up k8s worker service
-	if err := SetupKubeletService(r, ccfg.ControlPlane.KubeletConf, hcf); err != nil {
+	if err := SetupKubeletService(r, ccfg, hcf); err != nil {
 		logrus.Errorf("setup k8s kubelet service failed: %v", err)
 		return err
 	}
 
-	if err := SetupProxyService(r, ccfg.ControlPlane.ProxyConf, hcf); err != nil {
+	if err := SetupProxyService(r, ccfg.WorkerConfig.ProxyConf, hcf); err != nil {
 		logrus.Errorf("setup k8s proxy service failed: %v", err)
 		return err
 	}

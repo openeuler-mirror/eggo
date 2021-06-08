@@ -68,8 +68,8 @@ func loadImages(r runner.Runner, conf *api.PackageSrcConfig, runtime string) err
 	return nil
 }
 
-func getRuntimeClient(kubeletConf *api.Kubelet) string {
-	if kubeletConf == nil {
+func getRuntimeClient(containerConf *api.ContainerEngine) string {
+	if containerConf == nil {
 		return "docker"
 	}
 
@@ -84,7 +84,7 @@ func getRuntimeClient(kubeletConf *api.Kubelet) string {
 		"Docker":  "docker",
 	}
 
-	if v, ok := runtimeClients[kubeletConf.Runtime]; ok {
+	if v, ok := runtimeClients[containerConf.Runtime]; ok {
 		return v
 	}
 
@@ -124,7 +124,7 @@ func (it *InfrastructureTask) Run(r runner.Runner, hcg *api.HostConfig) (err err
 	}
 
 	if utils.IsType(hcg.Type, api.Worker) {
-		if err = loadImages(r, it.ccfg.PackageSrc, getRuntimeClient(it.ccfg.ControlPlane.KubeletConf)); err != nil {
+		if err = loadImages(r, it.ccfg.PackageSrc, getRuntimeClient(it.ccfg.WorkerConfig.ContainerEngineConf)); err != nil {
 			logrus.Errorf("load images failed: %v", err)
 			return err
 		}
