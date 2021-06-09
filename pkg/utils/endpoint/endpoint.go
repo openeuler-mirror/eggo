@@ -71,6 +71,7 @@ func FormatURL(host, port string) *url.URL {
 func GetAPIServerEndpoint(apiEndpoint string, localEndpoint api.APIEndpoint) (string, error) {
 	host, sport, err := net.SplitHostPort(apiEndpoint)
 	if err != nil {
+		logrus.Warnf("parse api endpoint failed: %v, use local endpoint", err)
 		host = localEndpoint.AdvertiseAddress
 		sport = fmt.Sprintf("%d", DefaultEndpointPort)
 		if ValidPort(int(localEndpoint.BindPort)) {
