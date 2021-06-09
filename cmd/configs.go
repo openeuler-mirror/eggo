@@ -169,38 +169,39 @@ type HostConfig struct {
 }
 
 type deployConfig struct {
-	ClusterID          string                   `yaml:"cluster-id"`
-	Username           string                   `yaml:"username"`
-	Password           string                   `yaml:"password"`
-	Masters            []*HostConfig            `yaml:"masters"`
-	Nodes              []*HostConfig            `yaml:"nodes"`
-	Etcds              []*HostConfig            `yaml:"etcds"`
-	LoadBalances       []*HostConfig            `yaml:"loadbalances"`
-	ConfigDir          string                   `yaml:"config-dir"`
-	CertificateDir     string                   `yaml:"certificate-dir"`
-	ExternalCA         bool                     `yaml:"external-ca"`
-	ExternalCAPath     string                   `yaml:"external-ca-path"`
-	Service            api.ServiceClusterConfig `yaml:"service"`
-	NetWork            api.NetworkConfig        `yaml:"network"`
-	ApiServerEndpoint  string                   `yaml:"apiserver-endpoint"`
-	ApiServerCertSans  api.Sans                 `yaml:"apiserver-cert-sans"`
-	ApiServerTimeout   string                   `yaml:"apiserver-timeout"`
-	EtcdExternal       bool                     `yaml:"etcd-external"`
-	EtcdToken          string                   `yaml:"etcd-token"`
-	EtcdDataDir        string                   `yaml:"etcd-data-dir"`
-	DnsVip             string                   `yaml:"dns-vip"`
-	DnsDomain          string                   `yaml:"dns-domain"`
-	PauseImage         string                   `yaml:"pause-image"`
-	NetworkPlugin      string                   `yaml:"network-plugin"`
-	CniBinDir          string                   `yaml:"cni-bin-dir"`
-	Runtime            string                   `yaml:"runtime"`
-	RuntimeEndpoint    string                   `yaml:"runtime-endpoint"`
-	RegistryMirrors    []string                 `yaml:"registry-mirrors"`
-	InsecureRegistries []string                 `yaml:"insecure-registries"`
-	ConfigExtraArgs    []*ConfigExtraArgs       `yaml:"config-extra-args"`
-	Addons             []*api.AddonConfig       `yaml:"addons"`
-	PackageSrc         api.PackageSrcConfig     `yaml:"package-src"`
-	Packages           map[string][]*Package    `yaml:"pacakges"` // key: master, node, etcd, loadbalance
+	ClusterID          string                      `yaml:"cluster-id"`
+	Username           string                      `yaml:"username"`
+	Password           string                      `yaml:"password"`
+	Masters            []*HostConfig               `yaml:"masters"`
+	Nodes              []*HostConfig               `yaml:"nodes"`
+	Etcds              []*HostConfig               `yaml:"etcds"`
+	LoadBalances       []*HostConfig               `yaml:"loadbalances"`
+	ConfigDir          string                      `yaml:"config-dir"`
+	CertificateDir     string                      `yaml:"certificate-dir"`
+	ExternalCA         bool                        `yaml:"external-ca"`
+	ExternalCAPath     string                      `yaml:"external-ca-path"`
+	Service            api.ServiceClusterConfig    `yaml:"service"`
+	NetWork            api.NetworkConfig           `yaml:"network"`
+	ApiServerEndpoint  string                      `yaml:"apiserver-endpoint"`
+	ApiServerCertSans  api.Sans                    `yaml:"apiserver-cert-sans"`
+	ApiServerTimeout   string                      `yaml:"apiserver-timeout"`
+	EtcdExternal       bool                        `yaml:"etcd-external"`
+	EtcdToken          string                      `yaml:"etcd-token"`
+	EtcdDataDir        string                      `yaml:"etcd-data-dir"`
+	DnsVip             string                      `yaml:"dns-vip"`
+	DnsDomain          string                      `yaml:"dns-domain"`
+	PauseImage         string                      `yaml:"pause-image"`
+	NetworkPlugin      string                      `yaml:"network-plugin"`
+	CniBinDir          string                      `yaml:"cni-bin-dir"`
+	Runtime            string                      `yaml:"runtime"`
+	RuntimeEndpoint    string                      `yaml:"runtime-endpoint"`
+	RegistryMirrors    []string                    `yaml:"registry-mirrors"`
+	InsecureRegistries []string                    `yaml:"insecure-registries"`
+	ConfigExtraArgs    []*ConfigExtraArgs          `yaml:"config-extra-args"`
+	Addons             []*api.AddonConfig          `yaml:"addons"`
+	OpenPorts          map[string][]*api.OpenPorts `yaml:"open-ports"` // key: master, node, etcd, loadbalance
+	PackageSrc         api.PackageSrcConfig        `yaml:"package-src"`
+	Packages           map[string][]*Package       `yaml:"pacakges"` // key: master, node, etcd, loadbalance
 }
 
 func getEggoDir() string {
@@ -402,8 +403,9 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 	for i, master := range conf.Masters {
 		hostconfig = createCommonHostConfig(master, "k8s-master-"+strconv.Itoa(i), conf.Username, conf.Password)
 		hostconfig.Type |= api.Master
+		ports := append(masterExports, conf.OpenPorts["master"]...)
 		addUserPackages(hostconfig, conf.Packages["master"])
-		addPackagesAndExports(hostconfig, masterPackages, masterExports)
+		addPackagesAndExports(hostconfig, masterPackages, ports)
 		idx, ok := cache[hostconfig.Address]
 		if ok {
 			nodes[idx] = hostconfig
@@ -422,8 +424,9 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 			hostconfig = nodes[idx]
 		}
 		hostconfig.Type |= api.Worker
+		ports := append(nodeExports, conf.OpenPorts["node"]...)
 		addUserPackages(hostconfig, conf.Packages["node"])
-		addPackagesAndExports(hostconfig, nodePackages, nodeExports)
+		addPackagesAndExports(hostconfig, nodePackages, ports)
 		if exist {
 			nodes[idx] = hostconfig
 			continue
@@ -447,8 +450,9 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 			hostconfig = nodes[idx]
 		}
 		hostconfig.Type |= api.ETCD
+		ports := append(etcdExports, conf.OpenPorts["etcd"]...)
 		addUserPackages(hostconfig, conf.Packages["etcd"])
-		addPackagesAndExports(hostconfig, etcdPackages, etcdExports)
+		addPackagesAndExports(hostconfig, etcdPackages, ports)
 		if exist {
 			nodes[idx] = hostconfig
 			continue
@@ -467,13 +471,15 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 		}
 		hostconfig.Type |= api.LoadBalance
 
-		addUserPackages(hostconfig, conf.Packages["loadbalance"])
-		addPackagesAndExports(hostconfig, loadbalancePackages, []*api.OpenPorts{
+		ports := []*api.OpenPorts{
 			{
 				Port:     getPortFromEndPoint(conf.ApiServerEndpoint),
 				Protocol: "tcp",
 			},
-		})
+		}
+		ports = append(ports, conf.OpenPorts["loadbalance"]...)
+		addUserPackages(hostconfig, conf.Packages["loadbalance"])
+		addPackagesAndExports(hostconfig, loadbalancePackages, ports)
 		if exist {
 			nodes[idx] = hostconfig
 			continue
@@ -481,6 +487,7 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 		cache[hostconfig.Address] = len(nodes)
 		nodes = append(nodes, hostconfig)
 	}
+
 	ccfg.Nodes = append(ccfg.Nodes, nodes...)
 }
 
@@ -643,6 +650,18 @@ func createDeployConfigTemplate(file string) error {
 			{
 				Type:     "file",
 				Filename: "calico.yaml",
+			},
+		},
+		OpenPorts: map[string][]*api.OpenPorts{
+			"node": {
+				&api.OpenPorts{
+					Port:     111,
+					Protocol: "tcp",
+				},
+				&api.OpenPorts{
+					Port:     179,
+					Protocol: "tcp",
+				},
 			},
 		},
 		PackageSrc: api.PackageSrcConfig{
