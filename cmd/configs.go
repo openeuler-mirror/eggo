@@ -50,10 +50,6 @@ var (
 			Name: "coredns",
 			Type: "repo",
 		},
-		{
-			Name: "tar",
-			Type: "repo",
-		},
 	}
 
 	masterExports = []*api.OpenPorts{
@@ -95,10 +91,6 @@ var (
 			Type: "repo",
 		},
 		{
-			Name: "iSulad",
-			Type: "repo",
-		},
-		{
 			Name: "kubernetes-client",
 			Type: "repo",
 		},
@@ -108,10 +100,6 @@ var (
 		},
 		{
 			Name: "kubernetes-kubelet",
-			Type: "repo",
-		},
-		{
-			Name: "tar",
 			Type: "repo",
 		},
 	}
@@ -132,10 +120,6 @@ var (
 	etcdPackages = []*api.Packages{
 		{
 			Name: "etcd",
-			Type: "repo",
-		},
-		{
-			Name: "tar",
 			Type: "repo",
 		},
 	}
@@ -161,10 +145,6 @@ var (
 	loadbalancePackages = []*api.Packages{
 		{
 			Name: "nginx",
-			Type: "repo",
-		},
-		{
-			Name: "tar",
 			Type: "repo",
 		},
 	}
@@ -665,10 +645,6 @@ func createDeployConfigTemplate(file string) error {
 					Type: "pkg",
 				},
 				&Package{
-					Name: "tar",
-					Type: "repo",
-				},
-				&Package{
 					Name: "addons",
 					Type: "binary",
 					Dst:  "/etc/kubernetes",
@@ -686,10 +662,6 @@ func createDeployConfigTemplate(file string) error {
 				&Package{
 					Name: "containernetworking-plugins",
 					Type: "pkg",
-				},
-				&Package{
-					Name: "tar",
-					Type: "repo",
 				},
 				&Package{
 					Name: "emacs-filesystem",
@@ -797,10 +769,6 @@ func createDeployConfigTemplate(file string) error {
 					Name: "etcd",
 					Type: "pkg",
 				},
-				&Package{
-					Name: "tar",
-					Type: "repo",
-				},
 			},
 			"loadbalance": {
 				&Package{
@@ -854,10 +822,6 @@ func createDeployConfigTemplate(file string) error {
 				&Package{
 					Name: "nginx-mod-stream",
 					Type: "pkg",
-				},
-				&Package{
-					Name: "tar",
-					Type: "repo",
 				},
 			},
 		},
