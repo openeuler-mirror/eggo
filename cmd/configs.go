@@ -43,10 +43,6 @@ var (
 			Type: "repo",
 		},
 		{
-			Name: "kubernetes-kubeadm",
-			Type: "repo",
-		},
-		{
 			Name: "coredns",
 			Type: "repo",
 		},
@@ -677,10 +673,6 @@ func createDeployConfigTemplate(file string) error {
 				},
 				&Package{
 					Name: "kubernetes-master",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "kubernetes-kubeadm",
 					Type: "pkg",
 				},
 				&Package{
