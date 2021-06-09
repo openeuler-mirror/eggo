@@ -416,27 +416,40 @@ func getPortFromEndPoint(endpoint string) int {
 
 func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 	var hostconfig *api.HostConfig
-	var exist bool
-	cache := make(map[string]*api.HostConfig)
+	cache := make(map[string]int)
+	var nodes []*api.HostConfig
 
 	for i, master := range conf.Masters {
 		hostconfig = createCommonHostConfig(master, "k8s-master-"+strconv.Itoa(i), conf.Username, conf.Password)
 		hostconfig.Type |= api.Master
 		addUserPackages(hostconfig, conf.Packages["master"])
 		addPackagesAndExports(hostconfig, masterPackages, masterExports)
-		cache[hostconfig.Address] = hostconfig
+		idx, ok := cache[hostconfig.Address]
+		if ok {
+			nodes[idx] = hostconfig
+			continue
+		}
+		cache[hostconfig.Address] = len(nodes)
+		nodes = append(nodes, hostconfig)
 	}
 
 	for i, node := range conf.Nodes {
-		hostconfig, exist = cache[node.Ip]
+		idx, exist := cache[node.Ip]
 		if !exist {
 			hostconfig = createCommonHostConfig(node, "k8s-node-"+strconv.Itoa(i), conf.Username,
 				conf.Password)
+		} else {
+			hostconfig = nodes[idx]
 		}
 		hostconfig.Type |= api.Worker
 		addUserPackages(hostconfig, conf.Packages["node"])
 		addPackagesAndExports(hostconfig, nodePackages, nodeExports)
-		cache[hostconfig.Address] = hostconfig
+		if exist {
+			nodes[idx] = hostconfig
+			continue
+		}
+		cache[hostconfig.Address] = len(nodes)
+		nodes = append(nodes, hostconfig)
 	}
 
 	// if no etcd configed, default to install to master
@@ -447,21 +460,30 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 		etcds = conf.Etcds
 	}
 	for i, etcd := range etcds {
-		hostconfig, exist = cache[etcd.Ip]
+		idx, exist := cache[etcd.Ip]
 		if !exist {
 			hostconfig = createCommonHostConfig(etcd, "etcd-"+strconv.Itoa(i), conf.Username, conf.Password)
+		} else {
+			hostconfig = nodes[idx]
 		}
 		hostconfig.Type |= api.ETCD
 		addUserPackages(hostconfig, conf.Packages["etcd"])
 		addPackagesAndExports(hostconfig, etcdPackages, etcdExports)
-		cache[hostconfig.Address] = hostconfig
+		if exist {
+			nodes[idx] = hostconfig
+			continue
+		}
+		cache[hostconfig.Address] = len(nodes)
+		nodes = append(nodes, hostconfig)
 	}
 
 	for i, lb := range conf.LoadBalances {
-		hostconfig, exist = cache[lb.Ip]
+		idx, exist := cache[lb.Ip]
 		if !exist {
 			hostconfig = createCommonHostConfig(lb, "k8s-loadbalance-"+strconv.Itoa(i), conf.Username,
 				conf.Password)
+		} else {
+			hostconfig = nodes[idx]
 		}
 		hostconfig.Type |= api.LoadBalance
 
@@ -472,12 +494,14 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 				Protocol: "tcp",
 			},
 		})
-		cache[hostconfig.Address] = hostconfig
+		if exist {
+			nodes[idx] = hostconfig
+			continue
+		}
+		cache[hostconfig.Address] = len(nodes)
+		nodes = append(nodes, hostconfig)
 	}
-
-	for _, v := range cache {
-		ccfg.Nodes = append(ccfg.Nodes, v)
-	}
+	ccfg.Nodes = append(ccfg.Nodes, nodes...)
 }
 
 func setIfStrConfigNotEmpty(config *string, userConfig string) {
@@ -622,7 +646,7 @@ func createDeployConfigTemplate(file string) error {
 			PodCIDR:    "10.244.64.0/16",
 			PluginArgs: make(map[string]string),
 		},
-		ApiServerEndpoint: fmt.Sprintf("https://%s:6443", lbs[0].Ip),
+		ApiServerEndpoint: fmt.Sprintf("%s:6443", lbs[0].Ip),
 		ApiServerCertSans: api.Sans{},
 		ApiServerTimeout:  "120s",
 		EtcdExternal:      false,

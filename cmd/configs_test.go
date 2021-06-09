@@ -17,11 +17,12 @@ package main
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v1"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"gopkg.in/yaml.v1"
 )
 
 func TestCmdConfigs(t *testing.T) {
@@ -46,6 +47,14 @@ func TestCmdConfigs(t *testing.T) {
 	d, err := yaml.Marshal(ccfg)
 	if err != nil {
 		t.Fatalf("marshal cluster config failed: %v", err)
+	}
+
+	// check order of nodesIP
+	expected := []string{"192.168.0.2", "192.168.0.3", "192.168.0.4", "192.168.0.1"}
+	for i, n := range ccfg.Nodes {
+		if n.Address != expected[i] {
+			t.Fatalf("expect ip: %s, get: %s", expected[i], n.Address)
+		}
 	}
 
 	fmt.Printf("%v\n", string(d))
