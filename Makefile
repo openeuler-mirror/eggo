@@ -6,15 +6,22 @@ ARCH := $(shell arch)
 .PHONY: eggo
 eggo:
 	@echo "build eggo starting..."
-	@go build -buildmode=pie -ldflags '-extldflags=-static' -ldflags '-linkmode=external -extldflags=-Wl,-z,relro,-z,now' -o eggo ./cmd/
+	@go build -buildmode=pie -ldflags '-extldflags=-static' -ldflags '-linkmode=external -extldflags=-Wl,-z,relro,-z,now' -o bin/eggo ./cmd/
 	@echo "build eggo done!"
 test:
 	@echo "Unit tests starting..."
 	@go test -race -cover -count=1 -timeout=300s  ./...
 	@echo "Units test done!"
 
+.PHONY: install
+install:
+	@echo "install eggo..."
+	@install -d /usr/local/bin
+	@install -m 0755 bin/eggo /usr/local/bin
+	@echo "install eggo done"
+
 .PHONY: clean
 clean:
 	@echo "clean...."
-	@rm -f eggo
+	@rm -rf ./bin
 	@echo "clean done!"
