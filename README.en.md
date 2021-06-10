@@ -17,6 +17,9 @@ $ go env -w GOPROXY=https://goproxy.cn,direct
 $ go mod tidy
 # compile
 $ make
+# use vendor to compile, must download dependences go library at first
+$ go mod vendor
+$ make local
 # install
 $ make install
 ```

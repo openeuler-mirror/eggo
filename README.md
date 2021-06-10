@@ -18,6 +18,9 @@ $ go env -w GOPROXY=https://goproxy.cn,direct
 $ go mod tidy
 # 编译
 $ make
+# 使用vendor本地编译，前提需要之前下载过依赖的go库
+$ go mod vendor
+$ make local
 # 安装
 $ make install
 ```
