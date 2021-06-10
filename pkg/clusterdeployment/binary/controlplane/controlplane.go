@@ -546,10 +546,10 @@ func (ct *PostControlPlaneTask) applyClusterRoleBinding(r runner.Runner, crbc *a
 
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"")
-	sb.WriteString("mkdir -p /tmp/.eggo")
+	sb.WriteString(fmt.Sprintf("mkdir -p %s", constants.DefaultK8SManifestsDir))
 	crbYamlBase64 := base64.StdEncoding.EncodeToString([]byte(crb))
-	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > /tmp/.eggo/%s.yaml", crbYamlBase64, crbc.Name))
-	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s/admin.conf kubectl apply -f /tmp/.eggo/%s.yaml", ct.cluster.GetConfigDir(), crbc.Name))
+	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/%s.yaml", crbYamlBase64, constants.DefaultK8SManifestsDir, crbc.Name))
+	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s/admin.conf kubectl apply -f %s/%s.yaml", ct.cluster.GetConfigDir(), constants.DefaultK8SManifestsDir, crbc.Name))
 	sb.WriteString("\"")
 
 	_, err = r.RunCommand(sb.String())

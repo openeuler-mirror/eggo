@@ -17,6 +17,7 @@ package infrastructure
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"gitee.com/openeuler/eggo/pkg/api"
@@ -160,18 +161,18 @@ func copySource(r runner.Runner, hcg *api.HostConfig, pcfg *api.PackageSrcConfig
 		return fmt.Errorf("invalid srcpath for %s", hcg.Address)
 	}
 
-	tmpDir := getPkgDistPath(pcfg.DistPath)
-	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"mkdir -p %s\"", tmpDir)); err != nil {
+	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"mkdir -p %s\"", constants.DefaultPkgUntarPath)); err != nil {
 		return err
 	}
-
-	if err := r.Copy(src, tmpDir); err != nil {
-		return fmt.Errorf("copy from %s to %s for %s failed: %v", src, tmpDir, hcg.Address, err)
+	tempPkgFile := filepath.Join(constants.DefaultPkgUntarPath, filepath.Base(src))
+	if err := r.Copy(src, tempPkgFile); err != nil {
+		return fmt.Errorf("copy from %s to %s for %s failed: %v", src, tempPkgFile, hcg.Address, err)
 	}
 
+	pkgDistDir := getPkgDistPath(pcfg.DistPath)
 	switch pcfg.Type {
 	case "tar.gz":
-		_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"cd %s && tar -zxvf *.tar.gz\"", tmpDir))
+		_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"cd %s && tar -zxvf *.tar.gz\"", pkgDistDir))
 		if err != nil {
 			return fmt.Errorf("uncompress %s failed for %s: %v", src, hcg.Address, err)
 		}

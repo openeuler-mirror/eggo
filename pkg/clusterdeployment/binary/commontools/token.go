@@ -79,10 +79,11 @@ func CreateBootstrapToken(r runner.Runner, bconf *api.BootstrapTokenConfig, kube
 		logrus.Errorf("rend core config failed: %v", err)
 		return err
 	}
-	sb.WriteString("sudo -E /bin/sh -c \"mkdir -p /tmp/.eggo")
+	sb.WriteString("sudo -E /bin/sh -c \"")
+	sb.WriteString(fmt.Sprintf("mkdir -p %s", constants.DefaultK8SManifestsDir))
 	tokenYamlBase64 := base64.StdEncoding.EncodeToString([]byte(coreConfig))
-	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > /tmp/.eggo/bootstrap_token.yaml", tokenYamlBase64))
-	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s kubectl apply -f /tmp/.eggo/bootstrap_token.yaml", kubeconfig))
+	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/bootstrap_token.yaml", tokenYamlBase64, constants.DefaultK8SManifestsDir))
+	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s kubectl apply -f %s/bootstrap_token.yaml", kubeconfig, constants.DefaultK8SManifestsDir))
 	sb.WriteString("\"")
 
 	_, err = r.RunCommand(sb.String())
