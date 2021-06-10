@@ -162,6 +162,11 @@ func setHostname(r runner.Runner, hcg *api.HostConfig) error {
 func addFirewallPort(r runner.Runner, hcg *api.HostConfig) error {
 	ports := []string{}
 
+	if _, err := r.RunCommand(utils.AddSudo("systemctl status firewalld | grep running")); err != nil {
+		logrus.Warnf("firewall is disable: %v, just ignore", err)
+		return nil
+	}
+
 	if hcg.Type&api.Master != 0 {
 		ports = append(ports, MasterPorts...)
 	}

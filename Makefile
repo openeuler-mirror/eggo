@@ -8,6 +8,10 @@ eggo:
 	@echo "build eggo starting..."
 	@go build -buildmode=pie -ldflags '-extldflags=-static' -ldflags '-linkmode=external -extldflags=-Wl,-z,relro,-z,now' -o bin/eggo ./cmd/
 	@echo "build eggo done!"
+local:
+	@echo "build eggo use vendor starting..."
+	@go build -buildmode=pie -ldflags '-extldflags=-static' -mod vendor -ldflags '-linkmode=external -extldflags=-Wl,-z,relro,-z,now' -o bin/eggo ./cmd/
+	@echo "build eggo use vendor done!"
 test:
 	@echo "Unit tests starting..."
 	@go test -race -cover -count=1 -timeout=300s  ./...

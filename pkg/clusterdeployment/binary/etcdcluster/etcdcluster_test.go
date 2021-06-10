@@ -16,6 +16,7 @@
 package etcdcluster
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -23,6 +24,7 @@ import (
 	"testing"
 
 	"gitee.com/openeuler/eggo/pkg/api"
+	"gitee.com/openeuler/eggo/pkg/utils"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 )
 
@@ -93,12 +95,17 @@ func TestDeployEtcd(t *testing.T) {
 		t.Fatalf("generate etcd certs failed: %v", err)
 	}
 
+	// change temp dir to 777, ensure ut success
+	if _, err = r.RunCommand(utils.AddSudo(fmt.Sprintf("chmod -R 777 %s/etcd", dstTempDir))); err != nil {
+		t.Fatalf("chmod etcd dir failed: %v", err)
+	}
+
 	for _, file := range []string{
 		"ca.crt", "healthcheck-client.crt", "peer.crt", "server.crt",
 		"ca.key", "healthcheck-client.key", "peer.key", "server.key",
 	} {
 		if _, err = os.Stat(filepath.Join(dstTempDir, "etcd", file)); err != nil {
-			t.Fatalf("etcd file %v not found in dst dir", file)
+			t.Fatalf("check file: %s failed: %v", file, err)
 		}
 	}
 
