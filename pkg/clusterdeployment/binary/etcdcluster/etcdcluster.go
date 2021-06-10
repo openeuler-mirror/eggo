@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"gitee.com/openeuler/eggo/pkg/api"
+	"gitee.com/openeuler/eggo/pkg/utils"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/task"
@@ -81,9 +82,9 @@ func copyCaAndConfigs(ccfg *api.ClusterConfig, r runner.Runner,
 	caKey := filepath.Join(etcdDir, "ca.key")
 	copyInfos = append(copyInfos, &copyInfo{src: caKey, dst: filepath.Join(dstCertsDir, "ca.key")})
 
-	createDirsCmd := "sudo mkdir -p -m 0700 " + filepath.Dir(dstConf) +
+	createDirsCmd := "mkdir -p -m 0700 " + filepath.Dir(dstConf) +
 		" && mkdir -p -m 0700 " + dstCertsDir
-	if output, err := r.RunCommand(createDirsCmd); err != nil {
+	if output, err := r.RunCommand(utils.AddSudo(createDirsCmd)); err != nil {
 		return fmt.Errorf("run command on %v to create dirs failed: %v\noutput: %v",
 			hostConfig.Address, err, output)
 	}
@@ -112,7 +113,8 @@ func (t *EtcdDeployEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfig) e
 		return err
 	}
 
-	if output, err := r.RunCommand("sudo systemctl enable etcd.service && systemctl daemon-reload && systemctl restart etcd.service"); err != nil {
+	cmd := "systemctl enable etcd.service && systemctl daemon-reload && systemctl restart etcd.service"
+	if output, err := r.RunCommand(utils.AddSudo(cmd)); err != nil {
 		return fmt.Errorf("run command on %v to enable etcd service failed: %v\noutput: %v",
 			hostConfig.Address, err, output)
 	}
@@ -129,8 +131,8 @@ func (t *EtcdPostDeployEtcdsTask) Name() string {
 }
 
 func healthcheck(r runner.Runner, etcdCertsDir string, ip string) error {
-	cmd := fmt.Sprintf("sudo -E /bin/sh -c \"ETCDCTL_API=3 etcdctl endpoint health --endpoints=https://%v:2379 --cacert=%v/ca.crt --cert=%v/server.crt --key=%v/server.key\"", ip, etcdCertsDir, etcdCertsDir, etcdCertsDir)
-	if output, err := r.RunCommand(cmd); err != nil {
+	cmd := fmt.Sprintf("ETCDCTL_API=3 etcdctl endpoint health --endpoints=https://%v:2379 --cacert=%v/ca.crt --cert=%v/server.crt --key=%v/server.key", ip, etcdCertsDir, etcdCertsDir, etcdCertsDir)
+	if output, err := r.RunCommand(utils.AddSudo(cmd)); err != nil {
 		return fmt.Errorf("etcd in %v healthcheck failed: %v\noutput: %v", ip, err, output)
 	}
 	return nil

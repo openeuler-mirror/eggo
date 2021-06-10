@@ -43,7 +43,7 @@ func (t *cleanupClusterTask) Name() string {
 }
 
 func umountKubeletSubDirs(r runner.Runner, hostConfig *api.HostConfig, kubeletDir string) error {
-	output, err := r.RunCommand(addSudo("cat /proc/mounts"))
+	output, err := r.RunCommand(utils.AddSudo("cat /proc/mounts"))
 	if err != nil {
 		logrus.Errorf("cat /proc/mounts on node %v failed: %v\noutput: %v",
 			hostConfig.Address, err, output)
@@ -62,7 +62,7 @@ func umountKubeletSubDirs(r runner.Runner, hostConfig *api.HostConfig, kubeletDi
 			continue
 		}
 		subDir := items[1]
-		if output, err := r.RunCommand(addSudo("umount " + subDir)); err != nil {
+		if output, err := r.RunCommand(utils.AddSudo("umount " + subDir)); err != nil {
 			logrus.Errorf("umount %v on node %v failed: %v\noutput: %v",
 				subDir, hostConfig.Address, err, output)
 		}
@@ -71,14 +71,10 @@ func umountKubeletSubDirs(r runner.Runner, hostConfig *api.HostConfig, kubeletDi
 	return nil
 }
 
-func addSudo(cmd string) string {
-	return "sudo -E /bin/sh -c \"" + cmd + "\""
-}
-
 func removePathes(r runner.Runner, hostConfig *api.HostConfig, pathes []string) {
 	for _, path := range pathes {
 		// TODO: dot not delete user configed directory, delete directories and files we addded only
-		if output, err := r.RunCommand(addSudo("rm -rf " + path)); err != nil {
+		if output, err := r.RunCommand(utils.AddSudo("rm -rf " + path)); err != nil {
 			logrus.Errorf("remove path %v on node %v failed: %v\noutput: %v",
 				path, hostConfig.Address, err, output)
 		}
@@ -154,13 +150,13 @@ func cleanupLoadBalance(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *ap
 
 func postCleanup(r runner.Runner, hostConfig *api.HostConfig) {
 	// save firewall config
-	if output, err := r.RunCommand(addSudo("firewall-cmd --runtime-to-permanent")); err != nil {
+	if output, err := r.RunCommand(utils.AddSudo("firewall-cmd --runtime-to-permanent")); err != nil {
 		logrus.Errorf("save firewall config on node %v failed: %v\noutput: %v",
 			hostConfig.Address, err, output)
 	}
 
 	// daemon-reload
-	if output, err := r.RunCommand(addSudo("systemctl daemon-reload")); err != nil {
+	if output, err := r.RunCommand(utils.AddSudo("systemctl daemon-reload")); err != nil {
 		logrus.Errorf("daemon-reload on node %v failed: %v\noutput: %v",
 			hostConfig.Address, err, output)
 	}
@@ -269,7 +265,7 @@ func runRemoveWorker(t *removeWorkersTask, r runner.Runner, worker string) {
 
 	sb.WriteString(fmt.Sprintf("KUBECONFIG=%s/%s kubectl delete node %v --force --grace-period=0",
 		t.ccfg.GetManifestDir(), constants.KubeConfigFileNameAdmin, worker))
-	if output, err := r.RunCommand(addSudo(sb.String())); err != nil {
+	if output, err := r.RunCommand(utils.AddSudo(sb.String())); err != nil {
 		logrus.Errorf("remove workder %v failed: %v\noutput: %v", worker, err, output)
 	}
 }
@@ -341,7 +337,7 @@ func parseEtcdMemberList(output string) []*etcdMember {
 
 func getEtcdMembers(t *removeEtcdsTask, r runner.Runner) []*etcdMember {
 	cmd := fmt.Sprintf("ETCDCTL_API=3 etcdctl %v member list", getEtcdCertsOpts(t.ccfg.GetCertDir()))
-	output, err := r.RunCommand(addSudo(cmd))
+	output, err := r.RunCommand(utils.AddSudo(cmd))
 	if err != nil {
 		logrus.Errorf("get etcd members failed: %v\noutput: %v", err, output)
 		return nil
@@ -372,7 +368,7 @@ func (t *removeEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfig) error
 
 		cmd := fmt.Sprintf("ETCDCTL_API=3 etcdctl %v member remove %v",
 			getEtcdCertsOpts(t.ccfg.GetCertDir()), member.id)
-		if output, err := r.RunCommand(addSudo(cmd)); err != nil {
+		if output, err := r.RunCommand(utils.AddSudo(cmd)); err != nil {
 			logrus.Errorf("remove workder %v failed: %v\noutput: %v", member.name, err, output)
 		}
 	}

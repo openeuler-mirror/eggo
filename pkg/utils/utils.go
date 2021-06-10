@@ -55,3 +55,7 @@ func IsDocker(engine string) bool {
 func IsType(curType uint16, expectedType uint16) bool {
 	return curType&expectedType != 0
 }
+
+func AddSudo(cmd string) string {
+	return "sudo -E /bin/sh -c \"" + cmd + "\""
+}
