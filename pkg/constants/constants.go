@@ -13,6 +13,8 @@ const (
 	EncryptionConfigName         = "encryption-config.yaml"
 
 	// package manager relate constants
-	DefaultPkgUntarPath = "/tmp/.eggo/"
+	TempFileHomeDir     = "/tmp/.eggo"
+	DefaultPkgUntarPath = "/tmp/.eggo/pkg"
 	DefaultImagePkgName = "images.tar"
+	DefaultUserTempDir  = "/tmp/.eggo/temp"
 )

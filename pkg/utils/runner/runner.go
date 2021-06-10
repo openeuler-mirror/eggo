@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"gitee.com/openeuler/eggo/pkg/api"
+	"gitee.com/openeuler/eggo/pkg/constants"
 	kkv1alpha1 "github.com/kubesphere/kubekey/apis/kubekey/v1alpha1"
 	"github.com/kubesphere/kubekey/pkg/util/ssh"
 	"github.com/sirupsen/logrus"
@@ -149,13 +150,34 @@ func (ssh *SSHRunner) Reconnect() error {
 	return nil
 }
 
+func (ssh *SSHRunner) prepareTempDir(dir string) error {
+	// scp to tmp file
+	_, err := ssh.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"mkdir -p -m 0777 %s\"", dir))
+	if err != nil {
+		logrus.Errorf("[%s] mkdir temp dir: %s failed: %v", ssh.Host.Name, dir, err)
+		return err
+	}
+	return nil
+}
+
 func (ssh *SSHRunner) Copy(src, dst string) error {
 	if ssh.Conn == nil {
 		return fmt.Errorf("[%s] SSH runner is not connected", ssh.Host.Name)
 	}
-	err := ssh.Conn.Scp(src, dst)
+	// scp to tmp file
+	err := ssh.prepareTempDir(constants.DefaultUserTempDir)
 	if err != nil {
-		logrus.Errorf("[%s] Copy %s to %s failed", ssh.Host.Name, src, dst)
+		return err
+	}
+	tempCpyFile := filepath.Join(constants.DefaultUserTempDir, filepath.Base(src))
+	err = ssh.Conn.Scp(src, tempCpyFile)
+	if err != nil {
+		logrus.Errorf("[%s] Copy %s to tempfile %s failed: %v", ssh.Host.Name, src, tempCpyFile, err)
+		return err
+	}
+	_, err = ssh.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"mv %s %s && rm -rf %s\"", tempCpyFile, dst, constants.DefaultUserTempDir))
+	if err != nil {
+		logrus.Errorf("[%s] untar tmp tar failed: %v", ssh.Host.Name, err)
 		return err
 	}
 	logrus.Debugf("[%s] Copy %s to %s success\n", ssh.Host.Name, src, dst)
@@ -176,22 +198,27 @@ func (ssh *SSHRunner) CopyDir(srcDir, dstDir string) error {
 		logrus.Errorf("[%s] create tempdir failed: %v", ssh.Host.Name, err)
 		return err
 	}
-	tmpCert := filepath.Join(tmpDir, "pki.tar.gz")
+	tmpPkgFile := filepath.Join(tmpDir, "pki.tar.gz")
 	lr := &LocalRunner{}
 	// tar src dir
-	_, err = lr.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"mkdir -p %s && cd %s && tar -cf %s *\"", tmpDir, srcDir, tmpCert))
+	_, err = lr.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"mkdir -p %s && cd %s && tar -cf %s *\"", tmpDir, srcDir, tmpPkgFile))
 	if err != nil {
 		logrus.Errorf("[%s] create cert tmp tar failed: %v", ssh.Host.Name, err)
 		return err
 	}
-	// scp to dist
-	err = ssh.Copy(tmpCert, filepath.Join(dstDir, "pki.tar.gz"))
+	tmpCpyDir := constants.DefaultUserTempDir
+	err = ssh.prepareTempDir(tmpCpyDir)
+	if err != nil {
+		return err
+	}
+	// scp to user home directory
+	err = ssh.Copy(tmpPkgFile, fmt.Sprintf("%s/%s", tmpCpyDir, "pki.tar.gz"))
 	if err != nil {
 		logrus.Errorf("[%s] copy tmp tar failed: %v", ssh.Host.Name, err)
 		return err
 	}
 	// untar tmp file
-	_, err = ssh.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"cd %s && tar -xf %s && rm -f %s\"", dstDir, "pki.tar.gz", "pki.tar.gz"))
+	_, err = ssh.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"cd %s && mv %s . && tar -xf %s && rm -rf %s\"", dstDir, fmt.Sprintf("%s/%s", tmpCpyDir, "pki.tar.gz"), "pki.tar.gz", tmpCpyDir))
 	if err != nil {
 		logrus.Errorf("[%s] untar tmp tar failed: %v", ssh.Host.Name, err)
 		return err
