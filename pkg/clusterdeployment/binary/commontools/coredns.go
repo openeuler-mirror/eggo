@@ -235,12 +235,13 @@ func (ct *CorednsSetupTask) createServiceTemplate(r runner.Runner) error {
 	}
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	serviceBase64 := base64.StdEncoding.EncodeToString([]byte(serviceConfig))
-	sb.WriteString(fmt.Sprintf("echo %s | base64 -d > /usr/lib/systemd/system/coredns.service", serviceBase64))
-	sb.WriteString(" && systemctl enable coredns")
-	sb.WriteString(" && systemctl start coredns")
-	sb.WriteString("\"")
+	shell, err := GetSystemdServiceShell("coredns", serviceBase64, true)
+	if err != nil {
+		logrus.Errorf("get coredns systemd service file failed: %v", err)
+		return err
+	}
 
-	_, err = r.RunCommand(sb.String())
+	_, err = r.RunShell(shell, "setcoredns")
 	if err != nil {
 		logrus.Errorf("create core dns service failed: %v", err)
 		return err

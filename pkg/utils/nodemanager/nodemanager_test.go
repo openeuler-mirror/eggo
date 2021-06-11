@@ -35,11 +35,6 @@ func (m *MockRunner) Copy(src, dst string) error {
 	return nil
 }
 
-func (m *MockRunner) CopyDir(src, dst string) error {
-	logrus.Infof("copydir %s to %s", src, dst)
-	return nil
-}
-
 func (m *MockRunner) RunCommand(cmd string) (string, error) {
 	logrus.Infof("run command: %s", cmd)
 	return "", nil

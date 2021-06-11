@@ -17,8 +17,6 @@ package commontools
 import (
 	"encoding/base64"
 	"fmt"
-	"path/filepath"
-	"strings"
 
 	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/utils"
@@ -86,17 +84,20 @@ func SetupAPIServerService(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.Ho
 		logrus.Errorf("create api-server systemd service config failed: %v", err)
 		return err
 	}
-	var sb strings.Builder
+
 	csrBase64 := base64.StdEncoding.EncodeToString([]byte(serviceConf))
-	sb.WriteString(fmt.Sprintf("sudo -E /bin/sh -c \"echo %s | base64 -d > %s\"", csrBase64, filepath.Join(SystemdServiceConfigPath, "kube-apiserver.service")))
-	_, err = r.RunCommand(sb.String())
+	shell, err := GetSystemdServiceShell("kube-apiserver", csrBase64, false)
 	if err != nil {
+		logrus.Errorf("get kube-apiserver systemd service file failed: %v", err)
 		return err
 	}
-	_, err = r.RunCommand("sudo systemctl enable kube-apiserver")
+
+	_, err = r.RunShell(shell, "kube-apiserver")
 	if err != nil {
+		logrus.Errorf("create kube-apiserver service failed: %v", err)
 		return err
 	}
+
 	return nil
 }
 
@@ -104,6 +105,7 @@ func SetupControllerManagerService(r runner.Runner, ccfg *api.ClusterConfig, hcf
 	defaultArgs := map[string]string{
 		"--bind-address":                     "0.0.0.0",
 		"--cluster-cidr":                     ccfg.Network.PodCIDR,
+		"--allocate-node-cidrs":              "true",
 		"--cluster-name":                     "kubernetes",
 		"--cluster-signing-cert-file":        "/etc/kubernetes/pki/ca.crt",
 		"--cluster-signing-key-file":         "/etc/kubernetes/pki/ca.key",
@@ -141,15 +143,17 @@ func SetupControllerManagerService(r runner.Runner, ccfg *api.ClusterConfig, hcf
 		logrus.Errorf("create controller-manager systemd service config failed: %v", err)
 		return err
 	}
-	var sb strings.Builder
+
 	csrBase64 := base64.StdEncoding.EncodeToString([]byte(serviceConf))
-	sb.WriteString(fmt.Sprintf("sudo -E /bin/sh -c \"echo %s | base64 -d > %s\"", csrBase64, filepath.Join(SystemdServiceConfigPath, "kube-controller-manager.service")))
-	_, err = r.RunCommand(sb.String())
+	shell, err := GetSystemdServiceShell("kube-controller-manager", csrBase64, false)
 	if err != nil {
+		logrus.Errorf("get kube-controller-manager systemd service file failed: %v", err)
 		return err
 	}
-	_, err = r.RunCommand("sudo systemctl enable kube-controller-manager")
+
+	_, err = r.RunShell(shell, "kube-controller-manager")
 	if err != nil {
+		logrus.Errorf("create kube-controller-manager service failed: %v", err)
 		return err
 	}
 	return nil
@@ -185,15 +189,16 @@ func SetupSchedulerService(r runner.Runner, ccfg *api.ClusterConfig) error {
 		logrus.Errorf("create kube-scheduler systemd service config failed: %v", err)
 		return err
 	}
-	var sb strings.Builder
 	csrBase64 := base64.StdEncoding.EncodeToString([]byte(serviceConf))
-	sb.WriteString(fmt.Sprintf("sudo -E /bin/sh -c \"sudo echo %s | base64 -d > %s\"", csrBase64, filepath.Join(SystemdServiceConfigPath, "kube-scheduler.service")))
-	_, err = r.RunCommand(sb.String())
+	shell, err := GetSystemdServiceShell("kube-scheduler", csrBase64, false)
 	if err != nil {
+		logrus.Errorf("get kube-scheduler systemd service file failed: %v", err)
 		return err
 	}
-	_, err = r.RunCommand("sudo systemctl enable kube-scheduler")
+
+	_, err = r.RunShell(shell, "kube-scheduler")
 	if err != nil {
+		logrus.Errorf("create kube-scheduler service failed: %v", err)
 		return err
 	}
 	return nil
@@ -273,15 +278,16 @@ func SetupKubeletService(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.Host
 		logrus.Errorf("create kubelet systemd service config failed: %v", err)
 		return err
 	}
-	var sb strings.Builder
 	csrBase64 := base64.StdEncoding.EncodeToString([]byte(serviceConf))
-	sb.WriteString(fmt.Sprintf("sudo -E /bin/sh -c \"echo %s | base64 -d > %s\"", csrBase64, filepath.Join(SystemdServiceConfigPath, "kubelet.service")))
-	_, err = r.RunCommand(sb.String())
+	shell, err := GetSystemdServiceShell("kubelet", csrBase64, false)
 	if err != nil {
+		logrus.Errorf("get kubelet systemd service file failed: %v", err)
 		return err
 	}
-	_, err = r.RunCommand("sudo systemctl enable kubelet")
+
+	_, err = r.RunShell(shell, "kubelet")
 	if err != nil {
+		logrus.Errorf("create kubelet service failed: %v", err)
 		return err
 	}
 	return nil
@@ -316,15 +322,16 @@ func SetupProxyService(r runner.Runner, kpcf *api.KubeProxy, hcf *api.HostConfig
 		logrus.Errorf("create proxy systemd service config failed: %v", err)
 		return err
 	}
-	var sb strings.Builder
 	csrBase64 := base64.StdEncoding.EncodeToString([]byte(serviceConf))
-	sb.WriteString(fmt.Sprintf("sudo -E /bin/sh -c \"echo %s | base64 -d > %s\"", csrBase64, filepath.Join(SystemdServiceConfigPath, "kube-proxy.service")))
-	_, err = r.RunCommand(sb.String())
+	shell, err := GetSystemdServiceShell("kube-proxy", csrBase64, false)
 	if err != nil {
+		logrus.Errorf("get kube-proxy systemd service file failed: %v", err)
 		return err
 	}
-	_, err = r.RunCommand("sudo systemctl enable kube-proxy")
+
+	_, err = r.RunShell(shell, "kube-proxy")
 	if err != nil {
+		logrus.Errorf("create kube-proxy service failed: %v", err)
 		return err
 	}
 	return nil
@@ -348,4 +355,46 @@ func SetupWorkerServices(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.Host
 	}
 	logrus.Info("setup k8s worker services success")
 	return nil
+}
+
+func GetSystemdServiceShell(name string, base64Data string, needStart bool) (string, error) {
+	shell := `
+#!/bin/bash
+{{- if .content }}
+echo {{ .content }} | base64 -d > /usr/lib/systemd/system/{{ .name }}.service
+{{- end }}
+which chcon
+if [ $? -eq 0 ]; then
+	chcon -v -t systemd_unit_file_t -u system_u /usr/lib/systemd/system/{{ .name }}.service
+	for conf in $(cat /usr/lib/systemd/system/{{ .name }}.service | grep EnvironmentFile | awk -F '=' '{print $2}'); do
+		split=$(echo $conf | awk -F '-' '{print $2}')
+		if [ "x$split" == "x" ]; then
+			split=$conf
+		fi
+		chcon -v -t etc_t -u system_u $split
+	done
+fi
+systemctl enable {{ .name }}
+[[ $? -ne 0 ]] && exit 1
+
+systemctl daemon-reload
+
+{{- if .start }}
+systemctl start {{ .name }}
+[[ $? -ne 0 ]] && exit 1
+{{- end}}
+
+echo "setup {{ .name }} success"
+exit 0
+`
+	datastore := make(map[string]interface{})
+	if base64Data != "" {
+		datastore["content"] = base64Data
+	}
+	datastore["name"] = name
+	if needStart {
+		datastore["start"] = true
+	}
+
+	return template.TemplateRender(shell, datastore)
 }

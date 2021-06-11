@@ -198,7 +198,6 @@ ExecStart=/usr/bin/kube-scheduler \\
 	    \$KUBE_CONFIG \\
 	    \$KUBE_AUTHENTICATION_KUBE_CONF \\
 	    \$KUBE_AUTHORIZATION_KUBE_CONF \\
-	    \$KUBE_BIND_ADDR \\
 	    \$KUBE_LEADER_ELECT \\
 	    \$KUBE_SCHEDULER_ARGS
 Restart=on-failure

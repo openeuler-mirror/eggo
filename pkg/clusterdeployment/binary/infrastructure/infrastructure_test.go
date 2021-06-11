@@ -26,11 +26,6 @@ import (
 type MockRunner struct {
 }
 
-func (m *MockRunner) CopyDir(src, dst string) error {
-	logrus.Infof("copydir %s to %s", src, dst)
-	return nil
-}
-
 func (m *MockRunner) Copy(src, dst string) error {
 	logrus.Infof("copy %s to %s", src, dst)
 	return nil
