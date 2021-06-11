@@ -54,6 +54,8 @@ $ eggo deploy -f test.yaml
 $ eggo cleanup -f test.yaml
 ```
 
+see https://gitee.com/openeuler/eggo/blob/master/docs/manual.md for detail usage.
+
 ### Gratitude
 
 The design of Eggo was inspired by [Kubekey](https://github.com/kubesphere/kubekey), thanks to their great work.
