@@ -55,6 +55,8 @@ $ eggo deploy -f test.yaml
 $ eggo cleanup -f test.yaml
 ```
 
+详细的用法见 https://gitee.com/openeuler/eggo/blob/master/docs/manual.md
+
 ### 感谢
 
 本项目受[Kubekey](https://github.com/kubesphere/kubekey)的启发，感谢Kubekey的伟大工作。
