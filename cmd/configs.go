@@ -168,6 +168,7 @@ type deployConfig struct {
 	ClusterID          string                      `yaml:"cluster-id"`
 	Username           string                      `yaml:"username"`
 	Password           string                      `yaml:"password"`
+	PrivateKeyPath     string                      `yaml:"private-key-path"`
 	Masters            []*HostConfig               `yaml:"masters"`
 	Nodes              []*HostConfig               `yaml:"nodes"`
 	Etcds              []*HostConfig               `yaml:"etcds"`
@@ -282,26 +283,34 @@ func getDefaultClusterdeploymentConfig() *api.ClusterConfig {
 	}
 }
 
+func getDefaultPrivateKeyPath() string {
+	return filepath.Join(utils.GetSysHome(), ".ssh", "id_rsa")
+}
+
 func createCommonHostConfig(userHostconfig *HostConfig, defaultName string, username string,
-	password string) *api.HostConfig {
-	arch, name, port := "amd64", defaultName, 22
+	password string, userPrivateKeyPath string) *api.HostConfig {
+	arch, name, port, privateKeyPath := "amd64", defaultName, 22, getDefaultPrivateKeyPath()
 	if userHostconfig.Arch != "" {
 		arch = userHostconfig.Arch
 	}
 	if userHostconfig.Name != "" {
 		name = userHostconfig.Name
 	}
+	if userPrivateKeyPath != "" {
+		privateKeyPath = userPrivateKeyPath
+	}
 	if userHostconfig.Port != 0 {
 		port = userHostconfig.Port
 	}
 
 	hostconfig := &api.HostConfig{
-		Arch:     arch,
-		Name:     name,
-		Address:  userHostconfig.Ip,
-		Port:     port,
-		UserName: username,
-		Password: password,
+		Arch:           arch,
+		Name:           name,
+		Address:        userHostconfig.Ip,
+		Port:           port,
+		UserName:       username,
+		Password:       password,
+		PrivateKeyPath: privateKeyPath,
 	}
 
 	return hostconfig
@@ -397,7 +406,8 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 	var nodes []*api.HostConfig
 
 	for i, master := range conf.Masters {
-		hostconfig = createCommonHostConfig(master, "k8s-master-"+strconv.Itoa(i), conf.Username, conf.Password)
+		hostconfig = createCommonHostConfig(master, "k8s-master-"+strconv.Itoa(i),
+			conf.Username, conf.Password, conf.PrivateKeyPath)
 		hostconfig.Type |= api.Master
 		ports := append(masterExports, conf.OpenPorts["master"]...)
 		addUserPackages(hostconfig, conf.Packages["master"])
@@ -414,8 +424,8 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 	for i, node := range conf.Nodes {
 		idx, exist := cache[node.Ip]
 		if !exist {
-			hostconfig = createCommonHostConfig(node, "k8s-node-"+strconv.Itoa(i), conf.Username,
-				conf.Password)
+			hostconfig = createCommonHostConfig(node, "k8s-node-"+strconv.Itoa(i),
+				conf.Username, conf.Password, conf.PrivateKeyPath)
 		} else {
 			hostconfig = nodes[idx]
 		}
@@ -441,7 +451,8 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 	for i, etcd := range etcds {
 		idx, exist := cache[etcd.Ip]
 		if !exist {
-			hostconfig = createCommonHostConfig(etcd, "etcd-"+strconv.Itoa(i), conf.Username, conf.Password)
+			hostconfig = createCommonHostConfig(etcd, "etcd-"+strconv.Itoa(i),
+				conf.Username, conf.Password, conf.PrivateKeyPath)
 		} else {
 			hostconfig = nodes[idx]
 		}
@@ -460,8 +471,8 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 	for i, lb := range conf.LoadBalances {
 		idx, exist := cache[lb.Ip]
 		if !exist {
-			hostconfig = createCommonHostConfig(lb, "k8s-loadbalance-"+strconv.Itoa(i), conf.Username,
-				conf.Password)
+			hostconfig = createCommonHostConfig(lb, "k8s-loadbalance-"+strconv.Itoa(i),
+				conf.Username, conf.Password, conf.PrivateKeyPath)
 		} else {
 			hostconfig = nodes[idx]
 		}
@@ -612,6 +623,7 @@ func createDeployConfigTemplate(file string) error {
 		ClusterID:      opts.name,
 		Username:       opts.username,
 		Password:       opts.password,
+		PrivateKeyPath: getDefaultPrivateKeyPath(),
 		Masters:        masters,
 		Nodes:          nodes,
 		Etcds:          etcds,
