@@ -45,6 +45,9 @@ func CreateCluster(cc *api.ClusterConfig) error {
 	if err := handler.DeployEtcdCluster(); err != nil {
 		return err
 	}
+	if err := handler.DeployLoadBalancer(); err != nil {
+		return err
+	}
 	if err := handler.InitControlPlane(); err != nil {
 		return err
 	}

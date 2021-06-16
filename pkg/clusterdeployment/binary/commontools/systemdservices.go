@@ -357,6 +357,51 @@ func SetupWorkerServices(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.Host
 	return nil
 }
 
+func SetupLoadBalanceServices(r runner.Runner, ccfg *api.ClusterConfig, command string) error {
+	config := `[Unit]
+Description=kube-apiserver nginx proxy
+After=network.target
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+ExecStartPre=setenforce 0
+ExecStartPre={{ .command }} -c /etc/kubernetes/kube-nginx.conf -t
+ExecStart={{ .command }} -c /etc/kubernetes/kube-nginx.conf
+ExecReload={{ .command }} -c /etc/kubernetes/kube-nginx.conf -s reload
+PrivateTmp=true
+Restart=always
+RestartSec=5
+StartLimitInterval=0
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+`
+
+	datastore := map[string]interface{}{}
+	datastore["command"] = command
+	serviceConf, err := template.TemplateRender(config, datastore)
+	if err != nil {
+		return err
+	}
+
+	serviceBase64 := base64.StdEncoding.EncodeToString([]byte(serviceConf))
+	shell, err := GetSystemdServiceShell("nginx", serviceBase64, true)
+	if err != nil {
+		logrus.Errorf("get nginx systemd service file failed: %v", err)
+		return err
+	}
+
+	_, err = r.RunShell(shell, "nginx")
+	if err != nil {
+		logrus.Errorf("create nginx service failed: %v", err)
+		return err
+	}
+	return nil
+}
+
 func GetSystemdServiceShell(name string, base64Data string, needStart bool) (string, error) {
 	shell := `
 #!/bin/bash
