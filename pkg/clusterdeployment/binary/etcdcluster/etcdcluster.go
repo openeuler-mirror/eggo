@@ -23,10 +23,12 @@ import (
 	"time"
 
 	"gitee.com/openeuler/eggo/pkg/api"
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/commontools"
 	"gitee.com/openeuler/eggo/pkg/utils"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/task"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -113,8 +115,12 @@ func (t *EtcdDeployEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfig) e
 		return err
 	}
 
-	cmd := "systemctl enable etcd.service && systemctl daemon-reload && systemctl restart etcd.service"
-	if output, err := r.RunCommand(utils.AddSudo(cmd)); err != nil {
+	shell, err := commontools.GetSystemdServiceShell("etcd", "", true)
+	if err != nil {
+		logrus.Errorf("get etcd systemd service shell failed: %v", err)
+		return err
+	}
+	if output, err := r.RunShell(shell, "etcd"); err != nil {
 		return fmt.Errorf("run command on %v to enable etcd service failed: %v\noutput: %v",
 			hostConfig.Address, err, output)
 	}

@@ -32,11 +32,6 @@ const (
 type fakeRunner struct {
 }
 
-func (m *fakeRunner) CopyDir(src, dst string) error {
-	logrus.Infof("copydir %s to %s", src, dst)
-	return nil
-}
-
 func (r *fakeRunner) Copy(src, dst string) error {
 	logrus.Infof("copy %v to %v", src, dst)
 	return nil

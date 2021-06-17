@@ -16,5 +16,8 @@ const (
 	TempFileHomeDir     = "/tmp/.eggo"
 	DefaultPkgUntarPath = "/tmp/.eggo/pkg"
 	DefaultImagePkgName = "images.tar"
-	DefaultUserTempDir  = "/tmp/.eggo/temp"
+
+	// user home dir formats
+	UserHomeFormat               = "/home/%s"
+	DefaultUserCopyTempDirFormat = "/home/%s/.eggo/temp"
 )
