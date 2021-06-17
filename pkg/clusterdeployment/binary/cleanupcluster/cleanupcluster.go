@@ -73,7 +73,6 @@ func umountKubeletSubDirs(r runner.Runner, hostConfig *api.HostConfig, kubeletDi
 
 func removePathes(r runner.Runner, hostConfig *api.HostConfig, pathes []string) {
 	for _, path := range pathes {
-		// TODO: dot not delete user configed directory, delete directories and files we addded only
 		if output, err := r.RunCommand(utils.AddSudo("rm -rf " + path)); err != nil {
 			logrus.Errorf("remove path %v on node %v failed: %v\noutput: %v",
 				path, hostConfig.Address, err, output)
@@ -126,15 +125,12 @@ func cleanupEtcd(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *api.HostC
 		getEtcdDataDir(ccfg.EtcdCluster.DataDir),
 		"/etc/etcd",
 		"/usr/lib/systemd/system/etcd.service",
-		"/var/lib/etcd",
 	})
 }
 
 func cleanupCoreDNS(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *api.HostConfig) {
 	// remove directories
 	removePathes(r, hostConfig, []string{
-		ccfg.GetConfigDir(),
-		ccfg.GetCertDir(),
 		"/usr/lib/systemd/system/coredns.service",
 	})
 }
@@ -142,8 +138,6 @@ func cleanupCoreDNS(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *api.Ho
 func cleanupLoadBalance(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *api.HostConfig) {
 	// remove directories
 	removePathes(r, hostConfig, []string{
-		ccfg.GetConfigDir(),
-		ccfg.GetCertDir(),
 		"/etc/nginx", "/usr/lib/systemd/system/nginx.service",
 	})
 }

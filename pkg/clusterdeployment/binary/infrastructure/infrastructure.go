@@ -103,7 +103,6 @@ func (it *InfrastructureTask) Run(r runner.Runner, hcg *api.HostConfig) (err err
 	}
 
 	defer func() {
-		// TODO: dot not delete user configed directory, delete directories and files we addded only
 		if _, e := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"rm -rf %s\"", getPkgDistPath(it.ccfg.PackageSrc.DistPath))); e != nil {
 			err = fmt.Errorf("%v. And remove dir failed: %v", err, e)
 		}
