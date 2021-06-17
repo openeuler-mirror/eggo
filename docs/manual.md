@@ -137,8 +137,6 @@ loadbalances:                    // 配置etcd节点的列表，建议只配置�
   ip: 192.168.0.5                // 该节点的ip地址
   port: 22                       // ssh登录的端口
   arch: amd64                    // 机器架构，x86_64的填amd64
-config-dir: /etc/kubernetes      // k8s节点上存放k8s组件使用的配置的根目录
-certificate-dir: /etc/kubernetes/pki        // k8s节点上存放k8s组件使用的tls证书的根目录，建议配置为config-dir的子目录
 external-ca: false                          // 是否使用外部ca证书，该功能还未实现
 external-ca-path: /opt/externalca           // 外部ca证书文件的路径
 service:                                    // k8s创建的service的配置
@@ -154,7 +152,6 @@ apiserver-cert-sans:                        // apiserver相关的证书中需要
 apiserver-timeout: 120s                     // apiserver响应超时时间
 etcd-external: false                        // 使用外部etcd，该功能还未实现
 etcd-token: etcd-cluster                    // etcd集群名称
-etcd-data-dir: /var/lib/etcd/default.etcd   // etcd数据存放目录
 dns-vip: 10.32.0.10                         // dns的虚拟ip地址
 dns-domain: cluster.local                   // DNS域名后缀
 pause-image: k8s.gcr.io/pause:3.2           // 容器运行时的pause容器的容器镜像名称

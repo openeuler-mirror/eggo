@@ -173,8 +173,6 @@ type deployConfig struct {
 	Nodes              []*HostConfig               `yaml:"nodes"`
 	Etcds              []*HostConfig               `yaml:"etcds"`
 	LoadBalances       []*HostConfig               `yaml:"loadbalances"`
-	ConfigDir          string                      `yaml:"config-dir"`
-	CertificateDir     string                      `yaml:"certificate-dir"`
 	ExternalCA         bool                        `yaml:"external-ca"`
 	ExternalCAPath     string                      `yaml:"external-ca-path"`
 	Service            api.ServiceClusterConfig    `yaml:"service"`
@@ -184,7 +182,6 @@ type deployConfig struct {
 	ApiServerTimeout   string                      `yaml:"apiserver-timeout"`
 	EtcdExternal       bool                        `yaml:"etcd-external"`
 	EtcdToken          string                      `yaml:"etcd-token"`
-	EtcdDataDir        string                      `yaml:"etcd-data-dir"`
 	DnsVip             string                      `yaml:"dns-vip"`
 	DnsDomain          string                      `yaml:"dns-domain"`
 	PauseImage         string                      `yaml:"pause-image"`
@@ -540,8 +537,6 @@ func toClusterdeploymentConfig(conf *deployConfig) *api.ClusterConfig {
 
 	setIfStrConfigNotEmpty(&ccfg.Name, conf.ClusterID)
 	fillHostConfig(ccfg, conf)
-	setIfStrConfigNotEmpty(&ccfg.ConfigDir, conf.ConfigDir)
-	setIfStrConfigNotEmpty(&ccfg.Certificate.SavePath, conf.CertificateDir)
 	ccfg.Certificate.ExternalCA = conf.ExternalCA
 	setIfStrConfigNotEmpty(&ccfg.Certificate.ExternalCAPath, conf.ExternalCAPath)
 	setIfStrConfigNotEmpty(&ccfg.ServiceCluster.CIDR, conf.Service.CIDR)
@@ -561,7 +556,6 @@ func toClusterdeploymentConfig(conf *deployConfig) *api.ClusterConfig {
 		}
 	}
 	setIfStrConfigNotEmpty(&ccfg.EtcdCluster.Token, conf.EtcdToken)
-	setIfStrConfigNotEmpty(&ccfg.EtcdCluster.DataDir, conf.EtcdDataDir)
 	setIfStrConfigNotEmpty(&ccfg.PackageSrc.Type, conf.PackageSrc.Type)
 	setIfStrConfigNotEmpty(&ccfg.PackageSrc.ArmSrc, conf.PackageSrc.ArmSrc)
 	setIfStrConfigNotEmpty(&ccfg.PackageSrc.X86Src, conf.PackageSrc.X86Src)
@@ -628,8 +622,6 @@ func createDeployConfigTemplate(file string) error {
 		Nodes:          nodes,
 		Etcds:          etcds,
 		LoadBalances:   lbs,
-		ConfigDir:      constants.DefaultK8SRootDir,
-		CertificateDir: constants.DefaultK8SCertDir,
 		ExternalCA:     false,
 		ExternalCAPath: "/opt/externalca",
 		Service: api.ServiceClusterConfig{
@@ -646,7 +638,6 @@ func createDeployConfigTemplate(file string) error {
 		ApiServerTimeout:  "120s",
 		EtcdExternal:      false,
 		EtcdToken:         "etcd-cluster",
-		EtcdDataDir:       "/var/lib/etcd/default.etcd",
 		DnsVip:            "10.32.0.10",
 		DnsDomain:         "cluster.local",
 		PauseImage:        "k8s.gcr.io/pause:3.2",
