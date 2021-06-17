@@ -153,6 +153,9 @@ func generateApiServerCertificate(savePath string, cg certs.CertGenerator, ccfg 
 		ips = append(ips, ccfg.ControlPlane.ApiConf.CertSans.IPs...)
 		dnsnames = append(dnsnames, ccfg.ControlPlane.ApiConf.CertSans.DNSNames...)
 	}
+	if ccfg.LoadBalancer.IP != "" {
+		ips = append(ips, ccfg.LoadBalancer.IP)
+	}
 	ips = append(ips, hcf.Address)
 
 	apiserverConfig := &certs.CertConfig{

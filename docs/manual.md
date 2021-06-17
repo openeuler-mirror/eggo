@@ -107,7 +107,7 @@ $ eggo -d cleanup -f deploy.yaml
 
 ## 配置文件说明
 
-下面的配置中，目前loadbalances需要部署在单独的机器上，其它的不同的节点类型的节点都可以同时部署在同一台机器(注意配置必须一致)。
+下面的配置中，不同节点类型的节点可以同时部署在同一台机器(注意配置必须一致)。
 
 ```
 cluster-id: k8s-cluster          // 集群名称
@@ -132,11 +132,12 @@ etcds:                           // 配置etcd节点的列表，如果该项为�
   ip: 192.168.0.4                // 该节点的ip地址
   port: 22                       // ssh登录的端口
   arch: amd64                    // 机器架构，x86_64的填amd64
-loadbalances:                    // 配置etcd节点的列表，建议只配置一个，该功能还未实现
-- name: k8s-loadbalance-0        // 该节点的名称，会设置该名称为该节点的hostname并设置为k8s集群看到的该节点的名称
+loadbalance:                     // 配置loadbalance节点
+  name: k8s-loadbalance          // 该节点的名称，会设置该名称为该节点的hostname并设置为k8s集群看到的该节点的名称
   ip: 192.168.0.5                // 该节点的ip地址
   port: 22                       // ssh登录的端口
   arch: amd64                    // 机器架构，x86_64的填amd64
+  bind-port: 8443                // 负载均衡服务监听的端口 
 external-ca: false                          // 是否使用外部ca证书，该功能还未实现
 external-ca-path: /opt/externalca           // 外部ca证书文件的路径
 service:                                    // k8s创建的service的配置

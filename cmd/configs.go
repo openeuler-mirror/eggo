@@ -18,11 +18,9 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"gopkg.in/yaml.v1"
 
@@ -164,6 +162,14 @@ type HostConfig struct {
 	Arch string `yaml:"arch"` // amd64, aarch64, default amd64
 }
 
+type LoadBalance struct {
+	Name     string `yaml:"name"`
+	Ip       string `yaml:"ip"`
+	Port     int    `yaml:"port"`
+	Arch     string `yaml:"arch"` // amd64, aarch64, default amd64
+	BindPort int    `yaml:"bind-port"`
+}
+
 type deployConfig struct {
 	ClusterID          string                      `yaml:"cluster-id"`
 	Username           string                      `yaml:"username"`
@@ -172,7 +178,7 @@ type deployConfig struct {
 	Masters            []*HostConfig               `yaml:"masters"`
 	Nodes              []*HostConfig               `yaml:"nodes"`
 	Etcds              []*HostConfig               `yaml:"etcds"`
-	LoadBalances       []*HostConfig               `yaml:"loadbalances"`
+	LoadBalance        LoadBalance                 `yaml:"loadbalance"`
 	ExternalCA         bool                        `yaml:"external-ca"`
 	ExternalCAPath     string                      `yaml:"external-ca-path"`
 	Service            api.ServiceClusterConfig    `yaml:"service"`
@@ -372,38 +378,13 @@ func addUserPackages(hostconfig *api.HostConfig, userPkgs []*Package) {
 	}
 }
 
-func getPortFromEndPoint(endpoint string) int {
-	defaultPort := 6443
-
-	// endpoint:
-	// https://192.168.0.11:6443
-	uri, err := url.Parse(endpoint)
-	if err != nil {
-		return defaultPort
-	}
-
-	// host:
-	// 192.168.0.11:6443
-	items := strings.Split(uri.Host, ":")
-	if len(items) < 2 {
-		return defaultPort
-	}
-
-	port, err := strconv.Atoi(items[len(items)-1])
-	if err != nil {
-		return defaultPort
-	}
-
-	return port
-}
-
 func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 	var hostconfig *api.HostConfig
 	cache := make(map[string]int)
 	var nodes []*api.HostConfig
 
 	for i, master := range conf.Masters {
-		hostconfig = createCommonHostConfig(master, "k8s-master-"+strconv.Itoa(i),
+		hostconfig = createCommonHostConfig(master, conf.ClusterID+"-master-"+strconv.Itoa(i),
 			conf.Username, conf.Password, conf.PrivateKeyPath)
 		hostconfig.Type |= api.Master
 		ports := append(masterExports, conf.OpenPorts["master"]...)
@@ -421,7 +402,7 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 	for i, node := range conf.Nodes {
 		idx, exist := cache[node.Ip]
 		if !exist {
-			hostconfig = createCommonHostConfig(node, "k8s-node-"+strconv.Itoa(i),
+			hostconfig = createCommonHostConfig(node, conf.ClusterID+"-node-"+strconv.Itoa(i),
 				conf.Username, conf.Password, conf.PrivateKeyPath)
 		} else {
 			hostconfig = nodes[idx]
@@ -448,7 +429,7 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 	for i, etcd := range etcds {
 		idx, exist := cache[etcd.Ip]
 		if !exist {
-			hostconfig = createCommonHostConfig(etcd, "etcd-"+strconv.Itoa(i),
+			hostconfig = createCommonHostConfig(etcd, conf.ClusterID+"-etcd-"+strconv.Itoa(i),
 				conf.Username, conf.Password, conf.PrivateKeyPath)
 		} else {
 			hostconfig = nodes[idx]
@@ -465,11 +446,17 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 		nodes = append(nodes, hostconfig)
 	}
 
-	for i, lb := range conf.LoadBalances {
-		idx, exist := cache[lb.Ip]
+	if conf.LoadBalance.Ip != "" {
+		idx, exist := cache[conf.LoadBalance.Ip]
 		if !exist {
-			hostconfig = createCommonHostConfig(lb, "k8s-loadbalance-"+strconv.Itoa(i),
-				conf.Username, conf.Password, conf.PrivateKeyPath)
+			config := &HostConfig{
+				Name: conf.LoadBalance.Name,
+				Ip:   conf.LoadBalance.Ip,
+				Port: conf.LoadBalance.Port,
+				Arch: conf.LoadBalance.Arch,
+			}
+			hostconfig = createCommonHostConfig(config, conf.ClusterID+"-loadbalance", conf.Username,
+				conf.Password, conf.PrivateKeyPath)
 		} else {
 			hostconfig = nodes[idx]
 		}
@@ -477,7 +464,7 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 
 		ports := []*api.OpenPorts{
 			{
-				Port:     getPortFromEndPoint(conf.ApiServerEndpoint),
+				Port:     conf.LoadBalance.BindPort,
 				Protocol: "tcp",
 			},
 		}
@@ -486,10 +473,10 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 		addPackagesAndExports(hostconfig, loadbalancePackages, ports)
 		if exist {
 			nodes[idx] = hostconfig
-			continue
+		} else {
+			cache[hostconfig.Address] = len(nodes)
+			nodes = append(nodes, hostconfig)
 		}
-		cache[hostconfig.Address] = len(nodes)
-		nodes = append(nodes, hostconfig)
 	}
 
 	ccfg.Nodes = append(ccfg.Nodes, nodes...)
@@ -532,6 +519,15 @@ func setStrArray(config []string, userConfig []string) {
 	}
 }
 
+func fillLoadBalance(ccfg *api.ClusterConfig, lb LoadBalance) {
+	if lb.Ip == "" || lb.BindPort <= 0 {
+		return
+	}
+
+	setIfStrConfigNotEmpty(&ccfg.LoadBalancer.IP, lb.Ip)
+	setIfStrConfigNotEmpty(&ccfg.LoadBalancer.Port, strconv.Itoa(lb.BindPort))
+}
+
 func toClusterdeploymentConfig(conf *deployConfig) *api.ClusterConfig {
 	ccfg := getDefaultClusterdeploymentConfig()
 
@@ -568,6 +564,7 @@ func toClusterdeploymentConfig(conf *deployConfig) *api.ClusterConfig {
 	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.ContainerEngineConf.RuntimeEndpoint, conf.RuntimeEndpoint)
 	setStrArray(ccfg.WorkerConfig.ContainerEngineConf.RegistryMirrors, conf.RegistryMirrors)
 	setStrArray(ccfg.WorkerConfig.ContainerEngineConf.InsecureRegistries, conf.InsecureRegistries)
+	fillLoadBalance(ccfg, conf.LoadBalance)
 
 	ccfg.Addons = append(ccfg.Addons, conf.Addons...)
 
@@ -588,7 +585,7 @@ func getHostconfigs(format string, ips []string) []*HostConfig {
 }
 
 func createDeployConfigTemplate(file string) error {
-	var masters, nodes, etcds, lbs []*HostConfig
+	var masters, nodes, etcds []*HostConfig
 	masterIP := []string{"192.168.0.2"}
 	if opts.masters != nil {
 		masterIP = opts.masters
@@ -597,9 +594,9 @@ func createDeployConfigTemplate(file string) error {
 	if opts.nodes != nil {
 		nodesIP = opts.nodes
 	}
-	lbsIP := []string{"192.168.0.1"}
-	if opts.loadbalancer != nil {
-		lbsIP = opts.loadbalancer
+	lbIP := "192.168.0.1"
+	if opts.loadbalance != "" {
+		lbIP = opts.loadbalance
 	}
 	etcdsIP := masterIP
 	if opts.etcds != nil {
@@ -608,7 +605,14 @@ func createDeployConfigTemplate(file string) error {
 	masters = getHostconfigs("k8s-master-%d", masterIP)
 	nodes = getHostconfigs("k8s-node-%d", nodesIP)
 	etcds = getHostconfigs("etcd-%d", etcdsIP)
-	lbs = getHostconfigs("k8s-loadbalance-%d", lbsIP)
+	lb := LoadBalance{
+		Name:     "k8s-loadbalance",
+		Ip:       lbIP,
+		Port:     22,
+		Arch:     "amd64",
+		BindPort: 8443,
+	}
+
 	if etcds == nil {
 		etcds = masters
 	}
@@ -621,7 +625,7 @@ func createDeployConfigTemplate(file string) error {
 		Masters:        masters,
 		Nodes:          nodes,
 		Etcds:          etcds,
-		LoadBalances:   lbs,
+		LoadBalance:    lb,
 		ExternalCA:     false,
 		ExternalCAPath: "/opt/externalca",
 		Service: api.ServiceClusterConfig{
@@ -633,7 +637,7 @@ func createDeployConfigTemplate(file string) error {
 			PodCIDR:    "10.244.64.0/16",
 			PluginArgs: make(map[string]string),
 		},
-		ApiServerEndpoint: fmt.Sprintf("%s:6443", lbs[0].Ip),
+		ApiServerEndpoint: fmt.Sprintf("%s:%d", lb.Ip, lb.BindPort),
 		ApiServerCertSans: api.Sans{},
 		ApiServerTimeout:  "120s",
 		EtcdExternal:      false,
@@ -642,7 +646,7 @@ func createDeployConfigTemplate(file string) error {
 		DnsDomain:         "cluster.local",
 		PauseImage:        "k8s.gcr.io/pause:3.2",
 		NetworkPlugin:     "cni",
-		CniBinDir:         "/usr/libexec/cni",
+		CniBinDir:         "/usr/libexec/cni,/opt/cni/bin",
 		Runtime:           "iSulad",
 		RuntimeEndpoint:   "unix:///var/run/isulad.sock",
 		Addons: []*api.AddonConfig{

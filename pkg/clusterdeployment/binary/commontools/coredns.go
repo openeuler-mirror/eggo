@@ -23,6 +23,7 @@ import (
 
 	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/constants"
+	"gitee.com/openeuler/eggo/pkg/utils"
 	"gitee.com/openeuler/eggo/pkg/utils/endpoint"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
@@ -259,20 +260,8 @@ func (ct *CorednsSetupTask) Run(r runner.Runner, hcf *api.HostConfig) error {
 	return nil
 }
 
-func getMasterIPList(c *api.ClusterConfig) []string {
-	var masters []string
-	for _, n := range c.Nodes {
-		if (n.Type & api.Master) != 0 {
-			masters = append(masters, n.Address)
-			continue
-		}
-	}
-
-	return masters
-}
-
 func SetUpCoredns(cluster *api.ClusterConfig) error {
-	masterIPs := getMasterIPList(cluster)
+	masterIPs := utils.GetMasterIPList(cluster)
 	if len(masterIPs) == 0 {
 		return fmt.Errorf("no master host found, can not setup coredns service")
 	}

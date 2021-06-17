@@ -237,6 +237,7 @@ func (c ClusterConfig) GetManifestDir() string {
 type ClusterDeploymentAPI interface {
 	PrepareInfrastructure() error
 	DeployEtcdCluster() error
+	DeployLoadBalancer() error
 	InitControlPlane() error
 	JoinBootstrap() error
 	UpgradeCluster() error

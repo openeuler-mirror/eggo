@@ -36,7 +36,7 @@ events {
 
 stream {
     upstream backend {
-        hash $remote_addr consistent;
+        hash \$remote_addr consistent;
     }
 
     server {

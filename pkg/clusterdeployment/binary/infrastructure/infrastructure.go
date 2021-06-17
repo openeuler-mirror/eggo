@@ -187,17 +187,33 @@ func addFirewallPort(r runner.Runner, hcg *api.HostConfig) error {
 		logrus.Warnf("no expose port for %s", hcg.Address)
 	}
 
-	if err := exposePorts(r, ports...); err != nil {
+	if err := ExposePorts(r, ports...); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func exposePorts(r runner.Runner, ports ...string) error {
+func removeDupPorts(ports []string) []string {
+	portMap := map[string]bool{}
+	result := []string{}
+
+	for _, p := range ports {
+		if _, ok := portMap[p]; !ok {
+			portMap[p] = true
+			result = append(result, p)
+		}
+	}
+
+	return result
+}
+
+func ExposePorts(r runner.Runner, ports ...string) error {
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"")
-	for _, p := range ports {
+
+	rPorts := removeDupPorts(ports)
+	for _, p := range rPorts {
 		sb.WriteString(fmt.Sprintf("firewall-cmd --zone=public --add-port=%s && ", p))
 	}
 
@@ -207,6 +223,21 @@ func exposePorts(r runner.Runner, ports ...string) error {
 	}
 
 	return nil
+}
+
+func ShieldPorts(r runner.Runner, ports ...string) {
+	var sb strings.Builder
+	sb.WriteString("sudo -E /bin/sh -c \"")
+
+	rPorts := removeDupPorts(ports)
+	for _, p := range rPorts {
+		sb.WriteString(fmt.Sprintf("firewall-cmd --zone=public --remove-port=%s && ", p))
+	}
+
+	sb.WriteString("firewall-cmd --runtime-to-permanent \"")
+	if _, err := r.RunCommand(sb.String()); err != nil {
+		logrus.Errorf("shield port failed: %v", err)
+	}
 }
 
 func Init(config *api.ClusterConfig) error {

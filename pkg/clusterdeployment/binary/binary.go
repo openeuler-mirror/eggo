@@ -25,6 +25,7 @@ import (
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/controlplane"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/etcdcluster"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/loadbalance"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/manager"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
@@ -122,6 +123,17 @@ func (bcp *BinaryClusterDeployment) DeployEtcdCluster() error {
 		logrus.Info("deploy etcd cluster success")
 	}
 	return err
+}
+
+func (bcp *BinaryClusterDeployment) DeployLoadBalancer() error {
+	logrus.Info("do join loadbalancer...")
+	if err := loadbalance.Init(bcp.config); err != nil {
+		logrus.Errorf("bootstrap falied: %v", err)
+		return err
+	}
+
+	logrus.Info("do join loadbalancer success")
+	return nil
 }
 
 func (bcp *BinaryClusterDeployment) InitControlPlane() error {

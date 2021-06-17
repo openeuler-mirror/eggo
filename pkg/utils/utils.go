@@ -18,6 +18,8 @@ package utils
 import (
 	"os/user"
 	"strings"
+
+	"gitee.com/openeuler/eggo/pkg/api"
 )
 
 func IsX86Arch(arch string) bool {
@@ -58,4 +60,16 @@ func IsType(curType uint16, expectedType uint16) bool {
 
 func AddSudo(cmd string) string {
 	return "sudo -E /bin/sh -c \"" + cmd + "\""
+}
+
+func GetMasterIPList(c *api.ClusterConfig) []string {
+	var masters []string
+	for _, n := range c.Nodes {
+		if (n.Type & api.Master) != 0 {
+			masters = append(masters, n.Address)
+			continue
+		}
+	}
+
+	return masters
 }
