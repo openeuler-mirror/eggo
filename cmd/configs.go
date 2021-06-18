@@ -302,6 +302,10 @@ func createCommonHostConfig(userHostconfig *HostConfig, defaultName string, user
 	if userPrivateKeyPath != "" {
 		privateKeyPath = userPrivateKeyPath
 	}
+	// If private key path does not exist, ignore it
+	if _, err := os.Stat(privateKeyPath); err != nil {
+		privateKeyPath = ""
+	}
 	if userHostconfig.Port != 0 {
 		port = userHostconfig.Port
 	}
