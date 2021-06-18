@@ -30,120 +30,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	masterPackages = []*api.Packages{
-		{
-			Name: "kubernetes-client",
-			Type: "repo",
-		},
-		{
-			Name: "kubernetes-master",
-			Type: "repo",
-		},
-		{
-			Name: "coredns",
-			Type: "repo",
-		},
-	}
-
-	masterExports = []*api.OpenPorts{
-		// kube-apiserver
-		{
-			Port:     6443,
-			Protocol: "tcp",
-		},
-		// kube-scheduler
-		{
-			Port:     10251,
-			Protocol: "tcp",
-		},
-		// kube-controller-manager
-		{
-			Port:     10252,
-			Protocol: "tcp",
-		},
-		// coredns
-		{
-			Port:     53,
-			Protocol: "tcp",
-		},
-		// coredns
-		{
-			Port:     53,
-			Protocol: "udp",
-		},
-		// coredns
-		{
-			Port:     9153,
-			Protocol: "tcp",
-		},
-	}
-
-	nodePackages = []*api.Packages{
-		{
-			Name: "docker-engine",
-			Type: "repo",
-		},
-		{
-			Name: "kubernetes-client",
-			Type: "repo",
-		},
-		{
-			Name: "kubernetes-node",
-			Type: "repo",
-		},
-		{
-			Name: "kubernetes-kubelet",
-			Type: "repo",
-		},
-	}
-
-	nodeExports = []*api.OpenPorts{
-		// kubelet
-		{
-			Port:     10250,
-			Protocol: "tcp",
-		},
-		// kube-proxy
-		{
-			Port:     10256,
-			Protocol: "tcp",
-		},
-	}
-
-	etcdPackages = []*api.Packages{
-		{
-			Name: "etcd",
-			Type: "repo",
-		},
-	}
-
-	etcdExports = []*api.OpenPorts{
-		// etcd api
-		{
-			Port:     2379,
-			Protocol: "tcp",
-		},
-		// etcd peer
-		{
-			Port:     2380,
-			Protocol: "tcp",
-		},
-		// etcd metric
-		{
-			Port:     2381,
-			Protocol: "tcp",
-		},
-	}
-
-	loadbalancePackages = []*api.Packages{
-		{
-			Name: "nginx",
-			Type: "repo",
-		},
-	}
-)
-
 type ConfigExtraArgs struct {
 	Name      string            `yaml:"name"`
 	ExtraArgs map[string]string `yaml:"extra-args"`
@@ -323,41 +209,6 @@ func createCommonHostConfig(userHostconfig *HostConfig, defaultName string, user
 	return hostconfig
 }
 
-func portExist(openPorts []*api.OpenPorts, port *api.OpenPorts) bool {
-	for _, p := range openPorts {
-		if p.Protocol == port.Protocol && p.Port == port.Port {
-			return true
-		}
-	}
-	return false
-}
-
-func addPackagesAndExports(hostconfig *api.HostConfig, pkgs []*api.Packages,
-	openPorts []*api.OpenPorts) {
-	for _, port := range openPorts {
-		if portExist(hostconfig.OpenPorts, port) {
-			continue
-		}
-		hostconfig.OpenPorts = append(hostconfig.OpenPorts, port)
-	}
-
-	if hostconfig.Packages == nil {
-		hostconfig.Packages = []*api.Packages{}
-	}
-
-	noDupPkgs := make(map[string]bool, len(hostconfig.Packages))
-	for _, p := range hostconfig.Packages {
-		noDupPkgs[p.Name] = true
-	}
-
-	for _, pkg := range pkgs {
-		if _, ok := noDupPkgs[pkg.Name]; ok {
-			continue
-		}
-		hostconfig.Packages = append(hostconfig.Packages, pkg)
-	}
-}
-
 func addUserPackages(hostconfig *api.HostConfig, userPkgs []*Package) {
 	if hostconfig.Packages == nil {
 		hostconfig.Packages = []*api.Packages{}
@@ -391,9 +242,7 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 		hostconfig = createCommonHostConfig(master, conf.ClusterID+"-master-"+strconv.Itoa(i),
 			conf.Username, conf.Password, conf.PrivateKeyPath)
 		hostconfig.Type |= api.Master
-		ports := append(masterExports, conf.OpenPorts["master"]...)
 		addUserPackages(hostconfig, conf.Packages["master"])
-		addPackagesAndExports(hostconfig, masterPackages, ports)
 		idx, ok := cache[hostconfig.Address]
 		if ok {
 			nodes[idx] = hostconfig
@@ -412,9 +261,7 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 			hostconfig = nodes[idx]
 		}
 		hostconfig.Type |= api.Worker
-		ports := append(nodeExports, conf.OpenPorts["node"]...)
 		addUserPackages(hostconfig, conf.Packages["node"])
-		addPackagesAndExports(hostconfig, nodePackages, ports)
 		if exist {
 			nodes[idx] = hostconfig
 			continue
@@ -439,9 +286,7 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 			hostconfig = nodes[idx]
 		}
 		hostconfig.Type |= api.ETCD
-		ports := append(etcdExports, conf.OpenPorts["etcd"]...)
 		addUserPackages(hostconfig, conf.Packages["etcd"])
-		addPackagesAndExports(hostconfig, etcdPackages, ports)
 		if exist {
 			nodes[idx] = hostconfig
 			continue
@@ -466,15 +311,7 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 		}
 		hostconfig.Type |= api.LoadBalance
 
-		ports := []*api.OpenPorts{
-			{
-				Port:     conf.LoadBalance.BindPort,
-				Protocol: "tcp",
-			},
-		}
-		ports = append(ports, conf.OpenPorts["loadbalance"]...)
 		addUserPackages(hostconfig, conf.Packages["loadbalance"])
-		addPackagesAndExports(hostconfig, loadbalancePackages, ports)
 		if exist {
 			nodes[idx] = hostconfig
 		} else {
@@ -594,7 +431,7 @@ func createDeployConfigTemplate(file string) error {
 	if opts.masters != nil {
 		masterIP = opts.masters
 	}
-	nodesIP := []string{"192.168.0.3", "192.168.0.4"}
+	nodesIP := []string{"192.168.0.2", "192.168.0.3", "192.168.0.4"}
 	if opts.nodes != nil {
 		nodesIP = opts.nodes
 	}

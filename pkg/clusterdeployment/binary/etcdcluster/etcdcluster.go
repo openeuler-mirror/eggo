@@ -115,6 +115,12 @@ func (t *EtcdDeployEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfig) e
 		return err
 	}
 
+	// create etcd service working dir
+	if _, err := r.RunCommand("sudo -E /bin/sh -c \"mkdir -p -m 700 /var/lib/etcd\""); err != nil {
+		logrus.Errorf("create etcd working dir failed: %v", err)
+		return err
+	}
+
 	shell, err := commontools.GetSystemdServiceShell("etcd", "", true)
 	if err != nil {
 		logrus.Errorf("get etcd systemd service shell failed: %v", err)
