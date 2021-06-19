@@ -62,7 +62,7 @@ Documentation=https://github.com/coredns/coredns
 After=network.target
 
 [Service]
-ExecStart=bash -c "KUBE_DNS_SERVICE_HOST={{ .DNSHostAddr }} coredns -conf {{ .CoreConfigPath }}"
+ExecStart=/usr/bin/bash -c "KUBE_DNS_SERVICE_HOST={{ .DNSHostAddr }} coredns -conf {{ .CoreConfigPath }}"
 
 Restart=on-failure
 LimitNOFILE=65536

@@ -27,11 +27,19 @@ import (
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/addons"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/etcdcluster"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment/runtime"
 	"gitee.com/openeuler/eggo/pkg/constants"
 	"gitee.com/openeuler/eggo/pkg/utils"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/task"
+)
+
+var (
+	EtcdService        = []string{"etcd"}
+	MasterService      = []string{"kube-apiserver", "kube-controller-manager", "kube-scheduler", "coredns"}
+	WorkerService      = []string{"kubelet", "kube-proxy"}
+	LoadBalanceService = []string{"nginx"}
 )
 
 type cleanupClusterTask struct {
@@ -122,6 +130,7 @@ func cleanupEtcd(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *api.HostC
 	removePathes(r, hostConfig, []string{
 		ccfg.GetConfigDir(),
 		ccfg.GetCertDir(),
+		ccfg.PackageSrc.GetPkgDistPath(),
 		getEtcdDataDir(ccfg.EtcdCluster.DataDir),
 		"/etc/etcd",
 		"/var/lib/etcd",
@@ -139,22 +148,51 @@ func cleanupCoreDNS(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *api.Ho
 func cleanupLoadBalance(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *api.HostConfig) {
 	// remove directories
 	removePathes(r, hostConfig, []string{
+		"/etc/kubernetes",
 		"/etc/nginx", "/usr/lib/systemd/system/nginx.service",
 	})
 }
 
 func postCleanup(r runner.Runner, hostConfig *api.HostConfig) {
-	// save firewall config
-	if output, err := r.RunCommand(utils.AddSudo("firewall-cmd --runtime-to-permanent")); err != nil {
-		logrus.Errorf("save firewall config on node %v failed: %v\noutput: %v",
-			hostConfig.Address, err, output)
-	}
-
 	// daemon-reload
 	if output, err := r.RunCommand(utils.AddSudo("systemctl daemon-reload")); err != nil {
 		logrus.Errorf("daemon-reload on node %v failed: %v\noutput: %v",
 			hostConfig.Address, err, output)
 	}
+}
+
+func stopService(r runner.Runner, ccfg *api.ClusterConfig, hostConfig *api.HostConfig) error {
+	service := []string{}
+
+	if utils.IsType(hostConfig.Type, api.ETCD) {
+		service = append(service, EtcdService...)
+	}
+
+	if utils.IsType(hostConfig.Type, api.Master) {
+		service = append(service, MasterService...)
+	}
+
+	if utils.IsType(hostConfig.Type, api.Worker) {
+		service = append(service, WorkerService...)
+	}
+
+	runtime := runtime.GetRuntime(ccfg.WorkerConfig.ContainerEngineConf.Runtime)
+	if runtime == nil {
+		return fmt.Errorf("invalid container engine %s", ccfg.WorkerConfig.ContainerEngineConf.Runtime)
+	}
+	service = append(service, runtime.GetRuntimeService())
+
+	if utils.IsType(hostConfig.Type, api.LoadBalance) {
+		service = append(service, LoadBalanceService...)
+	}
+
+	join := strings.Join(service, " ")
+	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"systemctl stop %s\"", join)); err != nil {
+		logrus.Errorf("stop service failed: %v", err)
+		return err
+	}
+
+	return nil
 }
 
 func isPkgInstalled(hostConfig *api.HostConfig, pkg string) bool {
@@ -173,8 +211,13 @@ func (t *cleanupClusterTask) Run(r runner.Runner, hostConfig *api.HostConfig) er
 		return fmt.Errorf("empty host config")
 	}
 
+	// stop service before remove dependences
+	if err := stopService(r, t.ccfg, hostConfig); err != nil {
+		logrus.Errorf("stop service failed: %v", err)
+	}
+
 	// call infrastructure function to cleanup
-	if err := infrastructure.RemoveDependences(r, hostConfig, t.ccfg.PackageSrc); err != nil {
+	if err := infrastructure.RemoveDependences(r, hostConfig, &t.ccfg.PackageSrc); err != nil {
 		logrus.Errorf("remove dependences failed: %v", err)
 	}
 

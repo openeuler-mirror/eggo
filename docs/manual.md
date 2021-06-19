@@ -61,7 +61,7 @@ $ tree
 - images.tar存放部署时需要导入的容器镜像，例如网络插件镜像以及pause镜像。如果是在线安装，则由容器运行时自动从镜像仓库下载，不需要准备images.tar包。以calico插件依赖的容器镜像为例，可以根据calico.yaml里面定义的镜像全名进行下载导出。该tar包包含的镜像必须是使用docker或者isula-build等兼容docker的tar包格式的命令，使用docker save -o images.tar images1:tag images2:tag ......  或类似命令将所有镜像一次性导出到images.tar包中，需要确保执行load镜像时能一次将images.tar导入成功。以上述calico镜像为例，镜像导出命令为：
 
   ```
-  $ docker save -o images.tar calico/node:v3.19.1 calico/cni:v3.19.1 calico/pod2daemon-flexvol:v3.19.1 k8s.gcr.io/pause:3.2
+  $ docker save -o images.tar calico/node:v3.19.1 calico/cni:v3.19.1 calico/kube-controllers:v3.19.1 calico/pod2daemon-flexvol:v3.19.1 k8s.gcr.io/pause:3.2
 
 3)  准备eggo部署时使用的yaml配置文件。可以使用下面的命令生成一个模板配置，并打开yaml文件对其进行增删改来满足不同的部署需求。
 
@@ -270,6 +270,7 @@ pacakges:                                   // 配置各种类型节点上需要
 ```
 
 ### dstpath 白名单
+dstpath可以配置为白名单中的目录，或者其子目录
 ```
 "/usr/bin", "/usr/local/bin", "/opt/cni/bin", "/usr/libexec/cni",
 "/etc/kubernetes",

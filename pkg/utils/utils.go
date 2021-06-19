@@ -45,15 +45,6 @@ func GetSysHome() string {
 	return "/root"
 }
 
-func IsISulad(engine string) bool {
-	return strings.ToLower(engine) == "isulad"
-}
-
-func IsDocker(engine string) bool {
-	// default engine
-	return engine == "" || strings.ToLower(engine) == "docker"
-}
-
 func IsType(curType uint16, expectedType uint16) bool {
 	return curType&expectedType != 0
 }

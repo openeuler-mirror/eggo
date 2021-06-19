@@ -1,11 +1,14 @@
-package bootstrap
+package runtime
 
 import (
 	"encoding/base64"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"gitee.com/openeuler/eggo/pkg/api"
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
+	"gitee.com/openeuler/eggo/pkg/constants"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/template"
 	"github.com/sirupsen/logrus"
@@ -20,6 +23,8 @@ var (
 
 type Runtime interface {
 	GetRuntimeSoftwares() []string
+	GetRuntimeClient() string
+	GetRuntimeService() string
 	PrepareRuntimeJson(r runner.Runner, ccfg *api.ClusterConfig) error
 }
 
@@ -28,6 +33,14 @@ type isuladRuntime struct {
 
 func (ir *isuladRuntime) GetRuntimeSoftwares() []string {
 	return []string{"isula", "isulad"}
+}
+
+func (ir *isuladRuntime) GetRuntimeClient() string {
+	return "isula"
+}
+
+func (ir *isuladRuntime) GetRuntimeService() string {
+	return "isulad"
 }
 
 func (ir *isuladRuntime) PrepareRuntimeJson(r runner.Runner, ccfg *api.ClusterConfig) error {
@@ -59,7 +72,6 @@ sed -i "/registry-mirrors/a\    \t\"{{ $v }}\"{{ if ne $i 0 }},{{ end }}" /etc/i
 {{- range $i, $v := .insecure }}
 sed -i "/insecure-registries/a\    \t\"{{ $v }}\"{{ if ne $i 0 }},{{ end }}" /etc/isulad/daemon.json
 {{- end }}
-systemctl restart isulad
 `
 	datastore := map[string]interface{}{}
 	datastore["pauseImage"] = pauseImage
@@ -85,6 +97,14 @@ type dockerRuntime struct {
 
 func (dr *dockerRuntime) GetRuntimeSoftwares() []string {
 	return []string{"docker", "dockerd"}
+}
+
+func (dr *dockerRuntime) GetRuntimeClient() string {
+	return "docker"
+}
+
+func (dr *dockerRuntime) GetRuntimeService() string {
+	return "docker"
 }
 
 func (dr *dockerRuntime) PrepareRuntimeJson(r runner.Runner, ccfg *api.ClusterConfig) error {
@@ -135,6 +155,96 @@ func (dr *dockerRuntime) PrepareRuntimeJson(r runner.Runner, ccfg *api.ClusterCo
 	logrus.Debugf("write docker daemon.json success")
 
 	return nil
+}
+
+type DeployRuntimeTask struct {
+	ccfg    *api.ClusterConfig
+	runtime Runtime
+}
+
+func NewDeployRuntimeTask(ccfg *api.ClusterConfig) *DeployRuntimeTask {
+	return &DeployRuntimeTask{
+		ccfg: ccfg,
+	}
+}
+
+func (ct *DeployRuntimeTask) Name() string {
+	return "DeployRuntimeTask"
+}
+
+func (ct *DeployRuntimeTask) Run(r runner.Runner, hcg *api.HostConfig) error {
+	logrus.Info("do deploy container engine...\n")
+
+	ct.runtime = GetRuntime(ct.ccfg.WorkerConfig.ContainerEngineConf.Runtime)
+	if ct.runtime == nil {
+		return fmt.Errorf("unsupport container engine %s", ct.ccfg.WorkerConfig.ContainerEngineConf.Runtime)
+	}
+
+	// check container engine softwares
+	err := ct.check(r)
+	if err != nil {
+		logrus.Errorf("check failed: %v", err)
+		return err
+	}
+
+	if err := ct.runtime.PrepareRuntimeJson(r, ct.ccfg); err != nil {
+		logrus.Errorf("prepare container engine json failed: %v", err)
+		return err
+	}
+
+	// start service
+	_, err = r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"systemctl restart %s\"", ct.runtime.GetRuntimeService()))
+	if err != nil {
+		logrus.Errorf("start %s failed: %v", ct.runtime.GetRuntimeService(), err)
+		return err
+	}
+
+	if err := loadImages(r, &ct.ccfg.PackageSrc, ct.runtime.GetRuntimeClient()); err != nil {
+		logrus.Errorf("load images failed: %v", err)
+		return err
+	}
+
+	logrus.Info("deploy container engine success\n")
+	return nil
+}
+
+func (ct *DeployRuntimeTask) check(r runner.Runner) error {
+	if err := infrastructure.CheckDependences(r, ct.runtime.GetRuntimeSoftwares()); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func loadImages(r runner.Runner, conf *api.PackageSrcConfig, client string) error {
+	logrus.Info("do load images...")
+	if conf == nil {
+		return fmt.Errorf("can not found dist path failed")
+	}
+
+	imagePkgPath := filepath.Join(conf.GetPkgDistPath(), constants.DefaultImagePkgName)
+
+	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"stat %s\"", imagePkgPath)); err != nil {
+		logrus.Debugf("no image package found on path %v", imagePkgPath)
+		return nil
+	}
+
+	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"%s load -i %s\"", client, imagePkgPath)); err != nil {
+		return fmt.Errorf("isula load -i %v failed: %v", imagePkgPath, err)
+	}
+
+	logrus.Info("load images success")
+
+	return nil
+}
+
+func IsISulad(engine string) bool {
+	return strings.ToLower(engine) == "isulad"
+}
+
+func IsDocker(engine string) bool {
+	// default engine
+	return engine == "" || strings.ToLower(engine) == "docker"
 }
 
 func GetRuntime(runtime string) Runtime {

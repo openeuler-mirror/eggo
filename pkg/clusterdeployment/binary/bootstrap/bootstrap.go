@@ -27,7 +27,7 @@ import (
 	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/commontools"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/controlplane"
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment/runtime"
 	"gitee.com/openeuler/eggo/pkg/constants"
 	"gitee.com/openeuler/eggo/pkg/utils/certs"
 	"gitee.com/openeuler/eggo/pkg/utils/endpoint"
@@ -85,19 +85,19 @@ func (it *BootstrapTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 	logrus.Info("do join new worker...\n")
 
 	// check worker dependences
-	runtime, err := check(r, it.ccfg)
+	err := check(r, it.ccfg)
 	if err != nil {
 		logrus.Errorf("check failed: %v", err)
 		return err
 	}
 
-	if err := runtime.PrepareRuntimeJson(r, it.ccfg); err != nil {
-		logrus.Errorf("prepare container engine json failed: %v", err)
+	if err := prepareConfig(r, it.ccfg, hcg); err != nil {
+		logrus.Errorf("prepare config failed: %v", err)
 		return err
 	}
 
-	if err := prepareConfig(r, it.ccfg, hcg); err != nil {
-		logrus.Errorf("prepare config failed: %v", err)
+	if _, err := r.RunCommand("sudo -E /bin/sh -c \"mkdir -p /var/lib/kubelet\""); err != nil {
+		logrus.Errorf("mkdir /var/lib/kubelet failed: %v", err)
 		return err
 	}
 
@@ -110,30 +110,21 @@ func (it *BootstrapTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 	return nil
 }
 
-func check(r runner.Runner, ccfg *api.ClusterConfig) (Runtime, error) {
+func check(r runner.Runner, ccfg *api.ClusterConfig) error {
 	if ccfg.WorkerConfig.KubeletConf == nil {
-		return nil, fmt.Errorf("empty kubeletconf")
+		return fmt.Errorf("empty kubeletconf")
 	}
 	if ccfg.WorkerConfig.ContainerEngineConf == nil {
-		return nil, fmt.Errorf("empty container engine conf")
-	}
-
-	runtime := GetRuntime(ccfg.WorkerConfig.ContainerEngineConf.Runtime)
-	if runtime == nil {
-		return nil, fmt.Errorf("unsupport container engine %s", ccfg.WorkerConfig.ContainerEngineConf.Runtime)
-	}
-
-	if err := infrastructure.CheckDependences(r, runtime.GetRuntimeSoftwares()); err != nil {
-		return nil, err
+		return fmt.Errorf("empty container engine conf")
 	}
 
 	_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"ls %s\"", filepath.Join(ccfg.Certificate.SavePath, "ca.crt")))
 	if err != nil {
 		logrus.Errorf("check ca cert failed: %v\n", err)
-		return nil, err
+		return err
 	}
 
-	return runtime, nil
+	return nil
 }
 
 func prepareConfig(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig) error {
@@ -357,6 +348,9 @@ func JoinNode(config *api.ClusterConfig, masters, workers []string) error {
 			&commontools.CopyCaCertificatesTask{
 				Cluster: config,
 			},
+		),
+		task.NewTaskInstance(
+			runtime.NewDeployRuntimeTask(config),
 		),
 		task.NewTaskInstance(
 			&BootstrapTask{

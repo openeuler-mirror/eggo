@@ -19,7 +19,7 @@ import (
 	"fmt"
 
 	"gitee.com/openeuler/eggo/pkg/api"
-	"gitee.com/openeuler/eggo/pkg/utils"
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment/runtime"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/template"
 	"github.com/sirupsen/logrus"
@@ -246,7 +246,7 @@ func SetupKubeletService(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.Host
 		"--pod-infra-container-image": ccfg.WorkerConfig.KubeletConf.PauseImage,
 	}
 
-	if !utils.IsDocker(ccfg.WorkerConfig.ContainerEngineConf.Runtime) {
+	if !runtime.IsDocker(ccfg.WorkerConfig.ContainerEngineConf.Runtime) {
 		configArgs["--container-runtime"] = "remote"
 		configArgs["--container-runtime-endpoint"] = ccfg.WorkerConfig.ContainerEngineConf.RuntimeEndpoint
 	}
@@ -271,7 +271,7 @@ func SetupKubeletService(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.Host
 		Afters:        []string{"network-online.target"},
 		Command:       "/usr/bin/kubelet",
 		Arguments:     args,
-		ExecStartPre:  []string{"swapoff -a"},
+		ExecStartPre:  []string{"/usr/sbin/swapoff -a"},
 	}
 	serviceConf, err := template.CreateSystemdServiceTemplate("kubelet-systemd", conf)
 	if err != nil {
@@ -366,7 +366,7 @@ Wants=network-online.target
 
 [Service]
 Type=forking
-ExecStartPre=setenforce 0
+ExecStartPre=/usr/sbin/setenforce 0
 ExecStartPre={{ .command }} -c /etc/kubernetes/kube-nginx.conf -t
 ExecStart={{ .command }} -c /etc/kubernetes/kube-nginx.conf
 ExecReload={{ .command }} -c /etc/kubernetes/kube-nginx.conf -s reload

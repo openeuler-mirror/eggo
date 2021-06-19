@@ -183,7 +183,7 @@ func TestPrepareInfrastructure(t *testing.T) {
 	addNodes()
 
 	ccfg := &api.ClusterConfig{
-		PackageSrc: &api.PackageSrcConfig{
+		PackageSrc: api.PackageSrcConfig{
 			Type:   "tar.gz",
 			ArmSrc: "/etc/eggo/arm.tar.gz",
 			X86Src: "/etc/eggo/x86.tar.gz",
