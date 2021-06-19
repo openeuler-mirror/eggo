@@ -27,6 +27,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var (
+	PathWhiteList = []string{
+		"/usr/bin", "/usr/local/bin", "/opt/cni/bin", "/usr/libexec/cni",
+		"/etc/kubernetes",
+		"/usr/lib/systemd/system", "/etc/systemd/system",
+		"/tmp",
+	}
+)
+
 const (
 	prmT = "sudo -E /bin/sh -c \"if [ x != x$(which apt 2>/dev/null) ]; then echo apt ; elif [ x != x$(which yum 2>/dev/null) ]; then echo yum ; fi\""
 	pmT  = "sudo -E /bin/sh -c \"if [ x != x$(which dpkg 2>/dev/null) ]; then echo dpkg ; elif [ x != x$(which rpm 2>/dev/null) ]; then echo rpm ; fi\""
@@ -239,9 +248,9 @@ func installByLocalBinary(r runner.Runner, hcg *api.HostConfig, pcfg *api.Packag
 	}
 
 	var sb strings.Builder
-	sb.WriteString("sudo -E /bin/sh -c \"")
+	sb.WriteString(fmt.Sprintf("sudo -E /bin/sh -c \"cd %s && ", getPkgDistPath(pcfg.DistPath)))
 	for b, d := range binary {
-		sb.WriteString(fmt.Sprintf("cp -r %s/%s %s && ", getPkgDistPath(pcfg.DistPath), b, d))
+		sb.WriteString(fmt.Sprintf("cp -r %s %s && ", b, d))
 	}
 
 	sb.WriteString("echo success\"")
@@ -260,7 +269,7 @@ func removeBinary(r runner.Runner, hcg *api.HostConfig, binary map[string]string
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	for b, d := range binary {
-		sb.WriteString(fmt.Sprintf("rm -f %s/%s && ", d, b))
+		sb.WriteString(fmt.Sprintf("cd %s && rm -r %s && ", d, b))
 	}
 
 	sb.WriteString("echo success\"")
@@ -269,6 +278,16 @@ func removeBinary(r runner.Runner, hcg *api.HostConfig, binary map[string]string
 	}
 
 	return nil
+}
+
+func checkDstPath(path string) bool {
+	for _, p := range PathWhiteList {
+		if strings.HasPrefix(path, p) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func separateDependences(hcg *api.HostConfig) ([]string, []string, map[string]string, error) {
@@ -287,7 +306,11 @@ func separateDependences(hcg *api.HostConfig) ([]string, []string, map[string]st
 			if p.Dst == "" {
 				return nil, nil, nil, fmt.Errorf("no dst for binary %s", p.Name)
 			}
-			binary[p.Name] = p.Dst
+			cleanPath := filepath.Clean(p.Dst)
+			if !checkDstPath(cleanPath) {
+				return nil, nil, nil, fmt.Errorf("invalid path %s out of WhiteList %v", p.Dst, PathWhiteList)
+			}
+			binary[p.Name] = cleanPath
 		default:
 			return nil, nil, nil, fmt.Errorf("invalid type %s for %s", p.Type, p.Name)
 		}

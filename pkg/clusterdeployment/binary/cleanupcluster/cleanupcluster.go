@@ -124,6 +124,7 @@ func cleanupEtcd(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *api.HostC
 		ccfg.GetCertDir(),
 		getEtcdDataDir(ccfg.EtcdCluster.DataDir),
 		"/etc/etcd",
+		"/var/lib/etcd",
 		"/usr/lib/systemd/system/etcd.service",
 	})
 }

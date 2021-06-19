@@ -129,7 +129,7 @@ func check(r runner.Runner, ccfg *api.ClusterConfig) (Runtime, error) {
 
 	_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"ls %s\"", filepath.Join(ccfg.Certificate.SavePath, "ca.crt")))
 	if err != nil {
-		logrus.Errorf("chech ca cert failed: %v\n", err)
+		logrus.Errorf("check ca cert failed: %v\n", err)
 		return nil, err
 	}
 

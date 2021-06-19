@@ -179,7 +179,7 @@ pacakges:                                   // 配置各种类型节点上需要
   etcd:                                     // etcd类型节点需要安装的包或二进制文件列表
   - name: etcd                              // 需要安装的包或二进制文件的名称，如果是安装包则只写名称，不填写具体的版本号，安装时会使用`$name*`来识别
     type: pkg                               // package的类型，pkg/repo/binary三种类型，如果配置为repo请在对应节点上配置好repo源
-    dstpath: ""                             // 目的文件夹路径，binary类型下需要配置，表示将二进制放到节点的哪个目录下
+    dstpath: ""                             // 目的文件夹路径，binary类型下需要配置，表示将二进制放到节点的哪个目录下，为了防止用户误配置路径，此配置必须符合白名单，参见下一小节
   master:                                   // master类型节点需要安装的包或二进制文件列表
   - name: kubernetes-client
     type: pkg
@@ -269,3 +269,10 @@ pacakges:                                   // 配置各种类型节点上需要
     dstpath: ""
 ```
 
+### dstpath 白名单
+```
+"/usr/bin", "/usr/local/bin", "/opt/cni/bin", "/usr/libexec/cni",
+"/etc/kubernetes",
+"/usr/lib/systemd/system", "/etc/systemd/system",
+"/tmp",
+```

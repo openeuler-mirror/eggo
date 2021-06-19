@@ -72,6 +72,6 @@ func setupTemplateCmdOpts(templateCmd *cobra.Command) {
 	flags.StringArrayVarP(&opts.masters, "masters", "", []string{"192.168.0.2"}, "set master ips")
 	flags.StringArrayVarP(&opts.nodes, "nodes", "", []string{"192.168.0.3", "192.168.0.4"}, "set worker ips")
 	flags.StringArrayVarP(&opts.etcds, "etcds", "", nil, "set etcd node ips")
-	flags.StringVarP(&opts.loadbalance, "loadbalancer", "l", "192.168.0.1", "set loadbalancer node")
+	flags.StringVarP(&opts.loadbalance, "loadbalance", "l", "192.168.0.1", "set loadbalance node")
 	flags.StringVarP(&opts.templateConfig, "file", "f", "template.yaml", "location of eggo's template config file, default $(current)/template.yaml")
 }
