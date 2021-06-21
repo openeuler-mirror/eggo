@@ -135,7 +135,7 @@ func getDefaultClusterdeploymentConfig() *api.ClusterConfig {
 			Gateway: "10.32.0.1",
 		},
 		Network: api.NetworkConfig{
-			PodCIDR:    "10.244.64.0/16",
+			PodCIDR:    "10.244.0.0/16",
 			PluginArgs: make(map[string]string),
 		},
 		LocalEndpoint: api.APIEndpoint{
@@ -475,7 +475,7 @@ func createDeployConfigTemplate(file string) error {
 			Gateway: "10.32.0.1",
 		},
 		NetWork: api.NetworkConfig{
-			PodCIDR:    "10.244.64.0/16",
+			PodCIDR:    "10.244.0.0/16",
 			PluginArgs: make(map[string]string),
 		},
 		ApiServerEndpoint: fmt.Sprintf("%s:%d", lb.Ip, lb.BindPort),

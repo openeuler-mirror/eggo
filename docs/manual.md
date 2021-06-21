@@ -145,7 +145,7 @@ service:                                    // k8s创建的service的配置
   dnsaddr: 10.32.0.10                       // k8s创建的service的DNS地址
   gateway: 10.32.0.1                        // k8s创建的service的网关地址
 network:                                    // k8s集群网络配置
-  podcidr: 10.244.64.0/16                   // k8s集群网络的IP地址网段
+  podcidr: 10.244.0.0/16                    // k8s集群网络的IP地址网段
 apiserver-endpoint: 192.168.122.222:6443    // 对外暴露的APISERVER服务的地址或域名，如果配置了loadbalances则填loadbalance地址，否则填写第1个master节点地址
 apiserver-cert-sans:                        // apiserver相关的证书中需要额外配置的ip和域名
   dnsnames: []                              // apiserver相关的证书中需要额外配置的域名列表
@@ -275,4 +275,60 @@ pacakges:                                   // 配置各种类型节点上需要
 "/etc/kubernetes",
 "/usr/lib/systemd/system", "/etc/systemd/system",
 "/tmp",
+```
+
+## 部署相关问题汇总
+
+### calico网络CIDR配置问题
+
+下载[calico官网的配置](https://docs.projectcalico.org/manifests/calico.yaml)，然后直接部署calico网络，会发现pod的网络区间不是我们eggo配置的`podcidr`。而如果通过kubeadm部署集群，然后使用同样的calico配置部署calico网络，会发现pod的网络区间为kubeadm设置的`pod-network-cidr`。
+
+#### 原因
+
+由于`calico/node`容器镜像对kubeadm做了适配，会自动读取kubeadm设置的kubeadm-config的configmaps的值，然后自动更新cidr。
+
+#### 解决方法
+
+eggo的二进制部署方式没办法修改`calico/node`进行配置，因此，建议直接修改`calico.yaml`配置。使能`CALICO_IPV4POOL_CIDR`项，并且设置为k8s集群的`podcidr`相同的值。
+
+`calico.yaml`默认值如下：
+```bash
+containers:
+  # Runs calico-node container on each Kubernetes node. This
+  # container programs network policy and routes on each
+  # host.
+  - name: calico-node
+    image: docker.io/calico/node:v3.19.1
+    envFrom:
+    - configMapRef:
+        # Allow KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT to be overridden for eBPF mode.
+        name: kubernetes-services-endpoint
+        optional: true
+    env:
+      # The default IPv4 pool to create on startup if none exists. Pod IPs will be
+      # chosen from this range. Changing this value after installation will have
+      # no effect. This should fall within `--cluster-cidr`.
+      # - name: CALICO_IPV4POOL_CIDR
+      #   value: "192.168.0.0/16"
+```
+
+按照集群cidr（例如为"10.244.0.0/16"），那么修改`calico.yaml`如下：
+```bash
+containers:
+  # Runs calico-node container on each Kubernetes node. This
+  # container programs network policy and routes on each
+  # host.
+  - name: calico-node
+    image: docker.io/calico/node:v3.19.1
+    envFrom:
+    - configMapRef:
+        # Allow KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT to be overridden for eBPF mode.
+        name: kubernetes-services-endpoint
+        optional: true
+    env:
+      # The default IPv4 pool to create on startup if none exists. Pod IPs will be
+      # chosen from this range. Changing this value after installation will have
+      # no effect. This should fall within `--cluster-cidr`.
+      - name: CALICO_IPV4POOL_CIDR
+         value: "10.244.0.0/16"
 ```
