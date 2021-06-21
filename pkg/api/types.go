@@ -136,6 +136,14 @@ type PackageSrcConfig struct {
 	X86Src   string `json:"x86-srcPath"`
 }
 
+func (p PackageSrcConfig) GetPkgDistPath() string {
+	if p.DistPath == "" {
+		return constants.DefaultPkgUntarPath
+	}
+
+	return p.DistPath
+}
+
 type EtcdClusterConfig struct {
 	Token     string            `json:"token"`
 	Nodes     []*HostConfig     `json:"nodes"`
@@ -187,7 +195,7 @@ type ClusterConfig struct {
 	Network         NetworkConfig           `json:"network,omitempty"`
 	LocalEndpoint   APIEndpoint             `json:"local-endpoint,omitempty"`
 	ControlPlane    ControlPlaneConfig      `json:"controlplane,omitempty"`
-	PackageSrc      *PackageSrcConfig       `json:"packagesource,omitempty"`
+	PackageSrc      PackageSrcConfig        `json:"packagesource,omitempty"`
 	EtcdCluster     EtcdClusterConfig       `json:"etcdcluster,omitempty"`
 	Nodes           []*HostConfig           `json:"nodes,omitempty"`
 	BootStrapTokens []*BootstrapTokenConfig `json:"bootstrap-tokens"`

@@ -29,7 +29,8 @@ import (
 
 var (
 	PathWhiteList = []string{
-		"/usr/bin", "/usr/local/bin", "/opt/cni/bin", "/usr/libexec/cni",
+		"/usr/bin", "/usr/local/bin",
+		"/opt/cni/bin", "/usr/libexec/cni", "/etc/cni/net.d",
 		"/etc/kubernetes",
 		"/usr/lib/systemd/system", "/etc/systemd/system",
 		"/tmp",
@@ -40,13 +41,6 @@ const (
 	prmT = "sudo -E /bin/sh -c \"if [ x != x$(which apt 2>/dev/null) ]; then echo apt ; elif [ x != x$(which yum 2>/dev/null) ]; then echo yum ; fi\""
 	pmT  = "sudo -E /bin/sh -c \"if [ x != x$(which dpkg 2>/dev/null) ]; then echo dpkg ; elif [ x != x$(which rpm 2>/dev/null) ]; then echo rpm ; fi\""
 )
-
-func getPkgDistPath(confPath string) string {
-	if confPath == "" {
-		return constants.DefaultPkgUntarPath
-	}
-	return confPath
-}
 
 type Dependences interface {
 	Check(r runner.Runner, hcg *api.HostConfig) error
@@ -178,7 +172,7 @@ func copySource(r runner.Runner, hcg *api.HostConfig, pcfg *api.PackageSrcConfig
 		return fmt.Errorf("copy from %s to %s for %s failed: %v", src, tempPkgFile, hcg.Address, err)
 	}
 
-	pkgDistDir := getPkgDistPath(pcfg.DistPath)
+	pkgDistDir := pcfg.GetPkgDistPath()
 	switch pcfg.Type {
 	case "tar.gz":
 		_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"cd %s && tar -zxvf *.tar.gz\"", pkgDistDir))
@@ -207,7 +201,7 @@ func installByLocalPkg(r runner.Runner, hcg *api.HostConfig, pcfg *api.PackageSr
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("sudo -E /bin/sh -c \"%s ", pmCommand))
 	for _, p := range pkg {
-		sb.WriteString(fmt.Sprintf("%s/%s* ", getPkgDistPath(pcfg.DistPath), p))
+		sb.WriteString(fmt.Sprintf("%s/%s* ", pcfg.GetPkgDistPath(), p))
 	}
 
 	sb.WriteString("&& echo success\"")
@@ -248,9 +242,9 @@ func installByLocalBinary(r runner.Runner, hcg *api.HostConfig, pcfg *api.Packag
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("sudo -E /bin/sh -c \"cd %s && ", getPkgDistPath(pcfg.DistPath)))
+	sb.WriteString(fmt.Sprintf("sudo -E /bin/sh -c \"cd %s && ", pcfg.GetPkgDistPath()))
 	for b, d := range binary {
-		sb.WriteString(fmt.Sprintf("cp -r %s %s && ", b, d))
+		sb.WriteString(fmt.Sprintf("mkdir -p %s && cp -r %s %s && ", d, b, d))
 	}
 
 	sb.WriteString("echo success\"")
@@ -269,10 +263,10 @@ func removeBinary(r runner.Runner, hcg *api.HostConfig, binary map[string]string
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	for b, d := range binary {
-		sb.WriteString(fmt.Sprintf("cd %s && rm -r %s && ", d, b))
+		sb.WriteString(fmt.Sprintf("cd %s && rm -r %s ; ", d, b))
 	}
+	sb.WriteString("\"")
 
-	sb.WriteString("echo success\"")
 	if _, err := r.RunCommand(sb.String()); err != nil {
 		return fmt.Errorf("remove binary failed: %v", err)
 	}
@@ -333,7 +327,7 @@ func doInstallDependences(r runner.Runner, hcg *api.HostConfig, dp Dependences) 
 	return nil
 }
 
-func InstallDependences(r runner.Runner, hcg *api.HostConfig, pcfg *api.PackageSrcConfig) error {
+func InstallDependences(r runner.Runner, hcg *api.HostConfig, pcfg api.PackageSrcConfig) error {
 	repo, pkg, binary, err := separateDependences(hcg)
 	if err != nil {
 		return err
@@ -347,7 +341,7 @@ func InstallDependences(r runner.Runner, hcg *api.HostConfig, pcfg *api.PackageS
 	}
 
 	if len(pkg) != 0 || len(binary) != 0 {
-		il := NewInstallByLocal(pcfg, pkg, binary)
+		il := NewInstallByLocal(&pcfg, pkg, binary)
 		if err := doInstallDependences(r, hcg, il); err != nil {
 			return err
 		}

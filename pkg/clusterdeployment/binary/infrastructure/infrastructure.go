@@ -17,13 +17,11 @@ package infrastructure
 
 import (
 	"fmt"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"gitee.com/openeuler/eggo/pkg/api"
-	"gitee.com/openeuler/eggo/pkg/constants"
 	"gitee.com/openeuler/eggo/pkg/utils"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
@@ -49,48 +47,6 @@ func (it *InfrastructureTask) Name() string {
 	return "InfrastructureTask"
 }
 
-func loadImages(r runner.Runner, conf *api.PackageSrcConfig, runtime string) error {
-	if conf == nil {
-		return fmt.Errorf("can not found dist path failed")
-	}
-
-	imagePkgPath := filepath.Join(getPkgDistPath(conf.DistPath), constants.DefaultImagePkgName)
-
-	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"stat %s\"", imagePkgPath)); err != nil {
-		logrus.Debugf("no image package found on path %v", imagePkgPath)
-		return nil
-	}
-
-	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"%s load -i %s\"", runtime, imagePkgPath)); err != nil {
-		return fmt.Errorf("isula load -i %v failed: %v", imagePkgPath, err)
-	}
-
-	return nil
-}
-
-func getRuntimeClient(containerConf *api.ContainerEngine) string {
-	if containerConf == nil {
-		return "docker"
-	}
-
-	runtimeClients := map[string]string{
-		"isula":   "isula",
-		"isulad":  "isula",
-		"iSula":   "isula",
-		"iSulad":  "isula",
-		"docker":  "docker",
-		"dockerd": "docker",
-		"Dockerd": "docker",
-		"Docker":  "docker",
-	}
-
-	if v, ok := runtimeClients[containerConf.Runtime]; ok {
-		return v
-	}
-
-	return "docker"
-}
-
 func (it *InfrastructureTask) Run(r runner.Runner, hcg *api.HostConfig) (err error) {
 	if hcg == nil {
 		return fmt.Errorf("empty host config")
@@ -102,11 +58,6 @@ func (it *InfrastructureTask) Run(r runner.Runner, hcg *api.HostConfig) (err err
 		return
 	}
 
-	defer func() {
-		if _, e := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"rm -rf %s\"", getPkgDistPath(it.ccfg.PackageSrc.DistPath))); e != nil {
-			err = fmt.Errorf("%v. And remove dir failed: %v", err, e)
-		}
-	}()
 	if err = InstallDependences(r, hcg, it.ccfg.PackageSrc); err != nil {
 		logrus.Errorf("install dependences failed: %v", err)
 		return err
@@ -120,13 +71,6 @@ func (it *InfrastructureTask) Run(r runner.Runner, hcg *api.HostConfig) (err err
 	if err = addFirewallPort(r, hcg); err != nil {
 		logrus.Errorf("add firewall port failed: %v", err)
 		return err
-	}
-
-	if utils.IsType(hcg.Type, api.Worker) {
-		if err = loadImages(r, it.ccfg.PackageSrc, getRuntimeClient(it.ccfg.WorkerConfig.ContainerEngineConf)); err != nil {
-			logrus.Errorf("load images failed: %v", err)
-			return err
-		}
 	}
 
 	return nil
@@ -160,11 +104,6 @@ func setHostname(r runner.Runner, hcg *api.HostConfig) error {
 
 func addFirewallPort(r runner.Runner, hcg *api.HostConfig) error {
 	ports := []string{}
-
-	if _, err := r.RunCommand(utils.AddSudo("systemctl status firewalld | grep running")); err != nil {
-		logrus.Warnf("firewall is disable: %v, just ignore", err)
-		return nil
-	}
 
 	if hcg.Type&api.Master != 0 {
 		ports = append(ports, MasterPorts...)
@@ -209,6 +148,11 @@ func removeDupPorts(ports []string) []string {
 }
 
 func ExposePorts(r runner.Runner, ports ...string) error {
+	if _, err := r.RunCommand(utils.AddSudo("systemctl status firewalld | grep running")); err != nil {
+		logrus.Warnf("firewall is disable: %v, just ignore", err)
+		return nil
+	}
+
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"")
 
@@ -226,12 +170,17 @@ func ExposePorts(r runner.Runner, ports ...string) error {
 }
 
 func ShieldPorts(r runner.Runner, ports ...string) {
+	if _, err := r.RunCommand(utils.AddSudo("systemctl status firewalld | grep running")); err != nil {
+		logrus.Warnf("firewall is disable: %v, just ignore", err)
+		return
+	}
+
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"")
 
 	rPorts := removeDupPorts(ports)
 	for _, p := range rPorts {
-		sb.WriteString(fmt.Sprintf("firewall-cmd --zone=public --remove-port=%s && ", p))
+		sb.WriteString(fmt.Sprintf("firewall-cmd --zone=public --remove-port=%s ; ", p))
 	}
 
 	sb.WriteString("firewall-cmd --runtime-to-permanent \"")

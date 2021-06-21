@@ -157,7 +157,7 @@ func getDefaultClusterdeploymentConfig() *api.ClusterConfig {
 			},
 			ContainerEngineConf: &api.ContainerEngine{},
 		},
-		PackageSrc: &api.PackageSrcConfig{
+		PackageSrc: api.PackageSrcConfig{
 			Type:   "tar.gz",
 			ArmSrc: "./pacakges-arm.tar.gz",
 			X86Src: "./packages-x86.tar.gz",

@@ -95,6 +95,9 @@ func TestCleanupCluster(t *testing.T) {
 		ConfigDir:   "/tmp/test",
 		Certificate: api.CertificateConfig{SavePath: "/tmp/test/pki"},
 		Nodes:       nodes,
+		WorkerConfig: api.WorkerConfig{
+			ContainerEngineConf: &api.ContainerEngine{},
+		},
 	}
 
 	task := &cleanupClusterTask{ccfg: conf}
