@@ -20,4 +20,7 @@ const (
 	// user home dir formats
 	UserHomeFormat               = "/home/%s"
 	DefaultUserCopyTempDirFormat = "/home/%s/.eggo/temp"
+
+	// network plugin arguments key
+	NetworkPluginArgKeyYamlPath = "NetworkYamlPath"
 )
