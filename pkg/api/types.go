@@ -251,6 +251,7 @@ type ClusterDeploymentAPI interface {
 	UpgradeCluster() error
 	CleanupCluster() error
 	ClusterStatus() (*ClusterStatus, error)
+	PrepareNetwork() error
 	ApplyAddons() error
 	Finish()
 }

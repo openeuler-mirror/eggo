@@ -146,6 +146,8 @@ service:                                    // k8s创建的service的配置
   gateway: 10.32.0.1                        // k8s创建的service的网关地址
 network:                                    // k8s集群网络配置
   podcidr: 10.244.0.0/16                    // k8s集群网络的IP地址网段
+  plugin: calico                            // k8s集群部署的网络插件
+  plugin-args: {"NetworkYamlPath": "/etc/kubernetes/addons/calico.yaml"}   // k8s集群网络的网络插件的配置
 apiserver-endpoint: 192.168.122.222:6443    // 对外暴露的APISERVER服务的地址或域名，如果配置了loadbalances则填loadbalance地址，否则填写第1个master节点地址
 apiserver-cert-sans:                        // apiserver相关的证书中需要额外配置的ip和域名
   dnsnames: []                              // apiserver相关的证书中需要额外配置的域名列表
@@ -164,7 +166,7 @@ insecure-registries: []                     // 下载容器镜像时运行使用
 config-extra-args: []                       // 各个组件(kube-apiserver/etcd等)服务启动配置的额外参数
 addons:                                     // 配置第三方插件
 - type: file                                // 插件类型，目前只支持file类型
-  filename: calico.yaml                     // 插件名称，注意需要将对应插件放到tar.gz包中的addons目录下
+  filename: xxx.yaml                        // 插件名称，注意需要将对应插件放到tar.gz包中的addons目录下
 open-ports:                                 // 配置需要额外打开的端口，k8s自身所需端口不需要进行配置，额外的插件的端口需要进行额外配置
   node:                                     // 指定在那种类型的节点上打开端口，可以是master/node/etcd/loadbalance
   - port: 111                               // 端口地址

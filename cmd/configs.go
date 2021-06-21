@@ -457,7 +457,6 @@ func createDeployConfigTemplate(file string) error {
 	if etcds == nil {
 		etcds = masters
 	}
-
 	conf := &deployConfig{
 		ClusterID:      opts.name,
 		Username:       opts.username,
@@ -476,6 +475,7 @@ func createDeployConfigTemplate(file string) error {
 		},
 		NetWork: api.NetworkConfig{
 			PodCIDR:    "10.244.0.0/16",
+			Plugin:     "calico",
 			PluginArgs: make(map[string]string),
 		},
 		ApiServerEndpoint: fmt.Sprintf("%s:%d", lb.Ip, lb.BindPort),
@@ -490,12 +490,6 @@ func createDeployConfigTemplate(file string) error {
 		CniBinDir:         "/usr/libexec/cni,/opt/cni/bin",
 		Runtime:           "iSulad",
 		RuntimeEndpoint:   "unix:///var/run/isulad.sock",
-		Addons: []*api.AddonConfig{
-			{
-				Type:     "file",
-				Filename: "calico.yaml",
-			},
-		},
 		OpenPorts: map[string][]*api.OpenPorts{
 			"node": {
 				&api.OpenPorts{

@@ -54,6 +54,9 @@ func CreateCluster(cc *api.ClusterConfig) error {
 	if err := handler.JoinBootstrap(); err != nil {
 		return err
 	}
+	if err := handler.PrepareNetwork(); err != nil {
+		return err
+	}
 	if err := handler.ApplyAddons(); err != nil {
 		return err
 	}

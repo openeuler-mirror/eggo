@@ -26,7 +26,9 @@ import (
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/etcdcluster"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/loadbalance"
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/network"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/manager"
+	"gitee.com/openeuler/eggo/pkg/utils/kubectl"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 
@@ -169,15 +171,74 @@ func (bcp *BinaryClusterDeployment) CleanupCluster() error {
 	return err
 }
 
-func (bcp *BinaryClusterDeployment) ApplyAddons() error {
+func (bcp *BinaryClusterDeployment) taintAndLabelMasterNodes() error {
+	taints := []kubectl.Taint{
+		{
+			Key:    "node-role.kubernetes.io/master",
+			Value:  "",
+			Effect: "NoSchedule",
+		},
+	}
+	labels := make(map[string]string)
+	labels["node-role.kubernetes.io/master"] = ""
+	labels["node-role.kubernetes.io/control-plane"] = ""
+	for _, node := range bcp.config.Nodes {
+		if (node.Type&api.Master != 0) && (node.Type&api.Worker != 0) {
+			// taint master node
+			r, ok := bcp.connections[node.Address]
+			if !ok {
+				logrus.Warnf("cannot find node: %s connection", node.Name)
+				continue
+			}
+			err := kubectl.WaitNodeJoined(r, node.Name, bcp.config)
+			if err != nil {
+				logrus.Warnf("wait node: %s joined failed: %v", node.Name, err)
+				continue
+			}
+			err = kubectl.AddNodeTaints(bcp.config, r, node.Name, taints)
+			if err != nil {
+				return err
+			}
+			err = kubectl.AddNodeLabels(bcp.config, r, node.Name, labels)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (bcp *BinaryClusterDeployment) PrepareNetwork() error {
 	// Setup coredns at here, like need addons
-	err := commontools.SetUpCoredns(bcp.config)
-	if err != nil {
+	if err := commontools.SetUpCoredns(bcp.config); err != nil {
 		logrus.Errorf("setup coredns failed: %v", err)
 		return err
 	}
 
-	return addons.SetupAddons(bcp.config)
+	// setup network
+	if err := network.SetupNetwork(bcp.config); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (bcp *BinaryClusterDeployment) ApplyAddons() error {
+	// taint and label master node before apply addons
+	err := bcp.taintAndLabelMasterNodes()
+	if err != nil {
+		logrus.Errorf("taint master node failed: %v", err)
+		return err
+	}
+
+	err = addons.SetupAddons(bcp.config)
+	if err != nil {
+		logrus.Errorf("setup addons failed: %v", err)
+		return err
+	}
+
+	return nil
 }
 
 func (bcp *BinaryClusterDeployment) ClusterStatus() (*api.ClusterStatus, error) {
