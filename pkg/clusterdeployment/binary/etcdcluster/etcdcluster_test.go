@@ -38,12 +38,6 @@ func TestDeployEtcd(t *testing.T) {
 	api.EggoHomePath = certsTempDir
 	certsTempDir = api.GetCertificateStorePath("test-cluster")
 
-	configsTempDir, err := ioutil.TempDir("", "etcd-test-src-configs-")
-	if err != nil {
-		t.Fatalf("create tempdir for etcd config failed: %v", err)
-	}
-	defer os.RemoveAll(configsTempDir)
-
 	dstTempDir, err := ioutil.TempDir("", "etcd-test-dst-")
 	if err != nil {
 		t.Fatalf("create tempdir for dst etcd configs and certs failed: %v", err)
@@ -74,20 +68,24 @@ func TestDeployEtcd(t *testing.T) {
 		Nodes: nodes,
 	}
 
-	if err = prepareEtcdConfigs(conf, configsTempDir); err != nil {
+	r := &runner.LocalRunner{}
+	if err = prepareEtcdConfigs(conf, r, &api.HostConfig{
+		Arch:    "aarch64",
+		Name:    "node0",
+		Address: "192.168.0.1",
+	}, filepath.Join(dstTempDir, "etcd.conf"), filepath.Join(dstTempDir, "etcd.service")); err != nil {
 		t.Fatalf("prepare etcd configs failed: %v", err)
 	}
-	r := &runner.LocalRunner{}
 
 	if err = generateCaAndApiserverEtcdCerts(r, conf); err != nil {
 		t.Fatalf("generate ca and apiserver etcd certs failed: %v", err)
 	}
 
-	if err = copyCaAndConfigs(conf, r, &api.HostConfig{
+	if err = copyCa(conf, r, &api.HostConfig{
 		Arch:    "aarch64",
 		Name:    "node0",
 		Address: "192.168.0.1",
-	}, configsTempDir, filepath.Join(dstTempDir, "etcd.conf"), filepath.Join(dstTempDir, "etcd.service")); err != nil {
+	}); err != nil {
 		t.Fatalf("copy etcd certs and configs failed: %v", err)
 	}
 

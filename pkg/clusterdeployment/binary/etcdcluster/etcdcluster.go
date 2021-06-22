@@ -16,9 +16,8 @@
 package etcdcluster
 
 import (
+	"encoding/base64"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -35,10 +34,6 @@ const (
 	EtcdConfFile       = "/etc/etcd/etcd.conf"
 	EtcdServiceFile    = "/usr/lib/systemd/system/etcd.service"
 	DefaultEtcdDataDir = "/var/lib/etcd/default.etcd"
-)
-
-var (
-	tempDir = ""
 )
 
 type copyInfo struct {
@@ -58,21 +53,12 @@ func getDstEtcdCertsDir(ccfg *api.ClusterConfig) string {
 	return filepath.Join(ccfg.GetCertDir(), "etcd")
 }
 
-func copyCaAndConfigs(ccfg *api.ClusterConfig, r runner.Runner,
-	hostConfig *api.HostConfig, tempConfigsDir string, dstConf string,
-	dstService string) error {
+func copyCa(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *api.HostConfig) error {
 	var copyInfos []*copyInfo
 
 	if hostConfig == nil {
 		return fmt.Errorf("empty host config")
 	}
-
-	// etcd configs
-	envFile := filepath.Join(tempConfigsDir, hostConfig.Name+".conf")
-	copyInfos = append(copyInfos, &copyInfo{src: envFile, dst: dstConf})
-
-	serviceFile := filepath.Join(tempConfigsDir, "etcd.service")
-	copyInfos = append(copyInfos, &copyInfo{src: serviceFile, dst: dstService})
 
 	// certs
 	certsDir := api.GetCertificateStorePath(ccfg.Name)
@@ -84,8 +70,7 @@ func copyCaAndConfigs(ccfg *api.ClusterConfig, r runner.Runner,
 	caKey := filepath.Join(etcdDir, "ca.key")
 	copyInfos = append(copyInfos, &copyInfo{src: caKey, dst: filepath.Join(dstCertsDir, "ca.key")})
 
-	createDirsCmd := "mkdir -p -m 0700 " + filepath.Dir(dstConf) +
-		" && mkdir -p -m 0700 " + dstCertsDir
+	createDirsCmd := "mkdir -p -m 0700 " + dstCertsDir
 	if output, err := r.RunCommand(utils.AddSudo(createDirsCmd)); err != nil {
 		return fmt.Errorf("run command on %v to create dirs failed: %v\noutput: %v",
 			hostConfig.Address, err, output)
@@ -106,7 +91,12 @@ func (t *EtcdDeployEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfig) e
 		return fmt.Errorf("empty host config")
 	}
 
-	if err := copyCaAndConfigs(t.ccfg, r, hostConfig, tempDir, EtcdConfFile, EtcdServiceFile); err != nil {
+	// prepare config
+	if err := prepareEtcdConfigs(t.ccfg, r, hostConfig, EtcdConfFile, EtcdServiceFile); err != nil {
+		return err
+	}
+
+	if err := copyCa(t.ccfg, r, hostConfig); err != nil {
 		return err
 	}
 
@@ -162,7 +152,8 @@ func (t *EtcdPostDeployEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfi
 	return nil
 }
 
-func prepareEtcdConfigs(ccfg *api.ClusterConfig, tempConfigsDir string) error {
+func prepareEtcdConfigs(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *api.HostConfig,
+	confPath string, servicePath string) error {
 	var peerAddresses string
 	dataDir := ccfg.EtcdCluster.DataDir
 	if dataDir == "" {
@@ -181,27 +172,30 @@ func prepareEtcdConfigs(ccfg *api.ClusterConfig, tempConfigsDir string) error {
 		peerAddresses += node.Name + "=https://" + node.Address + ":2380"
 	}
 
-	for _, node := range nodes {
-		conf := &etcdEnvConfig{
-			Arch:          node.Arch,
-			Ip:            node.Address,
-			Token:         ccfg.EtcdCluster.Token,
-			Hostname:      node.Name,
-			State:         "new",
-			PeerAddresses: peerAddresses,
-			DataDir:       dataDir,
-			CertsDir:      ccfg.GetCertDir(),
-			ExtraArgs:     ccfg.EtcdCluster.ExtraArgs,
-		}
-		envFile := filepath.Join(tempConfigsDir, node.Name+".conf")
-		if err := ioutil.WriteFile(envFile, []byte(createEtcdEnv(conf)), 0700); err != nil {
-			return fmt.Errorf("write etcd env file to %s failed: %v", envFile, err)
-		}
+	conf := &etcdEnvConfig{
+		Arch:          hostConfig.Arch,
+		Ip:            hostConfig.Address,
+		Token:         ccfg.EtcdCluster.Token,
+		Hostname:      hostConfig.Name,
+		State:         "new",
+		PeerAddresses: peerAddresses,
+		DataDir:       dataDir,
+		CertsDir:      ccfg.GetCertDir(),
+		ExtraArgs:     ccfg.EtcdCluster.ExtraArgs,
 	}
 
-	serviceFile := filepath.Join(tempConfigsDir, "etcd.service")
-	if err := ioutil.WriteFile(serviceFile, []byte(createEtcdService()), 0700); err != nil {
-		return fmt.Errorf("write etcd service file to %s failed: %v", serviceFile, err)
+	base64Str := base64.StdEncoding.EncodeToString([]byte(createEtcdEnv(conf)))
+	cmd := fmt.Sprintf("echo %v | base64 -d > %v", base64Str, confPath)
+	if output, err := r.RunCommand(utils.AddSudo(cmd)); err != nil {
+		return fmt.Errorf("run command on %v to create etcd config file failed: %v\noutput: %v",
+			hostConfig.Address, err, output)
+	}
+
+	base64Str = base64.StdEncoding.EncodeToString([]byte(createEtcdService()))
+	cmd = fmt.Sprintf("echo %v | base64 -d > %v", base64Str, servicePath)
+	if output, err := r.RunCommand(utils.AddSudo(cmd)); err != nil {
+		return fmt.Errorf("run command on %v to create etcd service file failed: %v\noutput: %v",
+			hostConfig.Address, err, output)
 	}
 
 	return nil
@@ -218,18 +212,6 @@ func getAllIps(nodes []*api.HostConfig) []string {
 }
 
 func Init(conf *api.ClusterConfig) error {
-	var err error
-	tempDir, err = ioutil.TempDir("", "etcd-conf-")
-	if err != nil {
-		return fmt.Errorf("create tempdir for etcd config failed: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	// prepare config
-	if err := prepareEtcdConfigs(conf, tempDir); err != nil {
-		return err
-	}
-
 	// generate ca certificates and kube-apiserver-etcd-client certificates
 	if err := generateCaAndApiserverEtcdCerts(&runner.LocalRunner{}, conf); err != nil {
 		return err
