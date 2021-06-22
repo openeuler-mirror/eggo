@@ -379,6 +379,9 @@ func toClusterdeploymentConfig(conf *deployConfig) *api.ClusterConfig {
 	setIfStrConfigNotEmpty(&ccfg.ServiceCluster.CIDR, conf.Service.CIDR)
 	setIfStrConfigNotEmpty(&ccfg.ServiceCluster.DNSAddr, conf.Service.DNSAddr)
 	setIfStrConfigNotEmpty(&ccfg.ServiceCluster.Gateway, conf.Service.Gateway)
+	setIfStrConfigNotEmpty(&ccfg.ServiceCluster.DNS.CorednsType, conf.Service.DNS.CorednsType)
+	setIfStrConfigNotEmpty(&ccfg.ServiceCluster.DNS.ImageVersion, conf.Service.DNS.ImageVersion)
+	ccfg.ServiceCluster.DNS.Replicas = conf.Service.DNS.Replicas
 	setIfStrConfigNotEmpty(&ccfg.Network.PodCIDR, conf.NetWork.PodCIDR)
 	setIfStrConfigNotEmpty(&ccfg.Network.Plugin, conf.NetWork.Plugin)
 	setStrStrMap(ccfg.Network.PluginArgs, conf.NetWork.PluginArgs)
@@ -472,6 +475,9 @@ func createDeployConfigTemplate(file string) error {
 			CIDR:    "10.32.0.0/16",
 			DNSAddr: "10.32.0.10",
 			Gateway: "10.32.0.1",
+			DNS: api.DnsConfig{
+				CorednsType: "binary",
+			},
 		},
 		NetWork: api.NetworkConfig{
 			PodCIDR:    "10.244.0.0/16",

@@ -17,6 +17,7 @@ package kubectl
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/constants"
@@ -60,7 +61,12 @@ exit 0
 		return err
 	}
 
-	_, err = r.RunShell(cmdStr, filepath.Base(yamlFile))
+	splits := strings.Split(filepath.Base(yamlFile), ".")
+	name := "defaultshell"
+	if len(splits) > 0 {
+		name = splits[0]
+	}
+	_, err = r.RunShell(cmdStr, name)
 	if err != nil {
 		return err
 	}

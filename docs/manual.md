@@ -144,6 +144,10 @@ service:                                    // k8s创建的service的配置
   cidr: 10.32.0.0/16                        // k8s创建的service的IP地址网段
   dnsaddr: 10.32.0.10                       // k8s创建的service的DNS地址
   gateway: 10.32.0.1                        // k8s创建的service的网关地址
+  dns:                                      // k8s创建的coredns的配置
+    corednstype: pod                        // k8s创建的coredns的部署类型，支持pod和binary
+    imageversion: 1.8.4                     // pod部署类型的coredns镜像版本
+    replicas: 2                             // pod部署类型的coredns副本数量
 network:                                    // k8s集群网络配置
   podcidr: 10.244.0.0/16                    // k8s集群网络的IP地址网段
   plugin: calico                            // k8s集群部署的网络插件

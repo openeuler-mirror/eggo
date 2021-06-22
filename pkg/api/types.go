@@ -123,10 +123,17 @@ type CertificateConfig struct {
 	ExternalCAPath string `json:"external-ca-path"`
 }
 
+type DnsConfig struct {
+	CorednsType  string `json:"coredns-type"`
+	ImageVersion string `json:"image-version"`
+	Replicas     int    `json:"replicas"`
+}
+
 type ServiceClusterConfig struct {
-	CIDR    string `json:"cidr"`
-	DNSAddr string `json:"dns-address"`
-	Gateway string `json:"gateway"`
+	CIDR    string    `json:"cidr"`
+	DNSAddr string    `json:"dns-address"`
+	Gateway string    `json:"gateway"`
+	DNS     DnsConfig `json:"dns"`
 }
 
 type PackageSrcConfig struct {
@@ -237,7 +244,7 @@ func (c ClusterConfig) GetManifestDir() string {
 			logrus.Debugf("ignore invalid config dir: %s, just use default", c.ConfigDir)
 			return constants.DefaultK8SManifestsDir
 		}
-		return filepath.Clean(c.ConfigDir)
+		return filepath.Join(filepath.Clean(c.ConfigDir), "manifests")
 	}
 	return constants.DefaultK8SManifestsDir
 }
