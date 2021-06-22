@@ -18,6 +18,7 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -138,10 +139,6 @@ func getDefaultClusterdeploymentConfig() *api.ClusterConfig {
 			PodCIDR:    "10.244.0.0/16",
 			PluginArgs: make(map[string]string),
 		},
-		LocalEndpoint: api.APIEndpoint{
-			AdvertiseAddress: "127.0.0.1",
-			BindPort:         6443,
-		},
 		ControlPlane: api.ControlPlaneConfig{
 			ApiConf: &api.ApiServer{
 				Timeout: "120s",
@@ -155,7 +152,10 @@ func getDefaultClusterdeploymentConfig() *api.ClusterConfig {
 				NetworkPlugin: "cni",
 				CniBinDir:     "/usr/libexec/cni",
 			},
-			ContainerEngineConf: &api.ContainerEngine{},
+			ContainerEngineConf: &api.ContainerEngine{
+				RegistryMirrors:    []string{},
+				InsecureRegistries: []string{},
+			},
 		},
 		PackageSrc: api.PackageSrcConfig{
 			Type:   "tar.gz",
@@ -352,21 +352,53 @@ func notInStrArray(arr []string, val string) bool {
 	return true
 }
 
-func setStrArray(config []string, userConfig []string) {
+func setStrArray(config *[]string, userConfig []string) {
 	for _, v := range userConfig {
-		if notInStrArray(config, v) {
-			config = append(config, v)
+		if notInStrArray(*config, v) {
+			*config = append(*config, v)
 		}
 	}
 }
 
-func fillLoadBalance(ccfg *api.ClusterConfig, lb LoadBalance) {
+func fillLoadBalance(LoadBalancer *api.LoadBalancer, lb LoadBalance) {
 	if lb.Ip == "" || lb.BindPort <= 0 {
 		return
 	}
 
-	setIfStrConfigNotEmpty(&ccfg.LoadBalancer.IP, lb.Ip)
-	setIfStrConfigNotEmpty(&ccfg.LoadBalancer.Port, strconv.Itoa(lb.BindPort))
+	setIfStrConfigNotEmpty(&LoadBalancer.IP, lb.Ip)
+	setIfStrConfigNotEmpty(&LoadBalancer.Port, strconv.Itoa(lb.BindPort))
+}
+
+func fillAPIEndPoint(APIEndpoint *api.APIEndpoint, conf *deployConfig) {
+	host, port := "", ""
+	if conf.ApiServerEndpoint != "" {
+		var err error
+		host, port, err = net.SplitHostPort(conf.ApiServerEndpoint)
+		if err != nil {
+			logrus.Errorf("invalid api endpoint %s: %v", conf.ApiServerEndpoint, err)
+		}
+	}
+
+	if host == "" || port == "" {
+		host, port = conf.LoadBalance.Ip, strconv.Itoa(conf.LoadBalance.Port)
+	}
+	if (host == "" || port == "") && len(conf.Masters) != 0 {
+		host = conf.Masters[0].Ip
+		port = "6443"
+	}
+
+	if host == "" || port == "" {
+		return
+	}
+
+	iport, err := strconv.ParseInt(port, 10, 32)
+	if err != nil {
+		logrus.Errorf("invalid port %s: %v", port, err)
+		return
+	}
+
+	APIEndpoint.AdvertiseAddress = host
+	APIEndpoint.BindPort = int32(iport)
 }
 
 func toClusterdeploymentConfig(conf *deployConfig) *api.ClusterConfig {
@@ -382,9 +414,8 @@ func toClusterdeploymentConfig(conf *deployConfig) *api.ClusterConfig {
 	setIfStrConfigNotEmpty(&ccfg.Network.PodCIDR, conf.NetWork.PodCIDR)
 	setIfStrConfigNotEmpty(&ccfg.Network.Plugin, conf.NetWork.Plugin)
 	setStrStrMap(ccfg.Network.PluginArgs, conf.NetWork.PluginArgs)
-	setIfStrConfigNotEmpty(&ccfg.ControlPlane.Endpoint, conf.ApiServerEndpoint)
-	setStrArray(ccfg.ControlPlane.ApiConf.CertSans.DNSNames, conf.ApiServerCertSans.DNSNames)
-	setStrArray(ccfg.ControlPlane.ApiConf.CertSans.IPs, conf.ApiServerCertSans.IPs)
+	setStrArray(&ccfg.ControlPlane.ApiConf.CertSans.DNSNames, conf.ApiServerCertSans.DNSNames)
+	setStrArray(&ccfg.ControlPlane.ApiConf.CertSans.IPs, conf.ApiServerCertSans.IPs)
 	setIfStrConfigNotEmpty(&ccfg.ControlPlane.ApiConf.Timeout, conf.ApiServerTimeout)
 	ccfg.EtcdCluster.External = conf.EtcdExternal
 	for _, node := range ccfg.Nodes {
@@ -403,9 +434,10 @@ func toClusterdeploymentConfig(conf *deployConfig) *api.ClusterConfig {
 	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.KubeletConf.CniBinDir, conf.CniBinDir)
 	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.ContainerEngineConf.Runtime, conf.Runtime)
 	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.ContainerEngineConf.RuntimeEndpoint, conf.RuntimeEndpoint)
-	setStrArray(ccfg.WorkerConfig.ContainerEngineConf.RegistryMirrors, conf.RegistryMirrors)
-	setStrArray(ccfg.WorkerConfig.ContainerEngineConf.InsecureRegistries, conf.InsecureRegistries)
-	fillLoadBalance(ccfg, conf.LoadBalance)
+	setStrArray(&ccfg.WorkerConfig.ContainerEngineConf.RegistryMirrors, conf.RegistryMirrors)
+	setStrArray(&ccfg.WorkerConfig.ContainerEngineConf.InsecureRegistries, conf.InsecureRegistries)
+	fillLoadBalance(&ccfg.LoadBalancer, conf.LoadBalance)
+	fillAPIEndPoint(&ccfg.APIEndpoint, conf)
 
 	ccfg.Addons = append(ccfg.Addons, conf.Addons...)
 

@@ -54,10 +54,8 @@ func (ir *isuladRuntime) PrepareRuntimeJson(r runner.Runner, ccfg *api.ClusterCo
 	if ccfg.WorkerConfig.KubeletConf.CniBinDir != "" {
 		cniBinDir = ccfg.WorkerConfig.KubeletConf.CniBinDir
 	}
-	if len(ccfg.WorkerConfig.ContainerEngineConf.RegistryMirrors) != 0 {
+	if len(ccfg.WorkerConfig.ContainerEngineConf.RegistryMirrors) != 0 || len(ccfg.WorkerConfig.ContainerEngineConf.InsecureRegistries) != 0 {
 		registry = ccfg.WorkerConfig.ContainerEngineConf.RegistryMirrors
-	}
-	if len(ccfg.WorkerConfig.ContainerEngineConf.InsecureRegistries) != 0 {
 		insecure = ccfg.WorkerConfig.ContainerEngineConf.InsecureRegistries
 	}
 
@@ -181,8 +179,7 @@ func (ct *DeployRuntimeTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 	}
 
 	// check container engine softwares
-	err := ct.check(r)
-	if err != nil {
+	if err := ct.check(r); err != nil {
 		logrus.Errorf("check failed: %v", err)
 		return err
 	}
@@ -193,8 +190,7 @@ func (ct *DeployRuntimeTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 	}
 
 	// start service
-	_, err = r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"systemctl restart %s\"", ct.runtime.GetRuntimeService()))
-	if err != nil {
+	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"systemctl restart %s\"", ct.runtime.GetRuntimeService())); err != nil {
 		logrus.Errorf("start %s failed: %v", ct.runtime.GetRuntimeService(), err)
 		return err
 	}

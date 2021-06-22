@@ -133,20 +133,6 @@ func addFirewallPort(r runner.Runner, hcg *api.HostConfig) error {
 	return nil
 }
 
-func removeDupPorts(ports []string) []string {
-	portMap := map[string]bool{}
-	result := []string{}
-
-	for _, p := range ports {
-		if _, ok := portMap[p]; !ok {
-			portMap[p] = true
-			result = append(result, p)
-		}
-	}
-
-	return result
-}
-
 func ExposePorts(r runner.Runner, ports ...string) error {
 	if _, err := r.RunCommand(utils.AddSudo("systemctl status firewalld | grep running")); err != nil {
 		logrus.Warnf("firewall is disable: %v, just ignore", err)
@@ -156,7 +142,7 @@ func ExposePorts(r runner.Runner, ports ...string) error {
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"")
 
-	rPorts := removeDupPorts(ports)
+	rPorts := utils.RemoveDupString(ports)
 	for _, p := range rPorts {
 		sb.WriteString(fmt.Sprintf("firewall-cmd --zone=public --add-port=%s && ", p))
 	}
@@ -178,7 +164,7 @@ func ShieldPorts(r runner.Runner, ports ...string) {
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"")
 
-	rPorts := removeDupPorts(ports)
+	rPorts := utils.RemoveDupString(ports)
 	for _, p := range rPorts {
 		sb.WriteString(fmt.Sprintf("firewall-cmd --zone=public --remove-port=%s ; ", p))
 	}

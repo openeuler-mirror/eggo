@@ -68,19 +68,21 @@ func FormatURL(host, port string) *url.URL {
 	}
 }
 
-func GetAPIServerEndpoint(apiEndpoint string, localEndpoint api.APIEndpoint) (string, error) {
-	host, sport, err := net.SplitHostPort(apiEndpoint)
-	if err != nil {
-		logrus.Warnf("parse api endpoint failed: %v, use local endpoint", err)
-		host = localEndpoint.AdvertiseAddress
-		sport = fmt.Sprintf("%d", DefaultEndpointPort)
-		if ValidPort(int(localEndpoint.BindPort)) {
-			sport = strconv.Itoa(int(localEndpoint.BindPort))
-		}
+func GetAPIServerEndpoint(ccfg *api.ClusterConfig) (string, error) {
+	host := ccfg.APIEndpoint.AdvertiseAddress
+	sport := strconv.Itoa(int(ccfg.APIEndpoint.BindPort))
+
+	if host == "" {
+		return "", fmt.Errorf("invalid host")
 	}
+	if sport == "" {
+		sport = strconv.Itoa(DefaultEndpointPort)
+	}
+
 	port, err := ParsePort(sport)
 	if err != nil {
 		return "", err
 	}
+
 	return GetEndpoint(host, port)
 }

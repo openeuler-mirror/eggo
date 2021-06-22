@@ -111,7 +111,6 @@ type APIEndpoint struct {
 	BindPort         int32  `json:"bind-port,omitempty"`
 }
 type ControlPlaneConfig struct {
-	Endpoint      string          `json:"endpoint,omitempty"`
 	ApiConf       *ApiServer      `json:"apiconf,omitempty"`
 	ManagerConf   *ControlManager `json:"managerconf,omitempty"`
 	SchedulerConf *Scheduler      `json:"schedulerconf,omitempty"`
@@ -193,7 +192,7 @@ type ClusterConfig struct {
 	Certificate     CertificateConfig       `json:"certificate,omitempty"`
 	ServiceCluster  ServiceClusterConfig    `json:"servicecluster,omitempty"`
 	Network         NetworkConfig           `json:"network,omitempty"`
-	LocalEndpoint   APIEndpoint             `json:"local-endpoint,omitempty"`
+	APIEndpoint     APIEndpoint             `json:"api-endpoint,omitempty"`
 	ControlPlane    ControlPlaneConfig      `json:"controlplane,omitempty"`
 	PackageSrc      PackageSrcConfig        `json:"packagesource,omitempty"`
 	EtcdCluster     EtcdClusterConfig       `json:"etcdcluster,omitempty"`
