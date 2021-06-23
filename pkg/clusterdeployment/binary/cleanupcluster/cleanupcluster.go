@@ -237,6 +237,8 @@ func (t *cleanupClusterTask) Run(r runner.Runner, hostConfig *api.HostConfig) er
 	}
 	infrastructure.ShieldPorts(r, ports...)
 
+	removePathes(r, hostConfig, []string{"/etc/sysctl.d/k8s.conf"})
+
 	postCleanup(r, hostConfig)
 
 	return nil

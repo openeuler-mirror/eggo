@@ -16,6 +16,7 @@
 package infrastructure
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strconv"
 	"strings"
@@ -26,6 +27,7 @@ import (
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
 	"gitee.com/openeuler/eggo/pkg/utils/runner"
 	"gitee.com/openeuler/eggo/pkg/utils/task"
+	"gitee.com/openeuler/eggo/pkg/utils/template"
 
 	"github.com/sirupsen/logrus"
 )
@@ -47,6 +49,53 @@ func (it *InfrastructureTask) Name() string {
 	return "InfrastructureTask"
 }
 
+func setNetBridge(r runner.Runner) error {
+	const netBridgeNfCallIptablesConf = `net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+net.ipv4.ip_forward = 1
+vm.swappiness=0
+`
+	base64Str := base64.StdEncoding.EncodeToString([]byte(netBridgeNfCallIptablesConf))
+
+	confTmpl := `
+#!/bin/bash
+echo {{ .Config }} | base64 -d > /etc/sysctl.d/k8s.conf
+if [ $? -ne 0 ]; then
+	echo "set sysctl file failed"
+	exit 1
+fi
+
+modprobe br_netfilter
+if [ $? -ne 0 ]; then
+	echo "modprobe br_netfilter failed"
+	exit 1
+fi
+
+sysctl -p /etc/sysctl.d/k8s.conf
+if [ $? -ne 0 ]; then
+	echo "sysctl -p /etc/sysctl.d/k8s.conf failed"
+	exit 1
+fi
+
+exit 0
+`
+
+	datastore := make(map[string]interface{})
+	datastore["Config"] = base64Str
+
+	cmdStr, err := template.TemplateRender(confTmpl, datastore)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.RunShell(cmdStr, "k8s.conf")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (it *InfrastructureTask) Run(r runner.Runner, hcg *api.HostConfig) (err error) {
 	if hcg == nil {
 		return fmt.Errorf("empty host config")
@@ -55,6 +104,11 @@ func (it *InfrastructureTask) Run(r runner.Runner, hcg *api.HostConfig) (err err
 	// TODO: prepare loadbalancer
 	if err = check(hcg); err != nil {
 		logrus.Errorf("check failed: %v", err)
+		return
+	}
+
+	if err = setNetBridge(r); err != nil {
+		logrus.Errorf("set net bridge nf call iptables failed: %v", err)
 		return
 	}
 
