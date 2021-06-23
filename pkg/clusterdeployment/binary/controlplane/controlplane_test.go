@@ -59,12 +59,9 @@ func TestInit(t *testing.T) {
 			CIDR:    "10.32.0.0/16",
 			Gateway: "10.32.0.1",
 		},
-		LocalEndpoint: api.APIEndpoint{
+		APIEndpoint: api.APIEndpoint{
 			AdvertiseAddress: "192.168.1.1",
 			BindPort:         6443,
-		},
-		ControlPlane: api.ControlPlaneConfig{
-			Endpoint: "eggo.com:6443",
 		},
 		Nodes: []*api.HostConfig{
 			{

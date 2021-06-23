@@ -29,6 +29,7 @@ import (
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/commontools"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
 	"gitee.com/openeuler/eggo/pkg/constants"
+	"gitee.com/openeuler/eggo/pkg/utils"
 	"gitee.com/openeuler/eggo/pkg/utils/certs"
 	"gitee.com/openeuler/eggo/pkg/utils/endpoint"
 	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
@@ -47,6 +48,7 @@ const (
 	AdminKubeConfigName             = "admin"
 	ControllerManagerKubeConfigName = "controller-manager"
 	SchedulerKubeConfigName         = "scheduler"
+	LocalEndpoint                   = "https://127.0.0.1:6443"
 
 	AdminRoleConfig = `apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -156,13 +158,15 @@ func generateApiServerCertificate(savePath string, cg certs.CertGenerator, ccfg 
 	if ccfg.LoadBalancer.IP != "" {
 		ips = append(ips, ccfg.LoadBalancer.IP)
 	}
+
+	ips = append(ips, ccfg.APIEndpoint.AdvertiseAddress)
 	ips = append(ips, hcf.Address)
 
 	apiserverConfig := &certs.CertConfig{
 		CommonName:    "kube-apiserver",
 		Organizations: []string{"kubernetes"},
 		AltNames: certs.AltNames{
-			IPs:      ips,
+			IPs:      utils.RemoveDupString(ips),
 			DNSNames: dnsnames,
 		},
 		Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
@@ -281,7 +285,7 @@ func createAdminKubeConfigForEggo(lcg certs.CertGenerator, caPath string, savePa
 		os.Remove(filepath.Join(savePath, "admin.key"))
 		os.Remove(filepath.Join(savePath, "admin.crt"))
 	}()
-	apiEndpoint, err := endpoint.GetAPIServerEndpoint(ccfg.ControlPlane.Endpoint, ccfg.LocalEndpoint)
+	apiEndpoint, err := endpoint.GetAPIServerEndpoint(ccfg)
 	if err != nil {
 		return err
 	}
@@ -307,11 +311,7 @@ func generateKubeConfigs(rootPath, certPath string, cg certs.CertGenerator, ccfg
 	if err = generateAdminCertificate(certPath, cg); err != nil {
 		return
 	}
-	apiEndpoint, err := endpoint.GetAPIServerEndpoint(ccfg.ControlPlane.Endpoint, ccfg.LocalEndpoint)
-	if err != nil {
-		return
-	}
-	localEndpoint, err := endpoint.GetEndpoint(ccfg.LocalEndpoint.AdvertiseAddress, int(ccfg.LocalEndpoint.BindPort))
+	apiEndpoint, err := endpoint.GetAPIServerEndpoint(ccfg)
 	if err != nil {
 		return
 	}
@@ -326,7 +326,7 @@ func generateKubeConfigs(rootPath, certPath string, cg certs.CertGenerator, ccfg
 		return
 	}
 	err = cg.CreateKubeConfig(rootPath, constants.KubeConfigFileNameController, filepath.Join(certPath, "ca.crt"), "default-controller-manager",
-		filepath.Join(certPath, "controller-manager.crt"), filepath.Join(certPath, "controller-manager.key"), localEndpoint)
+		filepath.Join(certPath, "controller-manager.crt"), filepath.Join(certPath, "controller-manager.key"), LocalEndpoint)
 	if err != nil {
 		return
 	}
@@ -336,7 +336,7 @@ func generateKubeConfigs(rootPath, certPath string, cg certs.CertGenerator, ccfg
 	}
 
 	return cg.CreateKubeConfig(rootPath, constants.KubeConfigFileNameScheduler, filepath.Join(certPath, "ca.crt"), "default-scheduler",
-		filepath.Join(certPath, "scheduler.crt"), filepath.Join(certPath, "scheduler.key"), localEndpoint)
+		filepath.Join(certPath, "scheduler.crt"), filepath.Join(certPath, "scheduler.key"), LocalEndpoint)
 }
 
 func getRandSecret() (string, error) {

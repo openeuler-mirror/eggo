@@ -20,7 +20,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -117,6 +116,9 @@ func check(r runner.Runner, ccfg *api.ClusterConfig) error {
 	if ccfg.WorkerConfig.ContainerEngineConf == nil {
 		return fmt.Errorf("empty container engine conf")
 	}
+	if ccfg.APIEndpoint.AdvertiseAddress == "" {
+		return fmt.Errorf("invalid endpoint")
+	}
 
 	_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"ls %s\"", filepath.Join(ccfg.Certificate.SavePath, "ca.crt")))
 	if err != nil {
@@ -128,7 +130,7 @@ func check(r runner.Runner, ccfg *api.ClusterConfig) error {
 }
 
 func prepareConfig(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig) error {
-	apiEndpoint, err := getEndpoint(ccfg)
+	apiEndpoint, err := endpoint.GetAPIServerEndpoint(ccfg)
 	if err != nil {
 		logrus.Errorf("get api server endpoint failed: %v", err)
 		return err
@@ -151,28 +153,6 @@ func prepareConfig(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig
 	logrus.Debug("prepare bootstrap config success")
 
 	return nil
-}
-
-func getEndpoint(ccfg *api.ClusterConfig) (string, error) {
-	host, sport := ccfg.LoadBalancer.IP, ccfg.LoadBalancer.Port
-	if host == "" || sport == "" {
-		// TODO: get ready master by master status list
-		for _, n := range ccfg.Nodes {
-			if n.Type&api.Master != 0 {
-				host = n.Address
-				sport = strconv.Itoa(int(ccfg.LocalEndpoint.BindPort))
-				break
-			}
-		}
-	}
-	if host == "" || sport == "" {
-		return "", fmt.Errorf("invalid host or sport")
-	}
-	port, err := endpoint.ParsePort(sport)
-	if err != nil {
-		return "", err
-	}
-	return endpoint.GetEndpoint(host, port)
 }
 
 func genKubeletBootstrapAndConfig(r runner.Runner, ccfg *api.ClusterConfig, token, apiEndpoint string) error {

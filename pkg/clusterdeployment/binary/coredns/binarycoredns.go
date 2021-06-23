@@ -195,7 +195,7 @@ func (ct *BinaryCorednsSetupTask) Name() string {
 func (ct *BinaryCorednsSetupTask) createCoreConfigTemplate(r runner.Runner) error {
 	var sb strings.Builder
 	datastore := map[string]interface{}{}
-	useEndPoint, err := endpoint.GetAPIServerEndpoint(ct.Cluster.ControlPlane.Endpoint, ct.Cluster.LocalEndpoint)
+	useEndPoint, err := endpoint.GetAPIServerEndpoint(ct.Cluster)
 	if err != nil {
 		logrus.Errorf("get api server endpoint failed: %v", err)
 		return err

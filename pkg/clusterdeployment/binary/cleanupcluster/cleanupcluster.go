@@ -169,13 +169,13 @@ func stopService(r runner.Runner, ccfg *api.ClusterConfig, hostConfig *api.HostC
 
 	if utils.IsType(hostConfig.Type, api.Worker) {
 		service = append(service, WorkerService...)
-	}
 
-	runtime := runtime.GetRuntime(ccfg.WorkerConfig.ContainerEngineConf.Runtime)
-	if runtime == nil {
-		return fmt.Errorf("invalid container engine %s", ccfg.WorkerConfig.ContainerEngineConf.Runtime)
+		runtime := runtime.GetRuntime(ccfg.WorkerConfig.ContainerEngineConf.Runtime)
+		if runtime == nil {
+			return fmt.Errorf("invalid container engine %s", ccfg.WorkerConfig.ContainerEngineConf.Runtime)
+		}
+		service = append(service, runtime.GetRuntimeService())
 	}
-	service = append(service, runtime.GetRuntimeService())
 
 	if utils.IsType(hostConfig.Type, api.LoadBalance) {
 		service = append(service, LoadBalanceService...)

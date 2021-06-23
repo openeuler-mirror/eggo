@@ -64,3 +64,17 @@ func GetMasterIPList(c *api.ClusterConfig) []string {
 
 	return masters
 }
+
+func RemoveDupString(str []string) []string {
+	strMap := map[string]bool{}
+	result := []string{}
+
+	for _, s := range str {
+		if _, ok := strMap[s]; !ok {
+			strMap[s] = true
+			result = append(result, s)
+		}
+	}
+
+	return result
+}

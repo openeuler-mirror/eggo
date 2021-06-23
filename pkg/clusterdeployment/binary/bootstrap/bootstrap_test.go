@@ -56,12 +56,9 @@ func TestInit(t *testing.T) {
 	lr := &runner.LocalRunner{}
 	conf := &api.ClusterConfig{
 		Name: "test-cluster",
-		LocalEndpoint: api.APIEndpoint{
+		APIEndpoint: api.APIEndpoint{
 			AdvertiseAddress: "192.168.1.1",
 			BindPort:         6443,
-		},
-		ControlPlane: api.ControlPlaneConfig{
-			Endpoint: "eggo.com:6443",
 		},
 		WorkerConfig: api.WorkerConfig{
 			KubeletConf: &api.Kubelet{
@@ -106,8 +103,8 @@ func TestInit(t *testing.T) {
 
 	api.EggoHomePath = "/tmp/eggo"
 	lr.RunCommand(fmt.Sprintf("sudo mkdir -p -m 0777 %s/%s/pki", api.EggoHomePath, conf.Name))
-	// if err := Init(conf); err != nil {
-	// 	t.Fatalf("do bootstrap init failed: %v", err)
-	// }
+	if err := Init(conf); err != nil {
+		t.Fatalf("do bootstrap init failed: %v", err)
+	}
 	t.Logf("do bootstrap init success")
 }
