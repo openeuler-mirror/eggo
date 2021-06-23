@@ -19,6 +19,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"gitee.com/openeuler/eggo/pkg/api"
@@ -91,6 +92,12 @@ func (t *EtcdDeployEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfig) e
 		return fmt.Errorf("empty host config")
 	}
 
+	// prepare etcd dir
+	if err := prepareEtcdDir(r); err != nil {
+		logrus.Errorf("prepare etcd dir failed: %v", err)
+		return err
+	}
+
 	// prepare config
 	if err := prepareEtcdConfigs(t.ccfg, r, hostConfig, EtcdConfFile, EtcdServiceFile); err != nil {
 		return err
@@ -102,12 +109,6 @@ func (t *EtcdDeployEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfig) e
 
 	// generate etcd-server etcd-peer and etcd-health-check certificates on etcd nodes
 	if err := generateEtcdCerts(r, t.ccfg, hostConfig); err != nil {
-		return err
-	}
-
-	// create etcd service working dir
-	if _, err := r.RunCommand("sudo -E /bin/sh -c \"mkdir -p -m 700 /var/lib/etcd\""); err != nil {
-		logrus.Errorf("create etcd working dir failed: %v", err)
 		return err
 	}
 
@@ -146,6 +147,18 @@ func (t *EtcdPostDeployEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfi
 	}
 
 	if err := healthcheck(r, getDstEtcdCertsDir(t.ccfg), hostConfig.Address); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func prepareEtcdDir(r runner.Runner) error {
+	dirs := []string{filepath.Dir(EtcdConfFile), filepath.Dir(DefaultEtcdDataDir)}
+
+	// create etcd working dir
+	join := strings.Join(dirs, " ")
+	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"mkdir -p %s\"", join)); err != nil {
 		return err
 	}
 

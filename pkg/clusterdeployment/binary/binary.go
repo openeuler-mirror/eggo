@@ -140,8 +140,7 @@ func (bcp *BinaryClusterDeployment) DeployLoadBalancer() error {
 
 func (bcp *BinaryClusterDeployment) InitControlPlane() error {
 	logrus.Info("do init control plane...")
-	controlplane.Init(bcp.config)
-	return nil
+	return controlplane.Init(bcp.config)
 }
 
 func (bcp *BinaryClusterDeployment) JoinBootstrap() error {

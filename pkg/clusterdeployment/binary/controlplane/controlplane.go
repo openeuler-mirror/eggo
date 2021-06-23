@@ -512,11 +512,13 @@ func (ct *PostControlPlaneTask) Name() string {
 }
 
 func (ct *PostControlPlaneTask) doAdminRole(r runner.Runner) error {
+	manifestDir := ct.cluster.GetManifestDir()
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"")
+	sb.WriteString(fmt.Sprintf("mkdir -p %s", manifestDir))
 	roleBase64 := base64.StdEncoding.EncodeToString([]byte(AdminRoleConfig))
-	sb.WriteString(fmt.Sprintf(" echo %s | base64 -d > %s/admin_cluster_role.yaml", roleBase64, ct.cluster.GetManifestDir()))
-	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s/admin.conf kubectl apply -f %s/admin_cluster_role.yaml", ct.cluster.GetConfigDir(), ct.cluster.GetManifestDir()))
+	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/admin_cluster_role.yaml", roleBase64, manifestDir))
+	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s/admin.conf kubectl apply -f %s/admin_cluster_role.yaml", ct.cluster.GetConfigDir(), manifestDir))
 	sb.WriteString("\"")
 	_, err := r.RunCommand(sb.String())
 	if err != nil {
@@ -531,7 +533,7 @@ func (ct *PostControlPlaneTask) doAdminRole(r runner.Runner) error {
 		RoleName:    "system:kube-apiserver-to-kubelet",
 	}
 
-	if err := ct.applyClusterRoleBinding(r, adminRoleBindConfig); err != nil {
+	if err := ct.applyClusterRoleBinding(r, adminRoleBindConfig, manifestDir); err != nil {
 		logrus.Errorf("apply admin rolebind failed: %v", err)
 		return err
 	}
@@ -562,7 +564,7 @@ func (ct *PostControlPlaneTask) createBootstrapCrb() []*api.ClusterRoleBindingCo
 	return []*api.ClusterRoleBindingConfig{csr, approve, renew}
 }
 
-func (ct *PostControlPlaneTask) applyClusterRoleBinding(r runner.Runner, crbc *api.ClusterRoleBindingConfig) error {
+func (ct *PostControlPlaneTask) applyClusterRoleBinding(r runner.Runner, crbc *api.ClusterRoleBindingConfig, manifestDir string) error {
 	datastore := map[string]interface{}{}
 	datastore["Name"] = crbc.Name
 	datastore["SubjectName"] = crbc.SubjectName
@@ -575,10 +577,10 @@ func (ct *PostControlPlaneTask) applyClusterRoleBinding(r runner.Runner, crbc *a
 
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"")
-	sb.WriteString(fmt.Sprintf("mkdir -p %s", constants.DefaultK8SManifestsDir))
+	sb.WriteString(fmt.Sprintf("mkdir -p %s", manifestDir))
 	crbYamlBase64 := base64.StdEncoding.EncodeToString([]byte(crb))
-	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/%s.yaml", crbYamlBase64, constants.DefaultK8SManifestsDir, crbc.Name))
-	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s/admin.conf kubectl apply -f %s/%s.yaml", ct.cluster.GetConfigDir(), constants.DefaultK8SManifestsDir, crbc.Name))
+	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/%s.yaml", crbYamlBase64, manifestDir, crbc.Name))
+	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s/admin.conf kubectl apply -f %s/%s.yaml", ct.cluster.GetConfigDir(), manifestDir, crbc.Name))
 	sb.WriteString("\"")
 
 	_, err = r.RunCommand(sb.String())
@@ -592,7 +594,7 @@ func (ct *PostControlPlaneTask) applyClusterRoleBinding(r runner.Runner, crbc *a
 func (ct *PostControlPlaneTask) bootstrapClusterRoleBinding(r runner.Runner) error {
 	crbcs := ct.createBootstrapCrb()
 	for _, crbc := range crbcs {
-		if err := ct.applyClusterRoleBinding(r, crbc); err != nil {
+		if err := ct.applyClusterRoleBinding(r, crbc, ct.cluster.GetManifestDir()); err != nil {
 			logrus.Errorf("apply ClusterRoleBinding failed: %v", err)
 			return err
 		}

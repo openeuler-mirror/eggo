@@ -57,7 +57,8 @@ func (gt *GetTokenTask) Name() string {
 }
 
 func (gt *GetTokenTask) Run(r runner.Runner, hcg *api.HostConfig) error {
-	token, err := commontools.GetBootstrapToken(r, gt.tokenStr, filepath.Join(gt.cluster.GetConfigDir(), constants.KubeConfigFileNameAdmin))
+	token, err := commontools.GetBootstrapToken(r, gt.tokenStr,
+		filepath.Join(gt.cluster.GetConfigDir(), constants.KubeConfigFileNameAdmin), gt.cluster.GetManifestDir())
 	if err != nil {
 		return err
 	}

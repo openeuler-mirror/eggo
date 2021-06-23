@@ -52,7 +52,7 @@ stringData:
 `
 )
 
-func CreateBootstrapToken(r runner.Runner, bconf *api.BootstrapTokenConfig, kubeconfig string) error {
+func CreateBootstrapToken(r runner.Runner, bconf *api.BootstrapTokenConfig, kubeconfig, manifestDir string) error {
 	var sb strings.Builder
 	var usages []string
 	now := time.Now()
@@ -80,10 +80,10 @@ func CreateBootstrapToken(r runner.Runner, bconf *api.BootstrapTokenConfig, kube
 		return err
 	}
 	sb.WriteString("sudo -E /bin/sh -c \"")
-	sb.WriteString(fmt.Sprintf("mkdir -p %s", constants.DefaultK8SManifestsDir))
+	sb.WriteString(fmt.Sprintf("mkdir -p %s", manifestDir))
 	tokenYamlBase64 := base64.StdEncoding.EncodeToString([]byte(coreConfig))
-	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/bootstrap_token.yaml", tokenYamlBase64, constants.DefaultK8SManifestsDir))
-	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s kubectl apply -f %s/bootstrap_token.yaml", kubeconfig, constants.DefaultK8SManifestsDir))
+	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/bootstrap_token.yaml", tokenYamlBase64, manifestDir))
+	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s kubectl apply -f %s/bootstrap_token.yaml", kubeconfig, manifestDir))
 	sb.WriteString("\"")
 
 	_, err = r.RunCommand(sb.String())
@@ -96,7 +96,7 @@ func CreateBootstrapToken(r runner.Runner, bconf *api.BootstrapTokenConfig, kube
 
 func CreateBootstrapTokensForCluster(r runner.Runner, ccfg *api.ClusterConfig) error {
 	for _, token := range ccfg.BootStrapTokens {
-		if err := CreateBootstrapToken(r, token, filepath.Join(ccfg.GetConfigDir(), constants.KubeConfigFileNameAdmin)); err != nil {
+		if err := CreateBootstrapToken(r, token, filepath.Join(ccfg.GetConfigDir(), constants.KubeConfigFileNameAdmin), ccfg.GetManifestDir()); err != nil {
 			logrus.Errorf("create bootstrap token failed: %v", err)
 			return err
 		}
@@ -104,7 +104,7 @@ func CreateBootstrapTokensForCluster(r runner.Runner, ccfg *api.ClusterConfig) e
 	return nil
 }
 
-func GetBootstrapToken(r runner.Runner, tokenStr string, kubeconfig string) (string, error) {
+func GetBootstrapToken(r runner.Runner, tokenStr string, kubeconfig, manifestDir string) (string, error) {
 	// TODO: check exist token first
 	token, id, secret, err := ParseBootstrapTokenStr(tokenStr)
 	if err != nil {
@@ -117,7 +117,7 @@ func GetBootstrapToken(r runner.Runner, tokenStr string, kubeconfig string) (str
 		Usages:          []string{"authentication", "signing"},
 		AuthExtraGroups: []string{"system:bootstrappers:worker,system:bootstrappers:ingress"},
 	}
-	err = CreateBootstrapToken(r, bconf, kubeconfig)
+	err = CreateBootstrapToken(r, bconf, kubeconfig, manifestDir)
 
 	return token, err
 }
