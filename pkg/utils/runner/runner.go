@@ -278,8 +278,7 @@ func (ssh *SSHRunner) RunShell(shell string, name string) (string, error) {
 	roleBase64 := base64.StdEncoding.EncodeToString([]byte(shell))
 	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/%s", roleBase64, tmpDir, name))
 	sb.WriteString(fmt.Sprintf(" && chmod +x %s/%s", tmpDir, name))
-	sb.WriteString(fmt.Sprintf(" && %s/%s > /dev/null", tmpDir, name))
-	sb.WriteString(fmt.Sprintf(" && rm -rf %s", tmpDir))
+	sb.WriteString(fmt.Sprintf(" && %s/%s > /dev/null; rm -rf %s", tmpDir, name, tmpDir))
 	sb.WriteString("\"")
 
 	output, err := ssh.RunCommand(sb.String())

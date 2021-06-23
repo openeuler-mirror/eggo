@@ -20,6 +20,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -103,6 +104,18 @@ func (ct *ControlPlaneTask) Name() string {
 	return "ControlplaneTask"
 }
 
+func (ct *ControlPlaneTask) copyEncryConfig(r runner.Runner) error {
+	src := filepath.Join(api.GetClusterHomePath(ct.ccfg.Name), constants.EncryptionConfigName)
+	dst := filepath.Join(ct.ccfg.GetConfigDir(), constants.EncryptionConfigName)
+
+	err := r.Copy(src, dst)
+	if err != nil {
+		logrus.Errorf("copy encry config failed: %v", err)
+	}
+
+	return err
+}
+
 func (ct *ControlPlaneTask) Run(r runner.Runner, hcf *api.HostConfig) error {
 	if hcf == nil {
 		return fmt.Errorf("empty cluster config")
@@ -110,6 +123,12 @@ func (ct *ControlPlaneTask) Run(r runner.Runner, hcf *api.HostConfig) error {
 
 	// do precheck phase
 	err := check(r, ct.ccfg.Certificate.SavePath)
+	if err != nil {
+		return err
+	}
+
+	// copy encryption
+	err = ct.copyEncryConfig(r)
 	if err != nil {
 		return err
 	}
@@ -351,7 +370,7 @@ func getRandSecret() (string, error) {
 	return encoded, nil
 }
 
-func generateEncryption(r runner.Runner, savePath string) error {
+func generateEncryption(savePath string) error {
 	const encry = `kind: EncryptionConfig
 apiVersion: v1
 resources:
@@ -361,22 +380,23 @@ resources:
       - aescbc:
           keys:
             - name: key1
-              secret: HOLDER
+              secret: {{ .Secret }}
       - identity: {}
 `
-	var sb strings.Builder
+	datastore := make(map[string]interface{})
 	randSecret, err := getRandSecret()
 	if err != nil {
 		return err
 	}
-	sb.WriteString("sudo -E /bin/sh -c \"")
-	encryBase64 := base64.StdEncoding.EncodeToString([]byte(encry))
-	sb.WriteString(fmt.Sprintf("echo \"%s\" | base64 -d > %s/%s", encryBase64, savePath, constants.EncryptionConfigName))
-	sb.WriteString(fmt.Sprintf(" && sed -i \"s#HOLDER#%s#g\" %s/%s", randSecret, savePath, constants.EncryptionConfigName))
-	sb.WriteString("\"")
+	datastore["Secret"] = randSecret
+	encryStr, err := template.TemplateRender(encry, datastore)
+	if err != nil {
+		logrus.Errorf("render encry yaml failed: %v", err)
+		return err
+	}
 
-	_, err = r.RunCommand(sb.String())
-	return err
+	fname := filepath.Join(savePath, constants.EncryptionConfigName)
+	return ioutil.WriteFile(fname, []byte(encryStr), 0600)
 }
 
 func generateCertsAndKubeConfigs(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig) (err error) {
@@ -400,7 +420,7 @@ func generateCertsAndKubeConfigs(r runner.Runner, ccfg *api.ClusterConfig, hcf *
 		return err
 	}
 
-	return generateEncryption(r, rootPath)
+	return nil
 }
 
 func runKubernetesServices(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig) error {
@@ -448,8 +468,14 @@ func Init(conf *api.ClusterConfig) error {
 		}
 	}
 
+	// create encryption for cluster
+	err := generateEncryption(api.GetClusterHomePath(conf.Name))
+	if err != nil {
+		return err
+	}
+
 	// generate ca certificates in eggo
-	err := prepareCredentials(conf.Name, conf)
+	err = prepareCredentials(conf.Name, conf)
 	if err != nil {
 		logrus.Errorf("[certs] create ca certificates failed: %v", err)
 		return err
