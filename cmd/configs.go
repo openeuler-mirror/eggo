@@ -233,6 +233,10 @@ func addUserPackages(hostconfig *api.HostConfig, userPkgs []*Package) {
 	}
 }
 
+func addUserPorts(hostconfig *api.HostConfig, ports []*api.OpenPorts) {
+	hostconfig.OpenPorts = append(hostconfig.OpenPorts, ports...)
+}
+
 func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 	var hostconfig *api.HostConfig
 	cache := make(map[string]int)
@@ -243,6 +247,7 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 			conf.Username, conf.Password, conf.PrivateKeyPath)
 		hostconfig.Type |= api.Master
 		addUserPackages(hostconfig, conf.Packages["master"])
+		addUserPorts(hostconfig, conf.OpenPorts["master"])
 		idx, ok := cache[hostconfig.Address]
 		if ok {
 			nodes[idx] = hostconfig
@@ -262,6 +267,7 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 		}
 		hostconfig.Type |= api.Worker
 		addUserPackages(hostconfig, conf.Packages["node"])
+		addUserPorts(hostconfig, conf.OpenPorts["node"])
 		if exist {
 			nodes[idx] = hostconfig
 			continue
@@ -287,6 +293,7 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 		}
 		hostconfig.Type |= api.ETCD
 		addUserPackages(hostconfig, conf.Packages["etcd"])
+		addUserPorts(hostconfig, conf.OpenPorts["etcd"])
 		if exist {
 			nodes[idx] = hostconfig
 			continue
@@ -312,6 +319,7 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 		hostconfig.Type |= api.LoadBalance
 
 		addUserPackages(hostconfig, conf.Packages["loadbalance"])
+		addUserPorts(hostconfig, conf.OpenPorts["loadbalance"])
 		if exist {
 			nodes[idx] = hostconfig
 		} else {
