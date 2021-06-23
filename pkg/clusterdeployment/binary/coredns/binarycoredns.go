@@ -144,10 +144,12 @@ func createCoreServerTemplate(cluster *api.ClusterConfig, r runner.Runner) error
 		logrus.Errorf("rend core dns server failed: %v", err)
 		return err
 	}
+	manifestDir := cluster.GetManifestDir()
 	sb.WriteString("sudo -E /bin/sh -c \"")
+	sb.WriteString(fmt.Sprintf("mkdir -p %s && ", manifestDir))
 	serverBase64 := base64.StdEncoding.EncodeToString([]byte(serverConfig))
-	sb.WriteString(fmt.Sprintf("echo %s | base64 -d > %s/coredns_server.yaml", serverBase64, cluster.GetManifestDir()))
-	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s kubectl apply -f %s/coredns_server.yaml", fmt.Sprintf("%s/%s", cluster.GetConfigDir(), constants.KubeConfigFileNameAdmin), cluster.GetManifestDir()))
+	sb.WriteString(fmt.Sprintf("echo %s | base64 -d > %s/coredns_server.yaml", serverBase64, manifestDir))
+	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s kubectl apply -f %s/coredns_server.yaml", fmt.Sprintf("%s/%s", cluster.GetConfigDir(), constants.KubeConfigFileNameAdmin), manifestDir))
 	sb.WriteString("\"")
 
 	_, err = r.RunCommand(sb.String())
@@ -170,10 +172,12 @@ func createCoreEndpointTemplate(cluster *api.ClusterConfig, r runner.Runner, ips
 		logrus.Errorf("rend core dns endpoint failed: %v", err)
 		return err
 	}
+	manifestDir := cluster.GetManifestDir()
 	sb.WriteString("sudo -E /bin/sh -c \"")
+	sb.WriteString(fmt.Sprintf("mkdir -p %s && ", manifestDir))
 	epBase64 := base64.StdEncoding.EncodeToString([]byte(epConfig))
-	sb.WriteString(fmt.Sprintf("echo %s | base64 -d > %s/coredns_ep.yaml", epBase64, cluster.GetManifestDir()))
-	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s kubectl apply -f %s/coredns_ep.yaml", fmt.Sprintf("%s/%s", cluster.GetConfigDir(), constants.KubeConfigFileNameAdmin), cluster.GetManifestDir()))
+	sb.WriteString(fmt.Sprintf("echo %s | base64 -d > %s/coredns_ep.yaml", epBase64, manifestDir))
+	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s kubectl apply -f %s/coredns_ep.yaml", fmt.Sprintf("%s/%s", cluster.GetConfigDir(), constants.KubeConfigFileNameAdmin), manifestDir))
 	sb.WriteString("\"")
 
 	_, err = r.RunCommand(sb.String())
