@@ -21,8 +21,8 @@ import (
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/addons"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/bootstrap"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/cleanupcluster"
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/commontools"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/controlplane"
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/coredns"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/etcdcluster"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/loadbalance"
@@ -211,7 +211,7 @@ func (bcp *BinaryClusterDeployment) taintAndLabelMasterNodes() error {
 
 func (bcp *BinaryClusterDeployment) PrepareNetwork() error {
 	// Setup coredns at here, like need addons
-	if err := commontools.SetUpCoredns(bcp.config); err != nil {
+	if err := coredns.CorednsSetup(bcp.config); err != nil {
 		logrus.Errorf("setup coredns failed: %v", err)
 		return err
 	}

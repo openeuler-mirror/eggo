@@ -25,6 +25,7 @@ import (
 
 	"gitee.com/openeuler/eggo/pkg/api"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/addons"
+	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/coredns"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/etcdcluster"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/infrastructure"
 	"gitee.com/openeuler/eggo/pkg/clusterdeployment/binary/network"
@@ -38,7 +39,7 @@ import (
 
 var (
 	EtcdService        = []string{"etcd"}
-	MasterService      = []string{"kube-apiserver", "kube-controller-manager", "kube-scheduler", "coredns"}
+	MasterService      = []string{"kube-apiserver", "kube-controller-manager", "kube-scheduler"}
 	WorkerService      = []string{"kubelet", "kube-proxy"}
 	LoadBalanceService = []string{"nginx"}
 )
@@ -139,13 +140,6 @@ func cleanupEtcd(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *api.HostC
 	})
 }
 
-func cleanupCoreDNS(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *api.HostConfig) {
-	// remove directories
-	removePathes(r, hostConfig, []string{
-		"/usr/lib/systemd/system/coredns.service",
-	})
-}
-
 func cleanupLoadBalance(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *api.HostConfig) {
 	// remove directories
 	removePathes(r, hostConfig, []string{
@@ -196,15 +190,6 @@ func stopService(r runner.Runner, ccfg *api.ClusterConfig, hostConfig *api.HostC
 	return nil
 }
 
-func isPkgInstalled(hostConfig *api.HostConfig, pkg string) bool {
-	for _, p := range hostConfig.Packages {
-		if strings.HasPrefix(p.Name, pkg) {
-			return true
-		}
-	}
-	return false
-}
-
 func (t *cleanupClusterTask) Run(r runner.Runner, hostConfig *api.HostConfig) error {
 	ports := []string{}
 
@@ -252,10 +237,6 @@ func (t *cleanupClusterTask) Run(r runner.Runner, hostConfig *api.HostConfig) er
 	}
 	infrastructure.ShieldPorts(r, ports...)
 
-	if isPkgInstalled(hostConfig, "coredns") {
-		cleanupCoreDNS(t.ccfg, r, hostConfig)
-	}
-
 	postCleanup(r, hostConfig)
 
 	return nil
@@ -292,7 +273,7 @@ func runRemoveWorker(t *removeWorkersTask, r runner.Runner, worker string) {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("KUBECONFIG=%s/%s kubectl delete node %v --force --grace-period=0",
-		t.ccfg.GetManifestDir(), constants.KubeConfigFileNameAdmin, worker))
+		t.ccfg.GetConfigDir(), constants.KubeConfigFileNameAdmin, worker))
 	if output, err := r.RunCommand(utils.AddSudo(sb.String())); err != nil {
 		logrus.Errorf("remove workder %v failed: %v\noutput: %v", worker, err, output)
 	}
@@ -447,6 +428,10 @@ func Init(conf *api.ClusterConfig) error {
 	// cleanup network resources
 	if err := network.CleanupNetwork(conf); err != nil {
 		logrus.Errorf("cleanup network failed: %v", err)
+	}
+
+	if err := coredns.CorednsCleanup(conf); err != nil {
+		logrus.Errorf("cleanup coredns failed: %v", err)
 	}
 
 	// remove workers from master
