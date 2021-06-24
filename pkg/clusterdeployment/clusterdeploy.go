@@ -17,6 +17,7 @@ package clusterdeployment
 
 import (
 	"fmt"
+	"os"
 
 	"gitee.com/openeuler/eggo/pkg/api"
 	_ "gitee.com/openeuler/eggo/pkg/clusterdeployment/binary"
@@ -39,6 +40,12 @@ func CreateCluster(cc *api.ClusterConfig) error {
 		return err
 	}
 	defer handler.Finish()
+
+	// prepare eggo config directory
+	if err := os.MkdirAll(api.GetClusterHomePath(cc.Name), 0750); err != nil {
+		return err
+	}
+
 	if err := handler.PrepareInfrastructure(); err != nil {
 		return err
 	}
@@ -70,17 +77,21 @@ func RemoveCluster(cc *api.ClusterConfig) error {
 	}
 	creator, err := manager.GetClusterDeploymentDriver(cc.DeployDriver)
 	if err != nil {
-		logrus.Errorf("get cluster deployment driver: %s failed: %v", cc.DeployDriver, err)
+		logrus.Errorf("[cluster] get cluster deployment driver: %s failed: %v", cc.DeployDriver, err)
 		return err
 	}
 	handler, err := creator(cc)
 	if err != nil {
-		logrus.Errorf("remove cluster deployment instance with driver: %s, failed: %v", cc.DeployDriver, err)
+		logrus.Errorf("[cluster] remove cluster deployment instance with driver: %s, failed: %v", cc.DeployDriver, err)
 		return err
 	}
 	defer handler.Finish()
 	if err := handler.CleanupCluster(); err != nil {
 		return err
+	}
+	// cleanup eggo config directory
+	if err := os.RemoveAll(api.GetClusterHomePath(cc.Name)); err != nil {
+		logrus.Warnf("[cluster] cleanup eggo config directory failed: %v", err)
 	}
 	logrus.Infof("[cluster] remove cluster '%s' successed", cc.Name)
 	return nil
