@@ -547,6 +547,20 @@ func createDeployConfigTemplate(file string) error {
 					Protocol: "tcp",
 				},
 			},
+			"master": {
+				&api.OpenPorts{
+					Port:     53,
+					Protocol: "tcp",
+				},
+				&api.OpenPorts{
+					Port:     53,
+					Protocol: "udp",
+				},
+				&api.OpenPorts{
+					Port:     9153,
+					Protocol: "tcp",
+				},
+			},
 		},
 		PackageSrc: api.PackageSrcConfig{
 			Type:   "tar.gz",
