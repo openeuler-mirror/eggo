@@ -3,7 +3,7 @@ package endpoint
 import (
 	"testing"
 
-	"gitee.com/openeuler/eggo/pkg/api"
+	"isula.org/eggo/pkg/api"
 )
 
 func TestGetAPIServerEndpoint(t *testing.T) {

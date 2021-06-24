@@ -1,5 +1,5 @@
 package main
 
 import (
-	_ "gitee.com/openeuler/eggo/pkg/clusterdeployment/binary"
+	_ "isula.org/eggo/pkg/clusterdeployment/binary"
 )

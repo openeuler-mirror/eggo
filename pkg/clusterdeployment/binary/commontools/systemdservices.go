@@ -18,10 +18,10 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"gitee.com/openeuler/eggo/pkg/api"
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment/runtime"
-	"gitee.com/openeuler/eggo/pkg/utils/runner"
-	"gitee.com/openeuler/eggo/pkg/utils/template"
+	"isula.org/eggo/pkg/api"
+	"isula.org/eggo/pkg/clusterdeployment/runtime"
+	"isula.org/eggo/pkg/utils/runner"
+	"isula.org/eggo/pkg/utils/template"
 	"github.com/sirupsen/logrus"
 )
 

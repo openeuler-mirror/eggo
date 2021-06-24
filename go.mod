@@ -1,4 +1,4 @@
-module gitee.com/openeuler/eggo
+module isula.org/eggo
 
 require (
 	github.com/kubesphere/kubekey v1.1.0

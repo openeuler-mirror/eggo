@@ -3,8 +3,8 @@ package kubectl
 import (
 	"fmt"
 
-	"gitee.com/openeuler/eggo/pkg/api"
-	"gitee.com/openeuler/eggo/pkg/utils/runner"
+	"isula.org/eggo/pkg/api"
+	"isula.org/eggo/pkg/utils/runner"
 	"github.com/sirupsen/logrus"
 )
 

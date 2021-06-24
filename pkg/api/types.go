@@ -19,7 +19,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"gitee.com/openeuler/eggo/pkg/constants"
+	"isula.org/eggo/pkg/constants"
 	"github.com/sirupsen/logrus"
 )
 

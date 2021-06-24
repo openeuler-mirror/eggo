@@ -23,9 +23,9 @@ import (
 	"strings"
 	"testing"
 
-	"gitee.com/openeuler/eggo/pkg/api"
-	"gitee.com/openeuler/eggo/pkg/utils"
-	"gitee.com/openeuler/eggo/pkg/utils/runner"
+	"isula.org/eggo/pkg/api"
+	"isula.org/eggo/pkg/utils"
+	"isula.org/eggo/pkg/utils/runner"
 )
 
 func TestDeployEtcd(t *testing.T) {

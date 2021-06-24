@@ -18,8 +18,8 @@ package infrastructure
 import (
 	"testing"
 
-	"gitee.com/openeuler/eggo/pkg/api"
-	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
+	"isula.org/eggo/pkg/api"
+	"isula.org/eggo/pkg/utils/nodemanager"
 	"github.com/sirupsen/logrus"
 )
 

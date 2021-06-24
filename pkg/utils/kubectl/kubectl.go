@@ -19,10 +19,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitee.com/openeuler/eggo/pkg/api"
-	"gitee.com/openeuler/eggo/pkg/constants"
-	"gitee.com/openeuler/eggo/pkg/utils/runner"
-	"gitee.com/openeuler/eggo/pkg/utils/template"
+	"isula.org/eggo/pkg/api"
+	"isula.org/eggo/pkg/constants"
+	"isula.org/eggo/pkg/utils/runner"
+	"isula.org/eggo/pkg/utils/template"
 )
 
 var ops map[string]string
