@@ -63,6 +63,8 @@ $ tree
   ```
   $ docker save -o images.tar calico/node:v3.19.1 calico/cni:v3.19.1 calico/kube-controllers:v3.19.1 calico/pod2daemon-flexvol:v3.19.1 k8s.gcr.io/pause:3.2
 
+- 如果coredns使用pod的方式部署，则images.tar里面需要包含coredns的镜像，而coredns对应的二进制包可以删除。
+
 3)  准备eggo部署时使用的yaml配置文件。可以使用下面的命令生成一个模板配置，并打开yaml文件对其进行增删改来满足不同的部署需求。
 
 ```

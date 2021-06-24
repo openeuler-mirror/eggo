@@ -35,8 +35,7 @@ import (
 var itask *task.TaskInstance
 
 var (
-	// TODO: coredns open ports should be config by user
-	MasterPorts = []string{"6443/tcp", "10252/tcp", "10251/tcp", "53/tcp", "53/udp", "9153/tcp"}
+	MasterPorts = []string{"6443/tcp", "10252/tcp", "10251/tcp"}
 	WorkPorts   = []string{"10250/tcp", "10256/tcp"}
 	EtcdPosts   = []string{"2379-2381/tcp"}
 )
