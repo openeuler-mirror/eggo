@@ -9,8 +9,8 @@
  * PURPOSE.
  * See the Mulan PSL v2 for more details.
  * Author: wangfengtu
- * Create: 2021-05-28
- * Description: eggo cleanup command implement
+ * Create: 2021-06-25
+ * Description: eggo join command implement
  ******************************************************************************/
 
 package main
@@ -24,37 +24,52 @@ import (
 	"isula.org/eggo/pkg/clusterdeployment"
 )
 
-func cleanup(ccfg *api.ClusterConfig) error {
-	return clusterdeployment.RemoveCluster(ccfg)
+func join(conf *api.ClusterConfig, hostconfig *api.HostConfig) error {
+	return clusterdeployment.JoinNode(conf, hostconfig)
 }
 
-func cleanupCluster(cmd *cobra.Command, args []string) error {
+func joinCluster(cmd *cobra.Command, args []string) error {
 	if opts.debug {
 		initLog()
 	}
 
-	conf, err := loadConfig()
+	if len(args) != 1 {
+		return fmt.Errorf("join command need exactly one argument")
+	}
+
+	opts.joinHost.Ip = args[0]
+
+	conf, err := loadBackupedDeployConfig()
 	if err != nil {
-		return fmt.Errorf("load config failed: %v", err)
+		return fmt.Errorf("load backuped deploy config failed: %v", err)
 	}
 
 	// TODO: make sure config valid
 
-	if err = cleanup(toClusterdeploymentConfig(conf)); err != nil {
+	hostconfig := joinConfig(conf, opts.joinType, &opts.joinHost)
+	if hostconfig == nil {
+		return fmt.Errorf("join userconfig failed")
+	}
+
+	if err = join(toClusterdeploymentConfig(conf), hostconfig); err != nil {
+		return err
+	}
+
+	if err = backupDeployConfig(conf); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func NewCleanupCmd() *cobra.Command {
-	cleanupCmd := &cobra.Command{
-		Use:   "cleanup",
-		Short: "cleanup a kubernetes cluster",
-		RunE:  cleanupCluster,
+func NewJoinCmd() *cobra.Command {
+	joinCmd := &cobra.Command{
+		Use:   "join NAME",
+		Short: "join a node to cluster",
+		RunE:  joinCluster,
 	}
 
-	setupCleanupCmdOpts(cleanupCmd)
+	setupJoinCmdOpts(joinCmd)
 
-	return cleanupCmd
+	return joinCmd
 }

@@ -45,7 +45,7 @@ func init() {
 	if err := manager.RegisterClusterDeploymentDriver(name, New); err != nil {
 		logrus.Fatal(err)
 	}
-	logrus.Info("register binary")
+	logrus.Debug("register binary")
 }
 
 func New(conf *api.ClusterConfig) (api.ClusterDeploymentAPI, error) {
@@ -203,7 +203,12 @@ func (bcp *BinaryClusterDeployment) EtcdClusterSetup() error {
 }
 
 func (bcp *BinaryClusterDeployment) EtcdClusterDestroy() error {
-	// TODO: add implement
+	logrus.Info("do etcd cluster destroy...")
+	if err := cleanupcluster.CleanupAllEtcds(bcp.config); err != nil {
+		return fmt.Errorf("etcd cluster destroy failed: %v", err)
+	}
+
+	logrus.Info("do etcd cluster destroy done")
 	return nil
 }
 
@@ -213,7 +218,12 @@ func (bcp *BinaryClusterDeployment) EtcdNodeSetup(machine *api.HostConfig) error
 }
 
 func (bcp *BinaryClusterDeployment) EtcdNodeDestroy(machine *api.HostConfig) error {
-	// TODO: add implement
+	logrus.Info("do etcd node destroy...")
+	if err := cleanupcluster.CleanupEtcdMember(bcp.config, machine); err != nil {
+		return fmt.Errorf("cleanup etcd member %v failed", machine.Name)
+	}
+
+	logrus.Info("do etcd node destroy done")
 	return nil
 }
 
@@ -264,8 +274,12 @@ func (bcp *BinaryClusterDeployment) ClusterNodeJoin(node *api.HostConfig) error 
 	return nil
 }
 
-func (bcp *BinaryClusterDeployment) ClusterNodeCleanup(node *api.HostConfig) error {
-	// TODO: add implement
+func (bcp *BinaryClusterDeployment) ClusterNodeCleanup(node *api.HostConfig, delType uint16) error {
+	logrus.Info("do node cleanup...")
+	if err := cleanupcluster.CleanupNode(bcp.config, node, delType); err != nil {
+		return fmt.Errorf("cleanup node %v failed: %v", node.Name, err)
+	}
+	logrus.Info("node cleanup success.")
 	return nil
 }
 

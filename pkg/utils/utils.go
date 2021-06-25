@@ -17,6 +17,7 @@ package utils
 
 import (
 	"os/user"
+	"path/filepath"
 	"strings"
 
 	"isula.org/eggo/pkg/api"
@@ -45,6 +46,10 @@ func GetSysHome() string {
 	return "/root"
 }
 
+func GetEggoDir() string {
+	return filepath.Join(GetSysHome(), ".eggo")
+}
+
 func IsType(curType uint16, expectedType uint16) bool {
 	return curType&expectedType != 0
 }
@@ -63,6 +68,16 @@ func GetMasterIPList(c *api.ClusterConfig) []string {
 	}
 
 	return masters
+}
+
+func GetAllIPs(nodes []*api.HostConfig) []string {
+	var ips []string
+
+	for _, node := range nodes {
+		ips = append(ips, node.Address)
+	}
+
+	return ips
 }
 
 func RemoveDupString(str []string) []string {

@@ -61,6 +61,8 @@ func NewEggoCmd() *cobra.Command {
 	eggoCmd.AddCommand(NewDeployCmd())
 	eggoCmd.AddCommand(NewCleanupCmd())
 	eggoCmd.AddCommand(NewTemplateCmd())
+	eggoCmd.AddCommand(NewJoinCmd())
+	eggoCmd.AddCommand(NewDeleteCmd())
 
 	return eggoCmd
 }

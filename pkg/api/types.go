@@ -266,7 +266,7 @@ type ClusterManagerAPI interface {
 	// TODO: should add other dependence cluster configurations
 	ClusterControlPlaneInit(node *HostConfig) error
 	ClusterNodeJoin(node *HostConfig) error
-	ClusterNodeCleanup(node *HostConfig) error
+	ClusterNodeCleanup(node *HostConfig, delType uint16) error
 	ClusterUpgrade() error
 	ClusterStatus() (*ClusterStatus, error)
 	AddonsSetup() error

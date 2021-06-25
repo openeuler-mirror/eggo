@@ -214,16 +214,6 @@ func prepareEtcdConfigs(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *ap
 	return nil
 }
 
-func getAllIps(nodes []*api.HostConfig) []string {
-	var ips []string
-
-	for _, node := range nodes {
-		ips = append(ips, node.Address)
-	}
-
-	return ips
-}
-
 func Init(conf *api.ClusterConfig) error {
 	// generate ca certificates and kube-apiserver-etcd-client certificates
 	if err := generateCaAndApiserverEtcdCerts(&runner.LocalRunner{}, conf); err != nil {
@@ -236,12 +226,12 @@ func Init(conf *api.ClusterConfig) error {
 		},
 	)
 
-	nodes := getAllIps(conf.EtcdCluster.Nodes)
+	nodes := utils.GetAllIPs(conf.EtcdCluster.Nodes)
 	if err := nodemanager.RunTaskOnNodes(taskDeployEtcds, nodes); err != nil {
 		return fmt.Errorf("run task on nodes failed: %v", err)
 	}
 
-	if err := nodemanager.WaitNodesFinish(nodes, time.Second*60*5); err != nil {
+	if err := nodemanager.WaitNodesFinish(nodes, time.Minute*5); err != nil {
 		return fmt.Errorf("wait for deploy etcds task finish failed: %v", err)
 	}
 
@@ -255,7 +245,7 @@ func Init(conf *api.ClusterConfig) error {
 		return fmt.Errorf("run task on nodes failed: %v", err)
 	}
 
-	if err := nodemanager.WaitNodesFinish(nodes, time.Second*60*5); err != nil {
+	if err := nodemanager.WaitNodesFinish(nodes, time.Minute*5); err != nil {
 		return fmt.Errorf("wait for post deploy etcds task finish failed: %v", err)
 	}
 

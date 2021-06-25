@@ -25,7 +25,6 @@ import (
 )
 
 func deploy(ccfg *api.ClusterConfig) error {
-	// TODO: save or load config on disk
 	return clusterdeployment.CreateCluster(ccfg)
 }
 
@@ -42,6 +41,10 @@ func deployCluster(cmd *cobra.Command, args []string) error {
 
 	if err := deploy(toClusterdeploymentConfig(conf)); err != nil {
 		return err
+	}
+
+	if err := backupDeployConfig(conf); err != nil {
+		return fmt.Errorf("backup deploy config failed: %v", err)
 	}
 
 	return nil

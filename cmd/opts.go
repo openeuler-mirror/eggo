@@ -20,6 +20,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"isula.org/eggo/pkg/utils"
 )
 
 type eggoOptions struct {
@@ -35,17 +36,21 @@ type eggoOptions struct {
 	cleanupConfig  string
 	debug          bool
 	version        bool
+	joinType       string
+	joinHost       HostConfig
+	delName        string
+	delType        string
 }
 
 var opts eggoOptions
 
 func init() {
-	if _, err := os.Stat(getEggoDir()); err == nil {
+	if _, err := os.Stat(utils.GetEggoDir()); err == nil {
 		return
 	}
 
-	if err := os.Mkdir(getEggoDir(), 0700); err != nil {
-		logrus.Errorf("mkdir eggo directory %v failed", getEggoDir())
+	if err := os.Mkdir(utils.GetEggoDir(), 0700); err != nil {
+		logrus.Errorf("mkdir eggo directory %v failed", utils.GetEggoDir())
 	}
 }
 
@@ -56,12 +61,25 @@ func setupEggoCmdOpts(eggoCmd *cobra.Command) {
 
 func setupDeployCmdOpts(deployCmd *cobra.Command) {
 	flags := deployCmd.Flags()
-	flags.StringVarP(&opts.deployConfig, "file", "f", getDefaultDeployConfig(), "location of cluster deploy config file, default $HOME/.eggo/deploy.yaml")
+	flags.StringVarP(&opts.deployConfig, "file", "f", defaultDeployConfigPath(), "location of cluster deploy config file, default $HOME/.eggo/deploy.yaml")
 }
 
 func setupCleanupCmdOpts(cleanupCmd *cobra.Command) {
 	flags := cleanupCmd.Flags()
-	flags.StringVarP(&opts.cleanupConfig, "file", "f", getDefaultDeployConfig(), "location of cluster deploy config file for cleanup, default $HOME/.eggo/deploy.yaml")
+	flags.StringVarP(&opts.deployConfig, "file", "f", defaultDeployConfigPath(), "location of cluster deploy config file, default $HOME/.eggo/deploy.yaml")
+}
+
+func setupJoinCmdOpts(joinCmd *cobra.Command) {
+	flags := joinCmd.Flags()
+	flags.StringVarP(&opts.joinType, "type", "t", "node", "join type, can be \"master,node,etcd\", deault node")
+	flags.StringVarP(&opts.joinHost.Arch, "arch", "", "amd64", "host's architecture, default amd64")
+	flags.StringVarP(&opts.joinHost.Name, "name", "n", "", "host's name")
+	flags.IntVarP(&opts.joinHost.Port, "port", "p", 22, "host's ssh port, default 22")
+}
+
+func setupDeleteCmdOpts(deleteCmd *cobra.Command) {
+	flags := deleteCmd.Flags()
+	flags.StringVarP(&opts.delType, "type", "t", "node", "delete type, can be \"master,node,etcd,all\", deault all")
 }
 
 func setupTemplateCmdOpts(templateCmd *cobra.Command) {

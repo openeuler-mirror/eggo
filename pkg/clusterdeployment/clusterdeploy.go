@@ -100,6 +100,7 @@ func CreateCluster(cc *api.ClusterConfig) error {
 	if cc == nil {
 		return fmt.Errorf("[cluster] cluster config is required")
 	}
+
 	creator, err := manager.GetClusterDeploymentDriver(cc.DeployDriver)
 	if err != nil {
 		logrus.Errorf("[cluster] get cluster deployment driver: %s failed: %v", cc.DeployDriver, err)
@@ -125,6 +126,108 @@ func CreateCluster(cc *api.ClusterConfig) error {
 	return nil
 }
 
+func doJoinNode(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, hostconfig *api.HostConfig) error {
+	if err := handler.MachineInfraSetup(hostconfig); err != nil {
+		return err
+	}
+
+	// wait infrastructure task success on node
+	if err := nodemanager.WaitNodesFinish([]string{hostconfig.Address}, time.Minute*5); err != nil {
+		return err
+	}
+
+	// join node to cluster
+	if err := handler.ClusterNodeJoin(hostconfig); err != nil {
+		return err
+	}
+
+	// wait node ready
+	if err := nodemanager.WaitNodesFinish([]string{hostconfig.Address}, time.Minute*5); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func JoinNode(cc *api.ClusterConfig, hostconfig *api.HostConfig) error {
+	if cc == nil {
+		return fmt.Errorf("[cluster] cluster config is required")
+	}
+
+	creator, err := manager.GetClusterDeploymentDriver(cc.DeployDriver)
+	if err != nil {
+		logrus.Errorf("[cluster] get cluster deployment driver: %s failed: %v", cc.DeployDriver, err)
+		return err
+	}
+	handler, err := creator(cc)
+	if err != nil {
+		logrus.Errorf("[cluster] create cluster deployment instance with driver: %s, failed: %v", cc.DeployDriver, err)
+		return err
+	}
+	defer handler.Finish()
+
+	if err := doJoinNode(handler, cc, hostconfig); err != nil {
+		return err
+	}
+
+	logrus.Infof("[cluster] join '%s' to cluster successed", cc.Name)
+	return nil
+}
+
+func getHostConfigByName(hostconfigs []*api.HostConfig, name string) *api.HostConfig {
+	for _, h := range hostconfigs {
+		if h.Name == name || h.Address == name {
+			return h
+		}
+	}
+	return nil
+}
+
+func doDeleteNode(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, name string, delType uint16) error {
+	h := getHostConfigByName(cc.Nodes, name)
+	if h == nil {
+		return fmt.Errorf("get host config by name %v failed", name)
+	}
+	if utils.IsType(delType, api.Worker) || utils.IsType(delType, api.Master) {
+		if err := handler.ClusterNodeCleanup(h, delType); err != nil {
+			return fmt.Errorf("delete master/worker of node %s failed: %v", h.Name, err)
+		}
+	}
+
+	if utils.IsType(delType, api.ETCD) {
+		if err := handler.EtcdNodeDestroy(h); err != nil {
+			return fmt.Errorf("delete etcd of node %s failed: %v", h.Name, err)
+		}
+	}
+
+	return nil
+}
+
+func DeleteNode(cc *api.ClusterConfig, name string, delType uint16) error {
+	if cc == nil {
+		return fmt.Errorf("[cluster] cluster config is required")
+	}
+
+	creator, err := manager.GetClusterDeploymentDriver(cc.DeployDriver)
+	if err != nil {
+		logrus.Errorf("[cluster] get cluster deployment driver: %s failed: %v", cc.DeployDriver, err)
+		return err
+	}
+	handler, err := creator(cc)
+	if err != nil {
+		logrus.Errorf("[cluster] create cluster deployment instance with driver: %s, failed: %v", cc.DeployDriver, err)
+		return err
+	}
+	defer handler.Finish()
+
+	if err := doDeleteNode(handler, cc, name, delType); err != nil {
+		return err
+	}
+
+	logrus.Infof("[cluster] delete node '%s' from cluster successed", cc.Name)
+	return nil
+}
+
 func doRemoveCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig) {
 	// Step1: cleanup addons
 	err := handler.AddonsDestroy()
@@ -132,7 +235,36 @@ func doRemoveCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig) {
 		logrus.Warnf("[cluster] cleanup addons failed: %v", err)
 	}
 
-	//Step2: cleanup loadbalance
+	allNodes := utils.GetAllIPs(cc.Nodes)
+	if err := nodemanager.WaitNodesFinish(allNodes, time.Minute*5); err != nil {
+		logrus.Warnf("[cluster] wait cleanup addons failed: %v", err)
+	}
+
+	// Step2: cleanup works
+	for _, n := range cc.Nodes {
+		if utils.IsType(n.Type, api.Worker) {
+			err = handler.ClusterNodeCleanup(n, api.Worker)
+			if err != nil {
+				logrus.Warnf("[cluster] cleanup node: %s failed: %v", n.Name, err)
+			}
+		}
+	}
+
+	if err := nodemanager.WaitNodesFinish(allNodes, time.Minute*5); err != nil {
+		logrus.Warnf("[cluster] wait cleanup cloadbalance failed: %v", err)
+	}
+
+	// Step3: cleanup masters
+	for _, n := range cc.Nodes {
+		if utils.IsType(n.Type, api.Master) {
+			err = handler.ClusterNodeCleanup(n, api.Master)
+			if err != nil {
+				logrus.Warnf("[cluster] cleanup master: %s failed: %v", n.Name, err)
+			}
+		}
+	}
+
+	//Step4: cleanup loadbalance
 	for _, n := range cc.Nodes {
 		if utils.IsType(n.Type, api.LoadBalance) {
 			err = handler.LoadBalancerDestroy(n)
@@ -143,36 +275,22 @@ func doRemoveCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig) {
 		}
 	}
 
-	// Step3: cleanup works
-	for _, n := range cc.Nodes {
-		if utils.IsType(n.Type, api.Worker) {
-			err = handler.ClusterNodeCleanup(n)
-			if err != nil {
-				logrus.Warnf("[cluster] cleanup node: %s failed: %v", n.Name, err)
-			}
-		}
-	}
-
-	// Step4: cleanup masters
-	for _, n := range cc.Nodes {
-		if utils.IsType(n.Type, api.Master) {
-			err = handler.ClusterNodeCleanup(n)
-			if err != nil {
-				logrus.Warnf("[cluster] cleanup master: %s failed: %v", n.Name, err)
-			}
-		}
-	}
 	// Step5: cleanup etcd cluster
 	err = handler.EtcdClusterDestroy()
 	if err != nil {
 		logrus.Warnf("[cluster] cleanup etcd cluster failed: %v", err)
 	}
+
 	// Step6: cleanup infrastructure
 	for _, n := range cc.Nodes {
 		err = handler.MachineInfraDestroy(n)
 		if err != nil {
 			logrus.Warnf("[cluster] cleanup infrastructure for node: %s failed: %v", n.Name, err)
 		}
+	}
+
+	if err := nodemanager.WaitNodesFinish(allNodes, time.Minute*5); err != nil {
+		logrus.Warnf("[cluster] wait all cleanup finish failed: %v", err)
 	}
 }
 
