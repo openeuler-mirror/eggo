@@ -115,7 +115,7 @@ $ eggo -d cleanup -f deploy.yaml
 cluster-id: k8s-cluster          // 集群名称
 username: root                   // 需要部署k8s集群的机器的ssh登录用户名，所有机器都需要使用同一个用户名
 password: 123456                 // 需要部署k8s集群的机器的ssh登录密码，所有机器都需要使用同一个密码
-masters:                         // 配置master节点的列表
+masters:                         // 配置master节点的列表，建议每个master节点同时作为node节点，否则master节点可以无法直接访问pod
 - name: test0                    // 该节点的名称，会设置该名称为该节点的hostname并设置为k8s集群看到的该节点的名称
   ip: 192.168.0.1                // 该节点的ip地址
   port: 22                       // ssh登录的端口
