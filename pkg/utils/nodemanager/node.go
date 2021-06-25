@@ -18,62 +18,107 @@ package nodemanager
 import (
 	"fmt"
 	"sync"
+	"time"
 
+	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/task"
-	"github.com/sirupsen/logrus"
 )
 
 const (
-	BeginLabel   = "[Starting]"
-	FinishPrefix = "[Finish]"
+	WorkingStatus = iota
+	FinishStatus
+	IgnoreStatus
+	ErrorStatus
 )
+
+type NodeStatus struct {
+	Status         int
+	Message        string
+	TaskTotalCnt   int
+	TaskSuccessCnt int
+	TaskIgnoreCnt  int
+	TaskFailCnt    int
+}
+
+func (ns NodeStatus) HasError() bool {
+	return ns.TaskFailCnt > 0
+}
+
+func (s NodeStatus) TasksFinished() bool {
+	return s.TaskTotalCnt == s.TaskSuccessCnt+s.TaskFailCnt+s.TaskIgnoreCnt
+}
 
 type Node struct {
 	host *api.HostConfig
 	r    runner.Runner
 	stop chan bool
 	// work on up to 10 tasks at a time
-	queue      chan task.Task
-	labelsLock sync.RWMutex
-	lables     map[string]string
+	queue  chan task.Task
+	lock   sync.RWMutex
+	status NodeStatus
 }
 
-func (n *Node) addLabel(key, label string) {
-	n.labelsLock.Lock()
-	n.lables[key] = label
-	n.labelsLock.Unlock()
+func (n *Node) GetStatus() NodeStatus {
+	n.lock.RLock()
+	defer n.lock.RUnlock()
+	return n.status
 }
 
-func (n *Node) CheckProgress() string {
-	n.labelsLock.RLock()
-	taskCnt := len(n.lables)
-	finishCnt := 0
-	for _, v := range n.lables {
-		if v != BeginLabel {
-			finishCnt++
+func (n *Node) WaitNodeTasksFinish(timeout time.Duration) error {
+	finish := time.After(timeout)
+	for {
+		select {
+		case t := <-finish:
+			return fmt.Errorf("timeout %s for wait node: %s", t.String(), n.host.Name)
+		default:
+			n.lock.RLock()
+			s := n.status
+			msg := s.Message
+			n.lock.RUnlock()
+			if !s.TasksFinished() {
+				time.Sleep(time.Millisecond * 200)
+				continue
+			}
+			if s.HasError() {
+				return fmt.Errorf("%s", msg)
+			}
+			return nil
 		}
 	}
-	n.labelsLock.RUnlock()
-
-	return fmt.Sprintf("%d/%d", finishCnt, taskCnt)
 }
 
-func (n *Node) GetTaskStatus(task string) (string, error) {
-	n.labelsLock.RLock()
-	v, ok := n.lables[task]
-	n.labelsLock.RUnlock()
-	if ok {
-		return v, nil
+func (n *Node) updateTotalCnt() {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+	n.status.TaskTotalCnt += 1
+}
+
+func (n *Node) updateNodeStatus(message string, status int) {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+	n.status.Message = message
+	n.status.Status = status
+	if status == FinishStatus {
+		n.status.TaskSuccessCnt += 1
 	}
-	return "", fmt.Errorf("cannot found task: %s", task)
+	if status == ErrorStatus {
+		n.status.TaskFailCnt += 1
+	}
+	if status == IgnoreStatus {
+		n.status.TaskIgnoreCnt += 1
+	}
 }
 
 func (n *Node) PushTask(task task.Task) bool {
+	if n.status.HasError() {
+		logrus.Debugf("node finished with error: %v", n.status.Message)
+		return false
+	}
 	select {
 	case n.queue <- task:
-		n.addLabel(task.Name(), BeginLabel)
+		n.updateTotalCnt()
 		return true
 	default:
 		logrus.Error("node task queue is full")
@@ -90,12 +135,12 @@ func (n *Node) Finish() {
 func NewNode(hcf *api.HostConfig, r runner.Runner) (*Node, error) {
 	// TODO: maybe we need deap copy hostconfig
 	n := &Node{
-		host:   hcf,
-		r:      r,
-		stop:   make(chan bool),
-		queue:  make(chan task.Task, 10),
-		lables: make(map[string]string, 10),
+		host:  hcf,
+		r:     r,
+		stop:  make(chan bool),
+		queue: make(chan task.Task, 16),
 	}
+
 	go func(n *Node) {
 		for {
 			select {
@@ -107,13 +152,18 @@ func NewNode(hcf *api.HostConfig, r runner.Runner) (*Node, error) {
 				if err != nil {
 					label := fmt.Sprintf("%s: run task: %s on node: %s fail: %v", task.FAILED, t.Name(), n.host.Address, err)
 					t.AddLabel(n.host.Address, label)
-					// set task status on node after task
-					n.addLabel(t.Name(), fmt.Sprintf("%s with err: %v", FinishPrefix, err))
-					logrus.Errorf("%s", label)
+					if task.IsIgnoreError(t) {
+						logrus.Warnf("ignore: %s", label)
+						n.updateNodeStatus("", IgnoreStatus)
+					} else {
+						logrus.Errorf("%s", label)
+						// set task status on node after task
+						n.updateNodeStatus(label, ErrorStatus)
+					}
 				} else {
 					t.AddLabel(n.host.Address, task.SUCCESS)
 					// set task status on node after task
-					n.addLabel(t.Name(), fmt.Sprintf("%s success", FinishPrefix))
+					n.updateNodeStatus("", FinishStatus)
 					logrus.Infof("run task: %s success on %s\n", t.Name(), n.host.Address)
 				}
 			}

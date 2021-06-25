@@ -398,10 +398,6 @@ func execRemoveWorkersTask(conf *api.ClusterConfig, node string) {
 		logrus.Errorf("run task for remove workers failed: %v", err)
 		return
 	}
-
-	if err := nodemanager.WaitTaskOnNodesFinished(taskRemoveWorkers, []string{node}, time.Second*60*5); err != nil {
-		logrus.Errorf("wait for remove workers task finish failed: %v", err)
-	}
 }
 
 func execRemoveEtcdsTask(conf *api.ClusterConfig, node string) {
@@ -414,10 +410,6 @@ func execRemoveEtcdsTask(conf *api.ClusterConfig, node string) {
 	if err := nodemanager.RunTaskOnNodes(taskRemoveEtcds, []string{node}); err != nil {
 		logrus.Errorf("run task for remove etcds failed: %v", err)
 		return
-	}
-
-	if err := nodemanager.WaitTaskOnNodesFinished(taskRemoveEtcds, []string{node}, time.Second*60); err != nil {
-		logrus.Errorf("wait for remove etcds task finish failed: %v", err)
 	}
 }
 
@@ -469,7 +461,7 @@ func Init(conf *api.ClusterConfig) error {
 		return fmt.Errorf("run task for cleanup cluster failed: %v", err)
 	}
 
-	if err := nodemanager.WaitTaskOnNodesFinished(taskCleanupCluster, nodes, time.Second*60*5); err != nil {
+	if err := nodemanager.WaitNodesFinish(nodes, time.Second*60*5); err != nil {
 		return fmt.Errorf("wait for cleanup cluster task finish failed: %v", err)
 	}
 

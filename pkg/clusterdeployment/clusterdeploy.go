@@ -18,25 +18,85 @@ package clusterdeployment
 import (
 	"fmt"
 	"os"
+	"time"
 
+	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	_ "isula.org/eggo/pkg/clusterdeployment/binary"
 	"isula.org/eggo/pkg/clusterdeployment/manager"
-	"github.com/sirupsen/logrus"
+	"isula.org/eggo/pkg/utils"
+	"isula.org/eggo/pkg/utils/nodemanager"
 )
+
+func doCreateCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig) error {
+	var controlPlane *api.HostConfig
+	var joinNodes []*api.HostConfig
+	var joinNodeIDs []string
+	var etcdNodes []string
+	// Step1: setup infrastructure for all nodes in the cluster
+	for _, n := range cc.Nodes {
+		if err := handler.MachineInfraSetup(n); err != nil {
+			return err
+		}
+		if utils.IsType(n.Type, api.ETCD) {
+			etcdNodes = append(etcdNodes, n.Address)
+		}
+		if controlPlane == nil && utils.IsType(n.Type, api.Master) {
+			controlPlane = n
+			continue
+		}
+		joinNodes = append(joinNodes, n)
+		joinNodeIDs = append(joinNodeIDs, n.Address)
+	}
+
+	// Step2: setup etcd cluster
+	// wait infrastructure task success on nodes of etcd cluster
+	if err := nodemanager.WaitNodesFinish(etcdNodes, time.Minute*5); err != nil {
+		return err
+	}
+	if err := handler.EtcdClusterSetup(); err != nil {
+		return err
+	}
+	// Step3: setup loadbalance for cluster
+	if err := handler.LoadBalancerSetup(); err != nil {
+		return err
+	}
+	// Step4: setup control plane for cluster
+	if err := handler.ClusterControlPlaneInit(controlPlane); err != nil {
+		return err
+	}
+	// wait controlplane setup task success
+	if err := nodemanager.WaitNodesFinish([]string{controlPlane.Address}, time.Minute*5); err != nil {
+		return err
+	}
+
+	//Step5: setup left nodes for cluster
+	for _, node := range joinNodes {
+		if err := handler.ClusterNodeJoin(node); err != nil {
+			return err
+		}
+	}
+	//Step5: setup addons for cluster
+	// wait all nodes ready
+	if err := nodemanager.WaitNodesFinish(joinNodeIDs, time.Minute*5); err != nil {
+		return err
+	}
+
+	return handler.AddonsSetup()
+}
 
 func CreateCluster(cc *api.ClusterConfig) error {
 	if cc == nil {
-		return fmt.Errorf("cluster config is required")
+		return fmt.Errorf("[cluster] cluster config is required")
 	}
 	creator, err := manager.GetClusterDeploymentDriver(cc.DeployDriver)
 	if err != nil {
-		logrus.Errorf("get cluster deployment driver: %s failed: %v", cc.DeployDriver, err)
+		logrus.Errorf("[cluster] get cluster deployment driver: %s failed: %v", cc.DeployDriver, err)
 		return err
 	}
 	handler, err := creator(cc)
 	if err != nil {
-		logrus.Errorf("create cluster deployment instance with driver: %s, failed: %v", cc.DeployDriver, err)
+		logrus.Errorf("[cluster] create cluster deployment instance with driver: %s, failed: %v", cc.DeployDriver, err)
 		return err
 	}
 	defer handler.Finish()
@@ -46,29 +106,58 @@ func CreateCluster(cc *api.ClusterConfig) error {
 		return err
 	}
 
-	if err := handler.PrepareInfrastructure(); err != nil {
+	if err := doCreateCluster(handler, cc); err != nil {
 		return err
 	}
-	if err := handler.DeployEtcdCluster(); err != nil {
-		return err
-	}
-	if err := handler.DeployLoadBalancer(); err != nil {
-		return err
-	}
-	if err := handler.InitControlPlane(); err != nil {
-		return err
-	}
-	if err := handler.JoinBootstrap(); err != nil {
-		return err
-	}
-	if err := handler.PrepareNetwork(); err != nil {
-		return err
-	}
-	if err := handler.ApplyAddons(); err != nil {
-		return err
-	}
+
 	logrus.Infof("[cluster] create cluster '%s' successed", cc.Name)
 	return nil
+}
+
+func doRemoveCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig) {
+	// Step1: cleanup addons
+	err := handler.AddonsDestroy()
+	if err != nil {
+		logrus.Warnf("[cluster] cleanup addons failed: %v", err)
+	}
+
+	//Step2: cleanup loadbalance
+	err = handler.LoadBalancerDestroy()
+	if err != nil {
+		logrus.Warnf("[cluster] cleanup loadbalance failed: %v", err)
+	}
+
+	// Step3: cleanup works
+	for _, n := range cc.Nodes {
+		if utils.IsType(n.Type, api.Worker) {
+			err = handler.ClusterNodeCleanup(n)
+			if err != nil {
+				logrus.Warnf("[cluster] cleanup node: %s failed: %v", n.Name, err)
+			}
+		}
+	}
+
+	// Step4: cleanup masters
+	for _, n := range cc.Nodes {
+		if utils.IsType(n.Type, api.Master) {
+			err = handler.ClusterNodeCleanup(n)
+			if err != nil {
+				logrus.Warnf("[cluster] cleanup master: %s failed: %v", n.Name, err)
+			}
+		}
+	}
+	// Step5: cleanup etcd cluster
+	err = handler.EtcdClusterDestroy()
+	if err != nil {
+		logrus.Warnf("[cluster] cleanup etcd cluster failed: %v", err)
+	}
+	// Step6: cleanup infrastructure
+	for _, n := range cc.Nodes {
+		err = handler.MachineInfraDestroy(n)
+		if err != nil {
+			logrus.Warnf("[cluster] cleanup infrastructure for node: %s failed: %v", n.Name, err)
+		}
+	}
 }
 
 func RemoveCluster(cc *api.ClusterConfig) error {
@@ -86,12 +175,14 @@ func RemoveCluster(cc *api.ClusterConfig) error {
 		return err
 	}
 	defer handler.Finish()
-	if err := handler.CleanupCluster(); err != nil {
-		return err
-	}
+
+	// cleanup cluster
+	doRemoveCluster(handler, cc)
+
 	// cleanup eggo config directory
 	if err := os.RemoveAll(api.GetClusterHomePath(cc.Name)); err != nil {
 		logrus.Warnf("[cluster] cleanup eggo config directory failed: %v", err)
+		return nil
 	}
 	logrus.Infof("[cluster] remove cluster '%s' successed", cc.Name)
 	return nil

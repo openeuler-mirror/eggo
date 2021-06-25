@@ -24,8 +24,9 @@ import (
 )
 
 const (
-	SUCCESS = "success"
-	FAILED  = "failed"
+	SUCCESS   = "success"
+	FAILED    = "failed"
+	IgnoreErr = "task.IgnoreError"
 )
 
 type TaskRun interface {
@@ -76,4 +77,13 @@ func IsSuccess(label string) bool {
 
 func IsFailed(label string) bool {
 	return strings.HasPrefix(label, FAILED)
+}
+
+func SetIgnoreErrorFlag(t Task) {
+	t.AddLabel(IgnoreErr, "true")
+}
+
+func IsIgnoreError(t Task) bool {
+	label := t.GetLabel(IgnoreErr)
+	return label != ""
 }

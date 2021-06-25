@@ -18,11 +18,11 @@ import (
 	"encoding/base64"
 	"fmt"
 
+	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment/runtime"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/template"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -406,6 +406,7 @@ func GetSystemdServiceShell(name string, base64Data string, needStart bool) (str
 	shell := `
 #!/bin/bash
 {{- if .content }}
+rm -f /usr/lib/systemd/system/{{ .name }}.service
 echo {{ .content }} | base64 -d > /usr/lib/systemd/system/{{ .name }}.service
 {{- end }}
 which chcon

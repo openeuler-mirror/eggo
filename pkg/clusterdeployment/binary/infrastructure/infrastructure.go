@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/utils"
@@ -242,9 +241,32 @@ func Init(config *api.ClusterConfig) error {
 		return fmt.Errorf("infrastructure Task failed: %v", err)
 	}
 
-	if err := nodemanager.WaitTaskOnAllFinished(itask, time.Second*120); err != nil {
-		return fmt.Errorf("wait Infrastructure Task failed: %v", err)
+	return nil
+}
+
+func NodeInfrastructureSetup(config *api.ClusterConfig, nodeID string) error {
+	if config == nil {
+		return fmt.Errorf("empty cluster config")
 	}
+
+	itask = task.NewTaskInstance(
+		&InfrastructureTask{
+			ccfg: config,
+		})
+
+	if err := nodemanager.RunTaskOnNodes(itask, []string{nodeID}); err != nil {
+		return fmt.Errorf("infrastructure Task failed: %v", err)
+	}
+
+	return nil
+}
+
+func NodeInfrastructureDestroy(config *api.ClusterConfig, nodeID string) error {
+	if config == nil {
+		return fmt.Errorf("empty cluster config")
+	}
+
+	// TODO: add implements
 
 	return nil
 }

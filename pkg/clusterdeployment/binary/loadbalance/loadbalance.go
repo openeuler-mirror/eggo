@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment/binary/commontools"
 	"isula.org/eggo/pkg/clusterdeployment/binary/infrastructure"
@@ -29,7 +30,6 @@ import (
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/task"
 	"isula.org/eggo/pkg/utils/template"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -186,7 +186,7 @@ func SetupLoadBalancer(config *api.ClusterConfig, loadBalancer string) error {
 		return err
 	}
 
-	if err := nodemanager.WaitTaskOnNodesFinished(taskSetupLoadBalancer, []string{loadBalancer}, time.Minute*2); err != nil {
+	if err := nodemanager.WaitNodesFinish([]string{loadBalancer}, time.Minute*2); err != nil {
 		logrus.Errorf("wait to deploy loadbalancer finish failed: %v", err)
 		return err
 	}

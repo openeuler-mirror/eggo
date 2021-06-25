@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment/binary/commontools"
 	"isula.org/eggo/pkg/clusterdeployment/binary/controlplane"
@@ -33,7 +34,6 @@ import (
 	"isula.org/eggo/pkg/utils/nodemanager"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/task"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -348,12 +348,7 @@ func JoinNode(config *api.ClusterConfig, masters, workers []string) error {
 		return err
 	}
 
-	if err := nodemanager.WaitTasksOnNodesFinished(joinMasterTasks, masters, time.Minute*5); err != nil {
-		logrus.Errorf("wait to join masters finish failed: %v", err)
-		return err
-	}
-
-	if err := nodemanager.WaitTasksOnNodesFinished(joinWorkerTasks, workers, time.Minute*5); err != nil {
+	if err := nodemanager.WaitNodesFinish(workers, time.Minute*5); err != nil {
 		logrus.Errorf("wait to join workers finish failed: %v", err)
 		return err
 	}
@@ -384,7 +379,7 @@ func Init(config *api.ClusterConfig) error {
 		if err := nodemanager.RunTasksOnNode(tasks, masters[0]); err != nil {
 			return err
 		}
-		if err := nodemanager.WaitTasksOnNodeFinished(tasks, masters[0], time.Minute*2); err != nil {
+		if err := nodemanager.WaitNodesFinish(masters[0:1], time.Minute*2); err != nil {
 			return err
 		}
 	}
