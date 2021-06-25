@@ -5,12 +5,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"gitee.com/openeuler/eggo/pkg/api"
-	"gitee.com/openeuler/eggo/pkg/constants"
-	"gitee.com/openeuler/eggo/pkg/utils/nodemanager"
-	"gitee.com/openeuler/eggo/pkg/utils/runner"
-	"gitee.com/openeuler/eggo/pkg/utils/task"
-	"gitee.com/openeuler/eggo/pkg/utils/template"
+	"isula.org/eggo/pkg/api"
+	"isula.org/eggo/pkg/constants"
+	"isula.org/eggo/pkg/utils/nodemanager"
+	"isula.org/eggo/pkg/utils/runner"
+	"isula.org/eggo/pkg/utils/task"
+	"isula.org/eggo/pkg/utils/template"
 	"github.com/sirupsen/logrus"
 )
 

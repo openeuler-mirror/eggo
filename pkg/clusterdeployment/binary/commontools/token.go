@@ -22,9 +22,9 @@ import (
 	"text/template"
 	"time"
 
-	"gitee.com/openeuler/eggo/pkg/api"
-	"gitee.com/openeuler/eggo/pkg/constants"
-	"gitee.com/openeuler/eggo/pkg/utils/runner"
+	"isula.org/eggo/pkg/api"
+	"isula.org/eggo/pkg/constants"
+	"isula.org/eggo/pkg/utils/runner"
 	kkutil "github.com/kubesphere/kubekey/pkg/util"
 	"github.com/lithammer/dedent"
 	"github.com/sirupsen/logrus"

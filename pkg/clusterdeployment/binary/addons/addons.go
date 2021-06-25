@@ -1,6 +1,6 @@
 package addons
 
-import "gitee.com/openeuler/eggo/pkg/api"
+import "isula.org/eggo/pkg/api"
 
 // TODO: support run apply addons in eggo, not run in master
 

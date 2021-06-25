@@ -18,9 +18,9 @@ package clusterdeployment
 import (
 	"fmt"
 
-	"gitee.com/openeuler/eggo/pkg/api"
-	_ "gitee.com/openeuler/eggo/pkg/clusterdeployment/binary"
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment/manager"
+	"isula.org/eggo/pkg/api"
+	_ "isula.org/eggo/pkg/clusterdeployment/binary"
+	"isula.org/eggo/pkg/clusterdeployment/manager"
 	"github.com/sirupsen/logrus"
 )
 

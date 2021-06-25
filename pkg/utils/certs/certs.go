@@ -21,8 +21,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitee.com/openeuler/eggo/pkg/utils/runner"
-	"gitee.com/openeuler/eggo/pkg/utils/template"
+	"isula.org/eggo/pkg/utils/runner"
+	"isula.org/eggo/pkg/utils/template"
 	"github.com/sirupsen/logrus"
 )
 

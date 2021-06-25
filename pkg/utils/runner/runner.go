@@ -26,8 +26,8 @@ import (
 	"strings"
 	"time"
 
-	"gitee.com/openeuler/eggo/pkg/api"
-	"gitee.com/openeuler/eggo/pkg/constants"
+	"isula.org/eggo/pkg/api"
+	"isula.org/eggo/pkg/constants"
 	kkv1alpha1 "github.com/kubesphere/kubekey/apis/kubekey/v1alpha1"
 	"github.com/kubesphere/kubekey/pkg/util/ssh"
 	"github.com/sirupsen/logrus"

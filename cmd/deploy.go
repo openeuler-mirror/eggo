@@ -20,8 +20,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"gitee.com/openeuler/eggo/pkg/api"
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment"
+	"isula.org/eggo/pkg/api"
+	"isula.org/eggo/pkg/clusterdeployment"
 )
 
 func deploy(ccfg *api.ClusterConfig) error {

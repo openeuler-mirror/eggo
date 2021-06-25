@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"sync"
 
-	"gitee.com/openeuler/eggo/pkg/api"
+	"isula.org/eggo/pkg/api"
 )
 
 type ClusterDeploymentCreator func(*api.ClusterConfig) (api.ClusterDeploymentAPI, error)

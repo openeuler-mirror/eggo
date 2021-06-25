@@ -20,7 +20,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"gitee.com/openeuler/eggo/pkg/api"
+	"isula.org/eggo/pkg/api"
 	"github.com/sirupsen/logrus"
 	validation "k8s.io/apimachinery/pkg/util/validation"
 )

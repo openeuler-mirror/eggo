@@ -18,8 +18,8 @@ package clusterdeployment
 import (
 	"testing"
 
-	"gitee.com/openeuler/eggo/pkg/api"
-	"gitee.com/openeuler/eggo/pkg/clusterdeployment/manager"
+	"isula.org/eggo/pkg/api"
+	"isula.org/eggo/pkg/clusterdeployment/manager"
 )
 
 func TestRegisterControlPlaneDriver(t *testing.T) {

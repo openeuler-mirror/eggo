@@ -19,7 +19,7 @@ import (
 	"os/user"
 	"strings"
 
-	"gitee.com/openeuler/eggo/pkg/api"
+	"isula.org/eggo/pkg/api"
 )
 
 func IsX86Arch(arch string) bool {

@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"gitee.com/openeuler/eggo/pkg/utils/runner"
+	"isula.org/eggo/pkg/utils/runner"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/clientcmd"

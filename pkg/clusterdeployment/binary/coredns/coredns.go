@@ -17,7 +17,7 @@ package coredns
 import (
 	"fmt"
 
-	"gitee.com/openeuler/eggo/pkg/api"
+	"isula.org/eggo/pkg/api"
 )
 
 const (

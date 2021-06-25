@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"gitee.com/openeuler/eggo/pkg/constants"
+	"isula.org/eggo/pkg/constants"
 )
 
 func TestNewLocalCertGenerator(t *testing.T) {
