@@ -467,3 +467,40 @@ func Init(conf *api.ClusterConfig) error {
 
 	return nil
 }
+
+type cleanupLoadBalanceTask struct {
+	ccfg *api.ClusterConfig
+}
+
+func (t *cleanupLoadBalanceTask) Name() string {
+	return "cleanupLoadBalanceTask"
+}
+
+func (t *cleanupLoadBalanceTask) Run(r runner.Runner, hostConfig *api.HostConfig) error {
+	// stop service before remove dependences
+	// TODO: recode stop service func
+	if err := stopService(r, t.ccfg, hostConfig); err != nil {
+		logrus.Errorf("stop service failed: %v", err)
+	}
+
+	cleanupLoadBalance(t.ccfg, r, hostConfig)
+
+	postCleanup(r, hostConfig)
+
+	return nil
+}
+
+func CleanupLoadBalance(conf *api.ClusterConfig, lb *api.HostConfig) error {
+	taskCleanupLoadBalance := task.NewTaskInstance(
+		&cleanupLoadBalanceTask{
+			ccfg: conf,
+		},
+	)
+
+	task.SetIgnoreErrorFlag(taskCleanupLoadBalance)
+	if err := nodemanager.RunTaskOnNodes(taskCleanupLoadBalance, []string{lb.Address}); err != nil {
+		return fmt.Errorf("run task for cleanup loadbalance failed: %v", err)
+	}
+
+	return nil
+}

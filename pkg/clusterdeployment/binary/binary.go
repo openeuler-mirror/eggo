@@ -20,6 +20,8 @@ import (
 
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment/binary/addons"
+	"isula.org/eggo/pkg/clusterdeployment/binary/bootstrap"
+	"isula.org/eggo/pkg/clusterdeployment/binary/cleanupcluster"
 	"isula.org/eggo/pkg/clusterdeployment/binary/controlplane"
 	"isula.org/eggo/pkg/clusterdeployment/binary/coredns"
 	"isula.org/eggo/pkg/clusterdeployment/binary/etcdcluster"
@@ -27,6 +29,7 @@ import (
 	"isula.org/eggo/pkg/clusterdeployment/binary/loadbalance"
 	"isula.org/eggo/pkg/clusterdeployment/binary/network"
 	"isula.org/eggo/pkg/clusterdeployment/manager"
+	"isula.org/eggo/pkg/utils"
 	"isula.org/eggo/pkg/utils/kubectl"
 	"isula.org/eggo/pkg/utils/nodemanager"
 	"isula.org/eggo/pkg/utils/runner"
@@ -224,7 +227,40 @@ func (bcp *BinaryClusterDeployment) ClusterControlPlaneInit(master *api.HostConf
 }
 
 func (bcp *BinaryClusterDeployment) ClusterNodeJoin(node *api.HostConfig) error {
-	// TODO: add implement
+	if node == nil {
+		logrus.Warnf("empty join node config")
+		return nil
+	}
+
+	logrus.Infof("do join node %s...", node.Address)
+
+	if utils.IsType(node.Type, api.Master) {
+		err := bootstrap.JoinMaster(bcp.config, node)
+		if err != nil {
+			return err
+		}
+	}
+
+	if utils.IsType(node.Type, api.Worker) {
+		var controlPlane *api.HostConfig
+		for _, n := range bcp.config.Nodes {
+			if utils.IsType(n.Type, api.Master) {
+				controlPlane = n
+				break
+			}
+		}
+
+		if controlPlane == nil {
+			return fmt.Errorf("no useful controlPlane")
+		}
+
+		err := bootstrap.JoinWorker(bcp.config, controlPlane, node)
+		if err != nil {
+			return err
+		}
+	}
+
+	logrus.Infof("join node %s success", node.Address)
 	return nil
 }
 
@@ -285,24 +321,47 @@ func (bcp *BinaryClusterDeployment) AddonsDestroy() error {
 	return nil
 }
 
-func (bcp *BinaryClusterDeployment) LoadBalancerSetup() error {
+func (bcp *BinaryClusterDeployment) LoadBalancerSetup(lb *api.HostConfig) error {
+	if lb == nil {
+		logrus.Warnf("empty loadbalancer config")
+		return nil
+	}
+
 	logrus.Info("do deploy loadbalancer...")
-	if err := loadbalance.Init(bcp.config); err != nil {
+
+	if err := loadbalance.SetupLoadBalancer(bcp.config, lb); err != nil {
 		logrus.Errorf("bootstrap falied: %v", err)
 		return err
 	}
 
-	logrus.Info("do deploy loadbalancer success")
+	logrus.Info("deploy loadbalancer success")
 	return nil
 }
 
-func (bcp *BinaryClusterDeployment) LoadBalancerUpdate() error {
-	// TODO: add implement
+func (bcp *BinaryClusterDeployment) LoadBalancerUpdate(lb *api.HostConfig) error {
+	if lb == nil {
+		logrus.Warnf("empty loadbalancer config")
+		return nil
+	}
+
+	logrus.Info("do deploy loadbalancer...")
+
+	if err := loadbalance.UpdateLoadBalancer(bcp.config, lb); err != nil {
+		logrus.Errorf("bootstrap falied: %v", err)
+		return err
+	}
+
+	logrus.Info("deploy loadbalancer success")
 	return nil
 }
 
-func (bcp *BinaryClusterDeployment) LoadBalancerDestroy() error {
-	// TODO: add implement
+func (bcp *BinaryClusterDeployment) LoadBalancerDestroy(lb *api.HostConfig) error {
+	if lb == nil {
+		logrus.Warnf("empty loadbalancer config")
+		return nil
+	}
+
+	cleanupcluster.CleanupLoadBalance(bcp.config, lb)
 	return nil
 }
 

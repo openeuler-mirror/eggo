@@ -29,6 +29,7 @@ import (
 )
 
 func doCreateCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig) error {
+	var loadbalancer *api.HostConfig
 	var controlPlane *api.HostConfig
 	var joinNodes []*api.HostConfig
 	var joinNodeIDs []string
@@ -38,15 +39,25 @@ func doCreateCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig) er
 		if err := handler.MachineInfraSetup(n); err != nil {
 			return err
 		}
+		if utils.IsType(n.Type, api.LoadBalance) {
+			loadbalancer = n
+		}
 		if utils.IsType(n.Type, api.ETCD) {
 			etcdNodes = append(etcdNodes, n.Address)
 		}
-		if controlPlane == nil && utils.IsType(n.Type, api.Master) {
-			controlPlane = n
-			continue
+		if utils.IsType(n.Type, api.Worker) {
+			joinNodes = append(joinNodes, n)
+			joinNodeIDs = append(joinNodeIDs, n.Address)
 		}
-		joinNodes = append(joinNodes, n)
-		joinNodeIDs = append(joinNodeIDs, n.Address)
+
+		if utils.IsType(n.Type, api.Master) {
+			if controlPlane == nil {
+				controlPlane = n
+			} else {
+				joinNodes = append(joinNodes, n)
+				joinNodeIDs = append(joinNodeIDs, n.Address)
+			}
+		}
 	}
 
 	// Step2: setup etcd cluster
@@ -58,7 +69,7 @@ func doCreateCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig) er
 		return err
 	}
 	// Step3: setup loadbalance for cluster
-	if err := handler.LoadBalancerSetup(); err != nil {
+	if err := handler.LoadBalancerSetup(loadbalancer); err != nil {
 		return err
 	}
 	// Step4: setup control plane for cluster
@@ -122,9 +133,14 @@ func doRemoveCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig) {
 	}
 
 	//Step2: cleanup loadbalance
-	err = handler.LoadBalancerDestroy()
-	if err != nil {
-		logrus.Warnf("[cluster] cleanup loadbalance failed: %v", err)
+	for _, n := range cc.Nodes {
+		if utils.IsType(n.Type, api.LoadBalance) {
+			err = handler.LoadBalancerDestroy(n)
+			if err != nil {
+				logrus.Warnf("[cluster] cleanup loadbalance failed: %v", err)
+			}
+			break
+		}
 	}
 
 	// Step3: cleanup works

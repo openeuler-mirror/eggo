@@ -24,7 +24,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment/binary/commontools"
-	"isula.org/eggo/pkg/clusterdeployment/binary/infrastructure"
 	"isula.org/eggo/pkg/utils"
 	"isula.org/eggo/pkg/utils/nodemanager"
 	"isula.org/eggo/pkg/utils/runner"
@@ -38,7 +37,8 @@ const (
 )
 
 type LoadBalanceTask struct {
-	ccfg *api.ClusterConfig
+	lbConfig *api.LoadBalancer
+	masters  []string
 }
 
 func (it *LoadBalanceTask) Name() string {
@@ -49,7 +49,7 @@ func (it *LoadBalanceTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 	logrus.Info("prepare loadbalancer...\n")
 
 	// check loadbalancer dependences
-	path, err := check(r, it.ccfg)
+	path, err := check(r, it.lbConfig, it.masters)
 	if err != nil {
 		logrus.Errorf("check failed: %v", err)
 		return err
@@ -60,21 +60,14 @@ func (it *LoadBalanceTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 	}
 
 	// prepare nginx config
-	if err := prepareConfig(r, it.ccfg); err != nil {
+	if err := prepareConfig(r, it.lbConfig, it.masters); err != nil {
 		logrus.Errorf("prepare config failed: %v", err)
 		return err
 	}
 
 	// prepare and start nginx service
-	if err := commontools.SetupLoadBalanceServices(r, it.ccfg, path); err != nil {
+	if err := commontools.SetupLoadBalanceServices(r, path); err != nil {
 		logrus.Errorf("run service failed: %v", err)
-		return err
-	}
-
-	// expose port
-	p := it.ccfg.LoadBalancer.Port + "/tcp"
-	if err := infrastructure.ExposePorts(r, p); err != nil {
-		logrus.Errorf("expose port failed: %v", err)
 		return err
 	}
 
@@ -82,9 +75,12 @@ func (it *LoadBalanceTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 	return nil
 }
 
-func check(r runner.Runner, ccfg *api.ClusterConfig) (string, error) {
-	if ccfg.LoadBalancer.IP == "" || ccfg.LoadBalancer.Port == "" {
-		return "", fmt.Errorf("invalid loadbalance %s:%s", ccfg.LoadBalancer.IP, ccfg.LoadBalancer.Port)
+func check(r runner.Runner, lbConfig *api.LoadBalancer, masters []string) (string, error) {
+	if lbConfig.IP == "" || lbConfig.Port == "" {
+		return "", fmt.Errorf("invalid loadbalance %s:%s", lbConfig.IP, lbConfig.Port)
+	}
+	if len(masters) == 0 {
+		return "", fmt.Errorf("empty apiserver address")
 	}
 
 	path, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"which %s\"", LoadBalanceSoftware))
@@ -97,7 +93,7 @@ func check(r runner.Runner, ccfg *api.ClusterConfig) (string, error) {
 	return path, nil
 }
 
-func prepareConfig(r runner.Runner, ccfg *api.ClusterConfig) error {
+func prepareConfig(r runner.Runner, lbConfig *api.LoadBalancer, masters []string) error {
 	nginxConfig := `load_module {{ .modulesPath }}/ngx_stream_module.so;
 
 worker_processes 1;
@@ -126,15 +122,11 @@ stream {
 	if err != nil {
 		logrus.Errorf("get nginx modules path failed: %v", err)
 	}
-	masterIPs := utils.GetMasterIPList(ccfg)
-	if len(masterIPs) == 0 {
-		return fmt.Errorf("no master host found, can not setup loadbalance")
-	}
 
 	datastore := map[string]interface{}{}
 	datastore["modulesPath"] = modulesPath
-	datastore["IPs"] = masterIPs
-	datastore["port"] = ccfg.LoadBalancer.Port
+	datastore["IPs"] = masters
+	datastore["port"] = lbConfig.Port
 	config, err := template.TemplateRender(nginxConfig, datastore)
 	if err != nil {
 		return err
@@ -166,27 +158,24 @@ func getModulePath(r runner.Runner) (string, error) {
 	return path, nil
 }
 
-func SetupLoadBalancer(config *api.ClusterConfig, loadBalancer string) error {
-	if config == nil {
-		return fmt.Errorf("empty cluster config")
-	}
-
-	if loadBalancer == "" {
-		logrus.Info("no loadbalance")
-		return nil
+func SetupLoadBalancer(config *api.ClusterConfig, lb *api.HostConfig) error {
+	masterIPs := utils.GetMasterIPList(config)
+	if len(masterIPs) == 0 {
+		return fmt.Errorf("no master host found, can not setup loadbalance")
 	}
 
 	taskSetupLoadBalancer := task.NewTaskInstance(
 		&LoadBalanceTask{
-			ccfg: config,
+			lbConfig: &config.LoadBalancer,
+			masters:  masterIPs,
 		},
 	)
 
-	if err := nodemanager.RunTaskOnNodes(taskSetupLoadBalancer, []string{loadBalancer}); err != nil {
+	if err := nodemanager.RunTaskOnNodes(taskSetupLoadBalancer, []string{lb.Address}); err != nil {
 		return err
 	}
 
-	if err := nodemanager.WaitNodesFinish([]string{loadBalancer}, time.Minute*2); err != nil {
+	if err := nodemanager.WaitNodesFinish([]string{lb.Address}, time.Minute*2); err != nil {
 		logrus.Errorf("wait to deploy loadbalancer finish failed: %v", err)
 		return err
 	}
@@ -194,18 +183,63 @@ func SetupLoadBalancer(config *api.ClusterConfig, loadBalancer string) error {
 	return nil
 }
 
-func Init(config *api.ClusterConfig) error {
-	loadbalancer := ""
-	for _, node := range config.Nodes {
-		if node.Type&api.LoadBalance != 0 {
-			loadbalancer = node.Address
-			break
-		}
-	}
-
-	return SetupLoadBalancer(config, loadbalancer)
+type UpdateLoadBalanceTask struct {
+	lbConfig *api.LoadBalancer
+	masters  []string
 }
 
-func UpdateLoadBalancer() {
-	// TODO: update loadbalance when join/drop master
+func (it *UpdateLoadBalanceTask) Name() string {
+	return "LoadBalanceTask"
+}
+
+func (it *UpdateLoadBalanceTask) Run(r runner.Runner, hcg *api.HostConfig) error {
+	logrus.Info("update loadbalancer...\n")
+
+	// remove nginx config
+	if _, err := r.RunCommand("sudo -E /bin/sh -c \"rm -rf /etc/kubernetes/kube-nginx.conf\""); err != nil {
+		logrus.Errorf("remove config failed: %v", err)
+		return err
+	}
+
+	// prepare nginx config
+	if err := prepareConfig(r, it.lbConfig, it.masters); err != nil {
+		logrus.Errorf("prepare config failed: %v", err)
+		return err
+	}
+
+	// restart nginx service
+	if _, err := r.RunCommand("sudo -E /bin/sh -c \"systemctl restart nginx\""); err != nil {
+		logrus.Errorf("restart service failed: %v", err)
+		return err
+	}
+
+	logrus.Info("update loadbalancer success\n")
+	return nil
+}
+
+func UpdateLoadBalancer(config *api.ClusterConfig, lb *api.HostConfig) error {
+	// update loadbalance when join/drop master
+
+	masterIPs := utils.GetMasterIPList(config)
+	if len(masterIPs) == 0 {
+		return fmt.Errorf("no master host found, can not update loadbalance")
+	}
+
+	taskUpdateLoadBalancer := task.NewTaskInstance(
+		&UpdateLoadBalanceTask{
+			lbConfig: &config.LoadBalancer,
+			masters:  masterIPs,
+		},
+	)
+
+	if err := nodemanager.RunTaskOnNodes(taskUpdateLoadBalancer, []string{lb.Address}); err != nil {
+		return err
+	}
+
+	if err := nodemanager.WaitNodesFinish([]string{lb.Address}, time.Minute*2); err != nil {
+		logrus.Errorf("wait to update loadbalancer finish failed: %v", err)
+		return err
+	}
+
+	return nil
 }

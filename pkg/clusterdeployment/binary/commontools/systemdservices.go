@@ -357,7 +357,7 @@ func SetupWorkerServices(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.Host
 	return nil
 }
 
-func SetupLoadBalanceServices(r runner.Runner, ccfg *api.ClusterConfig, command string) error {
+func SetupLoadBalanceServices(r runner.Runner, command string) error {
 	config := `[Unit]
 Description=kube-apiserver nginx proxy
 After=network.target

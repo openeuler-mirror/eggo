@@ -18,9 +18,9 @@ package infrastructure
 import (
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/utils/nodemanager"
-	"github.com/sirupsen/logrus"
 )
 
 type MockRunner struct {

@@ -39,12 +39,12 @@ var (
 	EtcdPosts   = []string{"2379-2381/tcp"}
 )
 
-type InfrastructureTask struct {
+type SetupInfraTask struct {
 	ccfg *api.ClusterConfig
 }
 
-func (it *InfrastructureTask) Name() string {
-	return "InfrastructureTask"
+func (it *SetupInfraTask) Name() string {
+	return "SetupInfraTask"
 }
 
 func setNetBridge(r runner.Runner) error {
@@ -94,12 +94,11 @@ exit 0
 	return nil
 }
 
-func (it *InfrastructureTask) Run(r runner.Runner, hcg *api.HostConfig) (err error) {
+func (it *SetupInfraTask) Run(r runner.Runner, hcg *api.HostConfig) (err error) {
 	if hcg == nil {
 		return fmt.Errorf("empty host config")
 	}
 
-	// TODO: prepare loadbalancer
 	if err = check(hcg); err != nil {
 		logrus.Errorf("check failed: %v", err)
 		return
@@ -120,7 +119,7 @@ func (it *InfrastructureTask) Run(r runner.Runner, hcg *api.HostConfig) (err err
 		return err
 	}
 
-	if err = addFirewallPort(r, hcg); err != nil {
+	if err = addFirewallPort(r, hcg, &it.ccfg.LoadBalancer); err != nil {
 		logrus.Errorf("add firewall port failed: %v", err)
 		return err
 	}
@@ -154,19 +153,23 @@ func setHostname(r runner.Runner, hcg *api.HostConfig) error {
 	return nil
 }
 
-func addFirewallPort(r runner.Runner, hcg *api.HostConfig) error {
+func preparePorts(hcg *api.HostConfig, lbConfig *api.LoadBalancer) []string {
 	ports := []string{}
 
-	if hcg.Type&api.Master != 0 {
+	if utils.IsType(hcg.Type, api.Master) {
 		ports = append(ports, MasterPorts...)
 	}
 
-	if hcg.Type&api.Worker != 0 {
+	if utils.IsType(hcg.Type, api.Worker) {
 		ports = append(ports, WorkPorts...)
 	}
 
-	if hcg.Type&api.ETCD != 0 {
+	if utils.IsType(hcg.Type, api.ETCD) {
 		ports = append(ports, EtcdPosts...)
+	}
+
+	if utils.IsType(hcg.Type, api.LoadBalance) {
+		ports = append(ports, lbConfig.Port+"/tcp")
 	}
 
 	for _, p := range hcg.OpenPorts {
@@ -174,8 +177,14 @@ func addFirewallPort(r runner.Runner, hcg *api.HostConfig) error {
 		ports = append(ports, port)
 	}
 
+	return ports
+}
+
+func addFirewallPort(r runner.Runner, hcg *api.HostConfig, lbConfig *api.LoadBalancer) error {
+	ports := preparePorts(hcg, lbConfig)
 	if len(ports) == 0 {
-		logrus.Warnf("no expose port for %s", hcg.Address)
+		logrus.Warnf("no port for %s", hcg.Address)
+		return nil
 	}
 
 	if err := ExposePorts(r, ports...); err != nil {
@@ -233,7 +242,7 @@ func Init(config *api.ClusterConfig) error {
 	}
 
 	itask = task.NewTaskInstance(
-		&InfrastructureTask{
+		&SetupInfraTask{
 			ccfg: config,
 		})
 
@@ -250,13 +259,51 @@ func NodeInfrastructureSetup(config *api.ClusterConfig, nodeID string) error {
 	}
 
 	itask = task.NewTaskInstance(
-		&InfrastructureTask{
+		&SetupInfraTask{
 			ccfg: config,
 		})
 
 	if err := nodemanager.RunTaskOnNodes(itask, []string{nodeID}); err != nil {
-		return fmt.Errorf("infrastructure Task failed: %v", err)
+		return fmt.Errorf("setup infrastructure Task failed: %v", err)
 	}
+
+	return nil
+}
+
+type DestroyInfraTask struct {
+	ccfg *api.ClusterConfig
+}
+
+func (it *DestroyInfraTask) Name() string {
+	return "DestroyInfraTask"
+}
+
+func (it *DestroyInfraTask) Run(r runner.Runner, hcg *api.HostConfig) (err error) {
+	if hcg == nil {
+		return fmt.Errorf("empty host config")
+	}
+
+	if err = RemoveDependences(r, hcg, &it.ccfg.PackageSrc); err != nil {
+		logrus.Errorf("remove dependences failed: %v", err)
+		return err
+	}
+
+	if err = removeFirewallPort(r, hcg, &it.ccfg.LoadBalancer); err != nil {
+		logrus.Errorf("add firewall port failed: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func removeFirewallPort(r runner.Runner, hcg *api.HostConfig, lbConfig *api.LoadBalancer) error {
+	ports := preparePorts(hcg, lbConfig)
+	if len(ports) == 0 {
+		logrus.Warnf("no ports for %s", hcg.Address)
+		return nil
+	}
+
+	ShieldPorts(r, ports...)
 
 	return nil
 }
@@ -266,7 +313,14 @@ func NodeInfrastructureDestroy(config *api.ClusterConfig, nodeID string) error {
 		return fmt.Errorf("empty cluster config")
 	}
 
-	// TODO: add implements
+	itask = task.NewTaskInstance(
+		&DestroyInfraTask{
+			ccfg: config,
+		})
+
+	if err := nodemanager.RunTaskOnNodes(itask, []string{nodeID}); err != nil {
+		return fmt.Errorf("destroy infrastructure Task failed: %v", err)
+	}
 
 	return nil
 }

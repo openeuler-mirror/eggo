@@ -274,9 +274,9 @@ type ClusterManagerAPI interface {
 }
 
 type LoadBalancerAPI interface {
-	LoadBalancerSetup() error
-	LoadBalancerUpdate() error
-	LoadBalancerDestroy() error
+	LoadBalancerSetup(lb *HostConfig) error
+	LoadBalancerUpdate(lb *HostConfig) error
+	LoadBalancerDestroy(lb *HostConfig) error
 }
 
 type ClusterDeploymentAPI interface {
