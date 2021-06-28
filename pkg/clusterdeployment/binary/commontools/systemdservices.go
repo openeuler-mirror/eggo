@@ -366,7 +366,6 @@ Wants=network-online.target
 
 [Service]
 Type=forking
-ExecStartPre=/usr/sbin/setenforce 0
 ExecStartPre={{ .command }} -c /etc/kubernetes/kube-nginx.conf -t
 ExecStart={{ .command }} -c /etc/kubernetes/kube-nginx.conf
 ExecReload={{ .command }} -c /etc/kubernetes/kube-nginx.conf -s reload

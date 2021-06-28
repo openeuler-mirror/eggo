@@ -66,12 +66,12 @@ func setupDeployCmdOpts(deployCmd *cobra.Command) {
 
 func setupCleanupCmdOpts(cleanupCmd *cobra.Command) {
 	flags := cleanupCmd.Flags()
-	flags.StringVarP(&opts.deployConfig, "file", "f", defaultDeployConfigPath(), "location of cluster deploy config file, default $HOME/.eggo/deploy.yaml")
+	flags.StringVarP(&opts.cleanupConfig, "file", "f", defaultDeployConfigPath(), "location of cluster deploy config file, default $HOME/.eggo/deploy.yaml")
 }
 
 func setupJoinCmdOpts(joinCmd *cobra.Command) {
 	flags := joinCmd.Flags()
-	flags.StringVarP(&opts.joinType, "type", "t", "node", "join type, can be \"master,node,etcd\", deault node")
+	flags.StringVarP(&opts.joinType, "type", "t", "worker", "join type, can be \"master,worker,etcd\", deault worker")
 	flags.StringVarP(&opts.joinHost.Arch, "arch", "", "amd64", "host's architecture, default amd64")
 	flags.StringVarP(&opts.joinHost.Name, "name", "n", "", "host's name")
 	flags.IntVarP(&opts.joinHost.Port, "port", "p", 22, "host's ssh port, default 22")
@@ -79,7 +79,7 @@ func setupJoinCmdOpts(joinCmd *cobra.Command) {
 
 func setupDeleteCmdOpts(deleteCmd *cobra.Command) {
 	flags := deleteCmd.Flags()
-	flags.StringVarP(&opts.delType, "type", "t", "node", "delete type, can be \"master,node,etcd,all\", deault all")
+	flags.StringVarP(&opts.delType, "type", "t", "worker", "delete type, can be \"master,worker,etcd,all\", deault all")
 }
 
 func setupTemplateCmdOpts(templateCmd *cobra.Command) {
@@ -88,7 +88,7 @@ func setupTemplateCmdOpts(templateCmd *cobra.Command) {
 	flags.StringVarP(&opts.username, "user", "u", "root", "user to login all node")
 	flags.StringVarP(&opts.password, "password", "p", "123456", "password to login all node")
 	flags.StringArrayVarP(&opts.masters, "masters", "", []string{"192.168.0.2"}, "set master ips")
-	flags.StringArrayVarP(&opts.nodes, "nodes", "", []string{"192.168.0.3", "192.168.0.4"}, "set worker ips")
+	flags.StringArrayVarP(&opts.nodes, "workers", "", []string{"192.168.0.3", "192.168.0.4"}, "set worker ips")
 	flags.StringArrayVarP(&opts.etcds, "etcds", "", nil, "set etcd node ips")
 	flags.StringVarP(&opts.loadbalance, "loadbalance", "l", "192.168.0.1", "set loadbalance node")
 	flags.StringVarP(&opts.templateConfig, "file", "f", "template.yaml", "location of eggo's template config file, default $(current)/template.yaml")

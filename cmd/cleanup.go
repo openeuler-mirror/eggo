@@ -33,9 +33,18 @@ func cleanupCluster(cmd *cobra.Command, args []string) error {
 		initLog()
 	}
 
-	conf, err := loadConfig()
-	if err != nil {
-		return fmt.Errorf("load config failed: %v", err)
+	var conf *deployConfig
+	var err error
+	if opts.cleanupConfig == "" {
+		conf, err = loadConfig()
+		if err != nil {
+			return fmt.Errorf("load config failed: %v", err)
+		}
+	} else {
+		conf, err = loadDeployConfig(opts.cleanupConfig)
+		if err != nil {
+			return fmt.Errorf("load deploy config file failed: %v", err)
+		}
 	}
 
 	// TODO: make sure config valid

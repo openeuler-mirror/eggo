@@ -6,12 +6,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
-	"isula.org/eggo/pkg/clusterdeployment/binary/infrastructure"
 	"isula.org/eggo/pkg/constants"
+	"isula.org/eggo/pkg/utils/dependency"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/template"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -25,7 +25,7 @@ type Runtime interface {
 	GetRuntimeSoftwares() []string
 	GetRuntimeClient() string
 	GetRuntimeService() string
-	PrepareRuntimeJson(r runner.Runner, ccfg *api.ClusterConfig) error
+	PrepareRuntimeJson(r runner.Runner, workerConfig *api.WorkerConfig) error
 }
 
 type isuladRuntime struct {
@@ -43,20 +43,20 @@ func (ir *isuladRuntime) GetRuntimeService() string {
 	return "isulad"
 }
 
-func (ir *isuladRuntime) PrepareRuntimeJson(r runner.Runner, ccfg *api.ClusterConfig) error {
-	pauseImage, cniBinDir := "k8s.gcr.io/pause:3.2", "/usr/libexec/cni"
+func (ir *isuladRuntime) PrepareRuntimeJson(r runner.Runner, WorkerConfig *api.WorkerConfig) error {
+	pauseImage, cniBinDir := "k8s.gcr.io/pause:3.2", "/usr/libexec/cni,/opt/cni/bin"
 	registry := []string{"docker.io"}
 	insecure := []string{"quay.io", "k8s.gcr.io"}
 
-	if ccfg.WorkerConfig.KubeletConf.PauseImage != "" {
-		pauseImage = ccfg.WorkerConfig.KubeletConf.PauseImage
+	if WorkerConfig.KubeletConf.PauseImage != "" {
+		pauseImage = WorkerConfig.KubeletConf.PauseImage
 	}
-	if ccfg.WorkerConfig.KubeletConf.CniBinDir != "" {
-		cniBinDir = ccfg.WorkerConfig.KubeletConf.CniBinDir
+	if WorkerConfig.KubeletConf.CniBinDir != "" {
+		cniBinDir = WorkerConfig.KubeletConf.CniBinDir
 	}
-	if len(ccfg.WorkerConfig.ContainerEngineConf.RegistryMirrors) != 0 || len(ccfg.WorkerConfig.ContainerEngineConf.InsecureRegistries) != 0 {
-		registry = ccfg.WorkerConfig.ContainerEngineConf.RegistryMirrors
-		insecure = ccfg.WorkerConfig.ContainerEngineConf.InsecureRegistries
+	if len(WorkerConfig.ContainerEngineConf.RegistryMirrors) != 0 || len(WorkerConfig.ContainerEngineConf.InsecureRegistries) != 0 {
+		registry = WorkerConfig.ContainerEngineConf.RegistryMirrors
+		insecure = WorkerConfig.ContainerEngineConf.InsecureRegistries
 	}
 
 	isuladConfig := `
@@ -105,9 +105,9 @@ func (dr *dockerRuntime) GetRuntimeService() string {
 	return "docker"
 }
 
-func (dr *dockerRuntime) PrepareRuntimeJson(r runner.Runner, ccfg *api.ClusterConfig) error {
-	registry := ccfg.WorkerConfig.ContainerEngineConf.RegistryMirrors
-	insecure := ccfg.WorkerConfig.ContainerEngineConf.InsecureRegistries
+func (dr *dockerRuntime) PrepareRuntimeJson(r runner.Runner, WorkerConfig *api.WorkerConfig) error {
+	registry := WorkerConfig.ContainerEngineConf.RegistryMirrors
+	insecure := WorkerConfig.ContainerEngineConf.InsecureRegistries
 
 	if len(registry) == 0 && len(insecure) == 0 {
 		return nil
@@ -156,13 +156,17 @@ func (dr *dockerRuntime) PrepareRuntimeJson(r runner.Runner, ccfg *api.ClusterCo
 }
 
 type DeployRuntimeTask struct {
-	ccfg    *api.ClusterConfig
-	runtime Runtime
+	runtime      Runtime
+	workerConfig *api.WorkerConfig
+	workerInfra  *api.RoleInfra
+	packageSrc   *api.PackageSrcConfig
 }
 
 func NewDeployRuntimeTask(ccfg *api.ClusterConfig) *DeployRuntimeTask {
 	return &DeployRuntimeTask{
-		ccfg: ccfg,
+		workerConfig: &ccfg.WorkerConfig,
+		workerInfra:  ccfg.RoleInfra[api.Worker],
+		packageSrc:   &ccfg.PackageSrc,
 	}
 }
 
@@ -173,9 +177,9 @@ func (ct *DeployRuntimeTask) Name() string {
 func (ct *DeployRuntimeTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 	logrus.Info("do deploy container engine...\n")
 
-	ct.runtime = GetRuntime(ct.ccfg.WorkerConfig.ContainerEngineConf.Runtime)
+	ct.runtime = GetRuntime(ct.workerConfig.ContainerEngineConf.Runtime)
 	if ct.runtime == nil {
-		return fmt.Errorf("unsupport container engine %s", ct.ccfg.WorkerConfig.ContainerEngineConf.Runtime)
+		return fmt.Errorf("unsupport container engine %s", ct.workerConfig.ContainerEngineConf.Runtime)
 	}
 
 	// check container engine softwares
@@ -184,7 +188,7 @@ func (ct *DeployRuntimeTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 		return err
 	}
 
-	if err := ct.runtime.PrepareRuntimeJson(r, ct.ccfg); err != nil {
+	if err := ct.runtime.PrepareRuntimeJson(r, ct.workerConfig); err != nil {
 		logrus.Errorf("prepare container engine json failed: %v", err)
 		return err
 	}
@@ -195,7 +199,7 @@ func (ct *DeployRuntimeTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 		return err
 	}
 
-	if err := loadImages(r, &ct.ccfg.PackageSrc, ct.runtime.GetRuntimeClient()); err != nil {
+	if err := loadImages(r, ct.workerInfra, ct.packageSrc, ct.runtime.GetRuntimeClient()); err != nil {
 		logrus.Errorf("load images failed: %v", err)
 		return err
 	}
@@ -205,32 +209,47 @@ func (ct *DeployRuntimeTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 }
 
 func (ct *DeployRuntimeTask) check(r runner.Runner) error {
-	if err := infrastructure.CheckDependences(r, ct.runtime.GetRuntimeSoftwares()); err != nil {
+	if ct.workerConfig == nil {
+		return fmt.Errorf("empty worker config")
+	}
+	if ct.workerInfra == nil {
+		return fmt.Errorf("empty worker infra")
+	}
+
+	if err := dependency.CheckDependency(r, ct.runtime.GetRuntimeSoftwares()); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func loadImages(r runner.Runner, conf *api.PackageSrcConfig, client string) error {
-	logrus.Info("do load images...")
-	if conf == nil {
-		return fmt.Errorf("can not found dist path failed")
+func getImages(workerInfra *api.RoleInfra) []*api.PackageConfig {
+	images := []*api.PackageConfig{}
+	for _, s := range workerInfra.Softwares {
+		if s.Type == "image" {
+			images = append(images, s)
+		}
 	}
 
-	imagePkgPath := filepath.Join(conf.GetPkgDistPath(), constants.DefaultImagePkgName)
+	return images
+}
 
-	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"stat %s\"", imagePkgPath)); err != nil {
-		logrus.Debugf("no image package found on path %v", imagePkgPath)
+func loadImages(r runner.Runner, workerInfra *api.RoleInfra, packageSrc *api.PackageSrcConfig, client string) error {
+	images := getImages(workerInfra)
+	if len(images) == 0 {
+		logrus.Warn("no images load")
 		return nil
 	}
 
-	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"%s load -i %s\"", client, imagePkgPath)); err != nil {
-		return fmt.Errorf("isula load -i %v failed: %v", imagePkgPath, err)
+	logrus.Info("do load images...")
+
+	imagePath := filepath.Join(packageSrc.GetPkgDstPath(), constants.DefaultImagePath)
+	imageDep := dependency.NewDependencyImage(imagePath, client, images)
+	if err := imageDep.Install(r); err != nil {
+		return err
 	}
 
 	logrus.Info("load images success")
-
 	return nil
 }
 

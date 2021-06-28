@@ -30,14 +30,22 @@ import (
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/constants"
 	"isula.org/eggo/pkg/utils"
+	"isula.org/eggo/pkg/utils/infra"
+)
+
+const (
+	MasterRole      string = "master"
+	WorkerRole      string = "worker"
+	ETCDRole        string = "etcd"
+	LoadBalanceRole string = "loadbalance"
 )
 
 var (
 	toTypeInt = map[string]uint16{
-		"master":      api.Master,
-		"node":        api.Worker,
-		"etcd":        api.ETCD,
-		"loadbalance": api.LoadBalance,
+		MasterRole:      api.Master,
+		WorkerRole:      api.Worker,
+		ETCDRole:        api.ETCD,
+		LoadBalanceRole: api.LoadBalance,
 	}
 )
 
@@ -46,10 +54,16 @@ type ConfigExtraArgs struct {
 	ExtraArgs map[string]string `yaml:"extra-args"`
 }
 
-type Package struct {
-	Name string `yaml:"name"`
-	Type string `yaml:"type"`    // repo, pkg, binary
-	Dst  string `yaml:"dstpath"` // used only when type is binary
+type InstallConfig struct {
+	PackageSrc       *api.PackageSrcConfig           `yaml:"package-source"`
+	KubernetesMaster []*api.PackageConfig            `yaml:"kubernetes-master"`
+	KubernetesWorker []*api.PackageConfig            `yaml:"kubernetes-worker"`
+	Network          []*api.PackageConfig            `yaml:"network"`
+	ETCD             []*api.PackageConfig            `yaml:"etcd"`
+	LoadBalance      []*api.PackageConfig            `yaml:"loadbalance"`
+	Container        []*api.PackageConfig            `yaml:"container"`
+	Image            []*api.PackageConfig            `yaml:"image"`
+	Addition         map[string][]*api.PackageConfig `yaml:"addition"` // key: master, worker, etcd, loadbalance
 }
 
 type HostConfig struct {
@@ -73,7 +87,7 @@ type deployConfig struct {
 	Password           string                      `yaml:"password"`
 	PrivateKeyPath     string                      `yaml:"private-key-path"`
 	Masters            []*HostConfig               `yaml:"masters"`
-	Nodes              []*HostConfig               `yaml:"nodes"`
+	Workers            []*HostConfig               `yaml:"workers"`
 	Etcds              []*HostConfig               `yaml:"etcds"`
 	LoadBalance        LoadBalance                 `yaml:"loadbalance"`
 	ExternalCA         bool                        `yaml:"external-ca"`
@@ -96,9 +110,8 @@ type deployConfig struct {
 	InsecureRegistries []string                    `yaml:"insecure-registries"`
 	ConfigExtraArgs    []*ConfigExtraArgs          `yaml:"config-extra-args"`
 	Addons             []*api.AddonConfig          `yaml:"addons"`
-	OpenPorts          map[string][]*api.OpenPorts `yaml:"open-ports"` // key: master, node, etcd, loadbalance
-	PackageSrc         api.PackageSrcConfig        `yaml:"package-src"`
-	Packages           map[string][]*Package       `yaml:"pacakges"` // key: master, node, etcd, loadbalance
+	OpenPorts          map[string][]*api.OpenPorts `yaml:"open-ports"` // key: master, worker, etcd, loadbalance
+	InstallConfig      InstallConfig               `yaml:"install"`
 }
 
 func init() {
@@ -160,18 +173,14 @@ func getDefaultClusterdeploymentConfig() *api.ClusterConfig {
 				DnsDomain:     "cluster.local",
 				PauseImage:    "k8s.gcr.io/pause:3.2",
 				NetworkPlugin: "cni",
-				CniBinDir:     "/usr/libexec/cni",
+				CniBinDir:     "/usr/libexec/cni,/opt/cni/bin",
 			},
 			ContainerEngineConf: &api.ContainerEngine{
 				RegistryMirrors:    []string{},
 				InsecureRegistries: []string{},
 			},
 		},
-		PackageSrc: api.PackageSrcConfig{
-			Type:   "tar.gz",
-			ArmSrc: "./pacakges-arm.tar.gz",
-			X86Src: "./packages-x86.tar.gz",
-		},
+		PackageSrc: api.PackageSrcConfig{},
 		EtcdCluster: api.EtcdClusterConfig{
 			Token:    "etcd-cluster",
 			DataDir:  "/var/lib/etcd/default.etcd",
@@ -179,6 +188,7 @@ func getDefaultClusterdeploymentConfig() *api.ClusterConfig {
 			External: false,
 		},
 		DeployDriver: "binary",
+		RoleInfra:    infra.RegisterInfra(),
 	}
 }
 
@@ -219,32 +229,73 @@ func createCommonHostConfig(userHostconfig *HostConfig, defaultName string, user
 	return hostconfig
 }
 
-func addUserPackages(hostconfig *api.HostConfig, userPkgs []*Package) {
-	if hostconfig.Packages == nil {
-		hostconfig.Packages = []*api.Packages{}
-	}
-
-	noDupPkgs := make(map[string]int, len(hostconfig.Packages))
-	for i, p := range hostconfig.Packages {
-		noDupPkgs[p.Name] = i
-	}
-
-	for _, pkg := range userPkgs {
-		p := &api.Packages{
-			Name: pkg.Name,
-			Type: pkg.Type,
-			Dst:  pkg.Dst,
-		}
-		if i, ok := noDupPkgs[pkg.Name]; ok {
-			hostconfig.Packages[i] = p
-			continue
-		}
-		hostconfig.Packages = append(hostconfig.Packages, p)
+func appendSoftware(s, pc, dpc []*api.PackageConfig) []*api.PackageConfig {
+	if len(pc) != 0 {
+		return append(s, pc...)
+	} else {
+		return append(s, dpc...)
 	}
 }
 
-func addUserPorts(hostconfig *api.HostConfig, ports []*api.OpenPorts) {
-	hostconfig.OpenPorts = append(hostconfig.OpenPorts, ports...)
+func fillPackageConfig(ccfg *api.ClusterConfig, icfg *InstallConfig, dnsType string) {
+	if icfg.PackageSrc != nil {
+		setIfStrConfigNotEmpty(&ccfg.PackageSrc.Type, icfg.PackageSrc.Type)
+		setIfStrConfigNotEmpty(&ccfg.PackageSrc.ArmSrc, icfg.PackageSrc.ArmSrc)
+		setIfStrConfigNotEmpty(&ccfg.PackageSrc.X86Src, icfg.PackageSrc.X86Src)
+	}
+
+	software := []struct {
+		pc   []*api.PackageConfig
+		role uint16
+		dpc  []*api.PackageConfig
+	}{
+		{icfg.LoadBalance, api.LoadBalance, infra.LoadbalancePackages},
+		{icfg.Container, api.Worker, infra.ContainerPackages},
+		{icfg.Image, api.Worker, []*api.PackageConfig{}},
+		{icfg.Network, api.Worker, infra.NetworkPackages},
+		{icfg.ETCD, api.ETCD, infra.EtcdPackages},
+		{icfg.KubernetesMaster, api.Master, infra.MasterPackages},
+		{icfg.KubernetesWorker, api.Worker, infra.WorkerPackages},
+	}
+
+	for _, s := range software {
+		ccfg.RoleInfra[s.role].Softwares = appendSoftware(ccfg.RoleInfra[s.role].Softwares, s.pc, s.dpc)
+	}
+
+	if len(icfg.Addition) == 0 {
+		return
+	}
+
+	for t, p := range icfg.Addition {
+		role, ok := toTypeInt[t]
+		if !ok {
+			logrus.Warnf("invalid role %s", t)
+			continue
+		}
+
+		ccfg.RoleInfra[role].Softwares = append(ccfg.RoleInfra[role].Softwares, p...)
+	}
+}
+
+func fillOpenPort(ccfg *api.ClusterConfig, openports map[string][]*api.OpenPorts, dnsType string) {
+	// key: master, worker, etcd, loadbalance
+	for t, p := range openports {
+		role, ok := toTypeInt[t]
+		if !ok {
+			logrus.Warnf("invalid role %s", t)
+			continue
+		}
+
+		ccfg.RoleInfra[role].OpenPorts = append(ccfg.RoleInfra[role].OpenPorts, p...)
+	}
+
+	if dnsType == "binary" {
+		ccfg.RoleInfra[api.Master].OpenPorts =
+			append(ccfg.RoleInfra[api.Master].OpenPorts, infra.CorednsPorts...)
+	} else if dnsType == "pod" {
+		ccfg.RoleInfra[api.Worker].OpenPorts =
+			append(ccfg.RoleInfra[api.Worker].OpenPorts, infra.CorednsPorts...)
+	}
 }
 
 func defaultHostName(clusterID string, nodeType string, i int) string {
@@ -277,13 +328,13 @@ func deleteConfig(userConfig *deployConfig, delType string, delName string) erro
 	var err error
 	types := strings.Split(delType, ",")
 	for _, nodeType := range types {
-		if nodeType == "master" {
+		if nodeType == MasterRole {
 			userConfig.Masters, err = deleteNodebyDelName(userConfig.Masters, delName)
 		}
-		if nodeType == "node" {
-			userConfig.Nodes, err = deleteNodebyDelName(userConfig.Nodes, delName)
+		if nodeType == WorkerRole {
+			userConfig.Workers, err = deleteNodebyDelName(userConfig.Workers, delName)
 		}
-		if nodeType == "etcd" {
+		if nodeType == ETCDRole {
 			userConfig.Etcds, err = deleteNodebyDelName(userConfig.Etcds, delName)
 		}
 		if err != nil {
@@ -297,13 +348,13 @@ func deleteConfig(userConfig *deployConfig, delType string, delName string) erro
 func joinConfig(userConfig *deployConfig, joinType string, joinHost *HostConfig) *api.HostConfig {
 	masters := userConfig.Masters
 	userConfig.Masters = nil
-	nodes := userConfig.Nodes
-	userConfig.Nodes = nil
+	workers := userConfig.Workers
+	userConfig.Workers = nil
 	etcds := userConfig.Etcds
 	userConfig.Etcds = nil
 	defer func() {
 		userConfig.Masters = masters
-		userConfig.Nodes = nodes
+		userConfig.Workers = workers
 		userConfig.Etcds = etcds
 	}()
 
@@ -312,13 +363,13 @@ func joinConfig(userConfig *deployConfig, joinType string, joinHost *HostConfig)
 		var hostconfig HostConfig
 		var index int
 
-		if nodeType == "master" {
+		if nodeType == MasterRole {
 			index = len(masters)
 		}
-		if nodeType == "node" {
-			index = len(nodes)
+		if nodeType == WorkerRole {
+			index = len(workers)
 		}
-		if nodeType == "etcd" {
+		if nodeType == ETCDRole {
 			index = len(etcds)
 		}
 
@@ -333,15 +384,15 @@ func joinConfig(userConfig *deployConfig, joinType string, joinHost *HostConfig)
 			hostconfig.Port = joinHost.Port
 		}
 
-		if nodeType == "master" {
+		if nodeType == MasterRole {
 			userConfig.Masters = []*HostConfig{&hostconfig}
 			masters = appendNodeNoDup(masters, &hostconfig)
 		}
-		if nodeType == "node" {
-			userConfig.Nodes = []*HostConfig{&hostconfig}
-			nodes = appendNodeNoDup(nodes, &hostconfig)
+		if nodeType == WorkerRole {
+			userConfig.Workers = []*HostConfig{&hostconfig}
+			workers = appendNodeNoDup(workers, &hostconfig)
 		}
-		if nodeType == "etcd" {
+		if nodeType == ETCDRole {
 			userConfig.Etcds = []*HostConfig{&hostconfig}
 			etcds = appendNodeNoDup(etcds, &hostconfig)
 		}
@@ -365,8 +416,6 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 		hostconfig = createCommonHostConfig(master, conf.ClusterID+"-master-"+strconv.Itoa(i),
 			conf.Username, conf.Password, conf.PrivateKeyPath)
 		hostconfig.Type |= api.Master
-		addUserPackages(hostconfig, conf.Packages["master"])
-		addUserPorts(hostconfig, conf.OpenPorts["master"])
 		idx, ok := cache[hostconfig.Address]
 		if ok {
 			nodes[idx] = hostconfig
@@ -376,17 +425,15 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 		nodes = append(nodes, hostconfig)
 	}
 
-	for i, node := range conf.Nodes {
-		idx, exist := cache[node.Ip]
+	for i, worker := range conf.Workers {
+		idx, exist := cache[worker.Ip]
 		if !exist {
-			hostconfig = createCommonHostConfig(node, conf.ClusterID+"-node-"+strconv.Itoa(i),
+			hostconfig = createCommonHostConfig(worker, conf.ClusterID+"-worker-"+strconv.Itoa(i),
 				conf.Username, conf.Password, conf.PrivateKeyPath)
 		} else {
 			hostconfig = nodes[idx]
 		}
 		hostconfig.Type |= api.Worker
-		addUserPackages(hostconfig, conf.Packages["node"])
-		addUserPorts(hostconfig, conf.OpenPorts["node"])
 		if exist {
 			nodes[idx] = hostconfig
 			continue
@@ -411,8 +458,6 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 			hostconfig = nodes[idx]
 		}
 		hostconfig.Type |= api.ETCD
-		addUserPackages(hostconfig, conf.Packages["etcd"])
-		addUserPorts(hostconfig, conf.OpenPorts["etcd"])
 		if exist {
 			nodes[idx] = hostconfig
 			continue
@@ -437,8 +482,6 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 		}
 		hostconfig.Type |= api.LoadBalance
 
-		addUserPackages(hostconfig, conf.Packages["loadbalance"])
-		addUserPorts(hostconfig, conf.OpenPorts["loadbalance"])
 		if exist {
 			nodes[idx] = hostconfig
 		} else {
@@ -554,9 +597,6 @@ func toClusterdeploymentConfig(conf *deployConfig) *api.ClusterConfig {
 		}
 	}
 	setIfStrConfigNotEmpty(&ccfg.EtcdCluster.Token, conf.EtcdToken)
-	setIfStrConfigNotEmpty(&ccfg.PackageSrc.Type, conf.PackageSrc.Type)
-	setIfStrConfigNotEmpty(&ccfg.PackageSrc.ArmSrc, conf.PackageSrc.ArmSrc)
-	setIfStrConfigNotEmpty(&ccfg.PackageSrc.X86Src, conf.PackageSrc.X86Src)
 	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.KubeletConf.DnsVip, conf.DnsVip)
 	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.KubeletConf.DnsDomain, conf.DnsDomain)
 	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.KubeletConf.PauseImage, conf.PauseImage)
@@ -568,6 +608,8 @@ func toClusterdeploymentConfig(conf *deployConfig) *api.ClusterConfig {
 	setStrArray(&ccfg.WorkerConfig.ContainerEngineConf.InsecureRegistries, conf.InsecureRegistries)
 	fillLoadBalance(&ccfg.LoadBalancer, conf.LoadBalance)
 	fillAPIEndPoint(&ccfg.APIEndpoint, conf)
+	fillPackageConfig(ccfg, &conf.InstallConfig, conf.Service.DNS.CorednsType)
+	fillOpenPort(ccfg, conf.OpenPorts, conf.Service.DNS.CorednsType)
 
 	ccfg.Addons = append(ccfg.Addons, conf.Addons...)
 
@@ -588,14 +630,14 @@ func getHostconfigs(format string, ips []string) []*HostConfig {
 }
 
 func createDeployConfigTemplate(file string) error {
-	var masters, nodes, etcds []*HostConfig
+	var masters, workers, etcds []*HostConfig
 	masterIP := []string{"192.168.0.2"}
 	if opts.masters != nil {
 		masterIP = opts.masters
 	}
-	nodesIP := []string{"192.168.0.2", "192.168.0.3", "192.168.0.4"}
+	workersIP := []string{"192.168.0.2", "192.168.0.3", "192.168.0.4"}
 	if opts.nodes != nil {
-		nodesIP = opts.nodes
+		workersIP = opts.nodes
 	}
 	lbIP := "192.168.0.1"
 	if opts.loadbalance != "" {
@@ -606,7 +648,7 @@ func createDeployConfigTemplate(file string) error {
 		etcdsIP = opts.etcds
 	}
 	masters = getHostconfigs("k8s-master-%d", masterIP)
-	nodes = getHostconfigs("k8s-node-%d", nodesIP)
+	workers = getHostconfigs("k8s-worker-%d", workersIP)
 	etcds = getHostconfigs("etcd-%d", etcdsIP)
 	lb := LoadBalance{
 		Name:     "k8s-loadbalance",
@@ -625,7 +667,7 @@ func createDeployConfigTemplate(file string) error {
 		Password:       opts.password,
 		PrivateKeyPath: getDefaultPrivateKeyPath(),
 		Masters:        masters,
-		Nodes:          nodes,
+		Workers:        workers,
 		Etcds:          etcds,
 		LoadBalance:    lb,
 		ExternalCA:     false,
@@ -656,7 +698,7 @@ func createDeployConfigTemplate(file string) error {
 		Runtime:           "iSulad",
 		RuntimeEndpoint:   "unix:///var/run/isulad.sock",
 		OpenPorts: map[string][]*api.OpenPorts{
-			"node": {
+			"worker": {
 				&api.OpenPorts{
 					Port:     111,
 					Protocol: "tcp",
@@ -681,203 +723,223 @@ func createDeployConfigTemplate(file string) error {
 				},
 			},
 		},
-		PackageSrc: api.PackageSrcConfig{
-			Type:   "tar.gz",
-			ArmSrc: "/root/pkgs/pacakges-arm.tar.gz",
-			X86Src: "/root/pkgs/packages-x86.tar.gz",
-		},
-		Packages: map[string][]*Package{
-			"master": {
-				&Package{
+		InstallConfig: InstallConfig{
+			PackageSrc: &api.PackageSrcConfig{
+				Type:   "tar.gz",
+				ArmSrc: "/root/pkgs/pacakges-arm.tar.gz",
+				X86Src: "/root/pkgs/packages-x86.tar.gz",
+			},
+			KubernetesMaster: []*api.PackageConfig{
+				{
 					Name: "kubernetes-client",
 					Type: "pkg",
 				},
-				&Package{
+				{
 					Name: "kubernetes-master",
 					Type: "pkg",
 				},
-				&Package{
+				{
 					Name: "coredns",
 					Type: "pkg",
 				},
-				&Package{
-					Name: "addons",
-					Type: "binary",
-					Dst:  "/etc/kubernetes",
-				},
 			},
-			"node": {
-				&Package{
-					Name: "conntrack-tools",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "socat",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "containernetworking-plugins",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "emacs-filesystem",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "gflags",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "gpm-libs",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "http-parser",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "libwebsockets",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "re2",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "rsync",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "vim-filesystem",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "vim-common",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "vim-enhanced",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "yajl",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "zlib-devel",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "protobuf",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "protobuf-devel",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "grpc",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "lxc",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "lxc-libs",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "lcr",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "clibcni",
-					Type: "pkg",
-				},
-				&Package{
-					Name: "libcgroup",
-					Type: "pkg",
-				},
-				&Package{
+			KubernetesWorker: []*api.PackageConfig{
+				{
 					Name: "docker-engine",
 					Type: "pkg",
 				},
-				&Package{
-					Name: "iSulad",
-					Type: "pkg",
-				},
-				&Package{
+				{
 					Name: "kubernetes-client",
 					Type: "pkg",
 				},
-				&Package{
+				{
 					Name: "kubernetes-node",
 					Type: "pkg",
 				},
-				&Package{
+				{
 					Name: "kubernetes-kubelet",
 					Type: "pkg",
 				},
+				{
+					Name: "conntrack-tools",
+					Type: "pkg",
+				},
+				{
+					Name: "socat",
+					Type: "pkg",
+				},
 			},
-			"etcd": {
-				&Package{
+			Container: []*api.PackageConfig{
+				{
+					Name: "emacs-filesystem",
+					Type: "pkg",
+				},
+				{
+					Name: "gflags",
+					Type: "pkg",
+				},
+				{
+					Name: "gpm-libs",
+					Type: "pkg",
+				},
+				{
+					Name: "http-parser",
+					Type: "pkg",
+				},
+				{
+					Name: "libwebsockets",
+					Type: "pkg",
+				},
+				{
+					Name: "re2",
+					Type: "pkg",
+				},
+				{
+					Name: "rsync",
+					Type: "pkg",
+				},
+				{
+					Name: "vim-filesystem",
+					Type: "pkg",
+				},
+				{
+					Name: "vim-common",
+					Type: "pkg",
+				},
+				{
+					Name: "vim-enhanced",
+					Type: "pkg",
+				},
+				{
+					Name: "yajl",
+					Type: "pkg",
+				},
+				{
+					Name: "zlib-devel",
+					Type: "pkg",
+				},
+				{
+					Name: "protobuf",
+					Type: "pkg",
+				},
+				{
+					Name: "protobuf-devel",
+					Type: "pkg",
+				},
+				{
+					Name: "grpc",
+					Type: "pkg",
+				},
+				{
+					Name: "lxc",
+					Type: "pkg",
+				},
+				{
+					Name: "lxc-libs",
+					Type: "pkg",
+				},
+				{
+					Name: "lcr",
+					Type: "pkg",
+				},
+				{
+					Name: "clibcni",
+					Type: "pkg",
+				},
+				{
+					Name: "libcgroup",
+					Type: "pkg",
+				},
+				{
+					Name: "iSulad",
+					Type: "pkg",
+				},
+			},
+			Network: []*api.PackageConfig{
+				{
+					Name: "containernetworking-plugins",
+					Type: "pkg",
+				},
+			},
+			ETCD: []*api.PackageConfig{
+				{
 					Name: "etcd",
 					Type: "pkg",
 				},
 			},
-			"loadbalance": {
-				&Package{
+			LoadBalance: []*api.PackageConfig{
+				{
 					Name: "nginx",
 					Type: "pkg",
 				},
-				&Package{
+				{
 					Name: "gd",
 					Type: "pkg",
 				},
-				&Package{
+				{
 					Name: "gperftools-libs",
 					Type: "pkg",
 				},
-				&Package{
+				{
 					Name: "libunwind",
 					Type: "pkg",
 				},
-				&Package{
+				{
 					Name: "libwebp",
 					Type: "pkg",
 				},
-				&Package{
+				{
 					Name: "libxslt",
 					Type: "pkg",
 				},
-				&Package{
+				{
 					Name: "nginx-all-modules",
 					Type: "pkg",
 				},
-				&Package{
+				{
 					Name: "nginx-filesystem",
 					Type: "pkg",
 				},
-				&Package{
+				{
 					Name: "nginx-mod-http-image-filter",
 					Type: "pkg",
 				},
-				&Package{
+				{
 					Name: "nginx-mod-http-perl",
 					Type: "pkg",
 				},
-				&Package{
+				{
 					Name: "nginx-mod-http-xslt-filter",
 					Type: "pkg",
 				},
-				&Package{
+				{
 					Name: "nginx-mod-mail",
 					Type: "pkg",
 				},
-				&Package{
+				{
 					Name: "nginx-mod-stream",
 					Type: "pkg",
+				},
+			},
+			Image: []*api.PackageConfig{
+				{
+					Name: "pause.tar",
+					Type: "image",
+				},
+			},
+			Addition: map[string][]*api.PackageConfig{
+				"master": {
+					{
+						Name: "calico.yaml",
+						Type: "yaml",
+					},
+				},
+				"worker": {
+					{
+						Name: "docker.service",
+						Type: "file",
+						Dst:  "/usr/lib/systemd/system/",
+					},
 				},
 			},
 		},

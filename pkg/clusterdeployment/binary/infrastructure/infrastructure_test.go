@@ -16,10 +16,12 @@
 package infrastructure
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
+	"isula.org/eggo/pkg/utils/dependency"
 	"isula.org/eggo/pkg/utils/nodemanager"
 )
 
@@ -33,9 +35,9 @@ func (m *MockRunner) Copy(src, dst string) error {
 
 func (m *MockRunner) RunCommand(cmd string) (string, error) {
 	logrus.Infof("run command: %s", cmd)
-	if cmd == pmT {
+	if cmd == fmt.Sprintf("sudo -E /bin/sh -c \"%s\"", dependency.PmTest) {
 		return "dpkg", nil
-	} else if cmd == prmT {
+	} else if cmd == fmt.Sprintf("sudo -E /bin/sh -c \"%s\"", dependency.PrmTest) {
 		return "apt", nil
 	}
 
@@ -56,123 +58,7 @@ func (m *MockRunner) Close() {
 	logrus.Infof("close")
 }
 
-func addNodes() {
-	hcfs := []*api.HostConfig{
-		{
-			Arch:     "x86_64",
-			Name:     "master",
-			Address:  "192.168.0.1",
-			Port:     22,
-			UserName: "root",
-			Password: "123456",
-			Type:     api.Master,
-			OpenPorts: []*api.OpenPorts{
-				{
-					Port:     1234,
-					Protocol: "tcp",
-				},
-			},
-			Packages: []*api.Packages{
-				{
-					Name: "openssl",
-					Type: "repo",
-				},
-				{
-					Name: "kubernetes-client",
-					Type: "repo",
-				},
-				{
-					Name: "kubernetes-master",
-					Type: "repo",
-				},
-				{
-					Name: "coredns",
-					Type: "repo",
-				},
-			},
-		},
-		{
-			Arch:     "arm64",
-			Name:     "work",
-			Address:  "192.168.0.2",
-			Port:     22,
-			UserName: "root",
-			Password: "123456",
-			Type:     api.Worker,
-			OpenPorts: []*api.OpenPorts{
-				{
-					Port:     2345,
-					Protocol: "udp",
-				},
-			},
-			Packages: []*api.Packages{
-				{
-					Name: "hostname",
-					Type: "repo",
-				},
-				{
-					Name: "kubectl",
-					Type: "binary",
-					Dst:  "/usr/bin/",
-				},
-				{
-					Name: "kubelet",
-					Type: "binary",
-					Dst:  "/usr/bin/",
-				},
-				{
-					Name: "kube-proxy",
-					Type: "binary",
-					Dst:  "/usr/bin/",
-				},
-			},
-		},
-		{
-			Arch:     "x86_64",
-			Name:     "etcd",
-			Address:  "192.168.0.3",
-			Port:     22,
-			UserName: "root",
-			Password: "123456",
-			Type:     api.Master | api.ETCD,
-			OpenPorts: []*api.OpenPorts{
-				{
-					Port:     12345,
-					Protocol: "tcp",
-				},
-				{
-					Port:     23456,
-					Protocol: "udp",
-				},
-			},
-			Packages: []*api.Packages{
-				{
-					Name: "ipcalc",
-					Type: "repo",
-				},
-				{
-					Name: "etcd",
-					Type: "pkg",
-				},
-				{
-					Name: "kube-apiserver",
-					Type: "binary",
-					Dst:  "/usr/bin/",
-				},
-				{
-					Name: "kube-controller-manager",
-					Type: "binary",
-					Dst:  "/usr/bin/",
-				},
-				{
-					Name: "kube-scheduler",
-					Type: "binary",
-					Dst:  "/usr/bin/",
-				},
-			},
-		},
-	}
-
+func addNodes(hcfs []*api.HostConfig) {
 	r := &MockRunner{}
 	for _, hcf := range hcfs {
 		nodemanager.RegisterNode(hcf, r)
@@ -180,18 +66,118 @@ func addNodes() {
 }
 
 func TestPrepareInfrastructure(t *testing.T) {
-	addNodes()
-
 	ccfg := &api.ClusterConfig{
+		Nodes: []*api.HostConfig{
+			{
+				Arch:     "x86_64",
+				Name:     "master",
+				Address:  "192.168.0.1",
+				Port:     22,
+				UserName: "root",
+				Password: "123456",
+				Type:     api.Master,
+			},
+			{
+				Arch:     "arm64",
+				Name:     "work",
+				Address:  "192.168.0.2",
+				Port:     22,
+				UserName: "root",
+				Password: "123456",
+				Type:     api.Worker,
+			},
+			{
+				Arch:     "x86_64",
+				Name:     "etcd",
+				Address:  "192.168.0.3",
+				Port:     22,
+				UserName: "root",
+				Password: "123456",
+				Type:     api.Master | api.ETCD,
+			},
+		},
 		PackageSrc: api.PackageSrcConfig{
-			Type:   "tar.gz",
-			ArmSrc: "/etc/eggo/arm.tar.gz",
-			X86Src: "/etc/eggo/x86.tar.gz",
+			Type:   "",
+			ArmSrc: "",
+			X86Src: "",
+		},
+		RoleInfra: map[uint16]*api.RoleInfra{
+			api.Master: {
+				OpenPorts: []*api.OpenPorts{
+					{
+						Port:     1234,
+						Protocol: "tcp",
+					},
+				},
+				Softwares: []*api.PackageConfig{
+					{
+						Name: "openssl",
+						Type: "repo",
+					},
+					{
+						Name: "kubernetes-client",
+						Type: "repo",
+					},
+					{
+						Name: "kubernetes-master",
+						Type: "repo",
+					},
+					{
+						Name: "coredns",
+						Type: "repo",
+					},
+				},
+			},
+			api.Worker: {
+				OpenPorts: []*api.OpenPorts{
+					{
+						Port:     2345,
+						Protocol: "udp",
+					},
+				},
+				Softwares: []*api.PackageConfig{
+					{
+						Name: "hostname",
+						Type: "repo",
+					},
+					{
+						Name: "kubectl",
+						Type: "repo",
+					},
+					{
+						Name: "kube-proxy",
+						Type: "repo",
+					},
+				},
+			},
+			api.ETCD: {
+				OpenPorts: []*api.OpenPorts{
+					{
+						Port:     12345,
+						Protocol: "tcp",
+					},
+					{
+						Port:     23456,
+						Protocol: "udp",
+					},
+				},
+				Softwares: []*api.PackageConfig{
+					{
+						Name: "etcd",
+						Type: "repo",
+					},
+				},
+			},
 		},
 	}
 
-	if err := Init(ccfg); err != nil {
-		t.Fatalf("test PrepareInfrastructure failed: %v\n", err)
+	addNodes(ccfg.Nodes)
+	if err := NodeInfrastructureSetup(ccfg, ccfg.Nodes[0].Address, ccfg.Nodes[0].Type); err != nil {
+		t.Fatalf("test NodeInfrastructureSetup failed: %v\n", err)
+	}
+
+	if err := NodeInfrastructureDestroy(ccfg, ccfg.Nodes[0].Address, ccfg.Nodes[0].Type); err != nil {
+		t.Fatalf("test NodeInfrastructureDestroy failed: %v\n", err)
 	}
 
 	nodemanager.UnRegisterAllNodes()
