@@ -19,8 +19,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"isula.org/eggo/pkg/constants"
 	"github.com/sirupsen/logrus"
+	"isula.org/eggo/pkg/constants"
 )
 
 const (
@@ -248,16 +248,42 @@ func (c ClusterConfig) GetManifestDir() string {
 	return constants.DefaultK8SManifestsDir
 }
 
-type ClusterDeploymentAPI interface {
-	PrepareInfrastructure() error
-	DeployEtcdCluster() error
-	DeployLoadBalancer() error
-	InitControlPlane() error
-	JoinBootstrap() error
-	UpgradeCluster() error
-	CleanupCluster() error
+type InfrastructureAPI interface {
+	// TODO: should add other dependence cluster configurations
+	MachineInfraSetup(machine *HostConfig) error
+	MachineInfraDestroy(machine *HostConfig) error
+}
+
+type EtcdAPI interface {
+	// TODO: should add other dependence cluster configurations
+	EtcdClusterSetup() error
+	EtcdClusterDestroy() error
+	EtcdNodeSetup(machine *HostConfig) error
+	EtcdNodeDestroy(machine *HostConfig) error
+}
+
+type ClusterManagerAPI interface {
+	// TODO: should add other dependence cluster configurations
+	ClusterControlPlaneInit(node *HostConfig) error
+	ClusterNodeJoin(node *HostConfig) error
+	ClusterNodeCleanup(node *HostConfig, delType uint16) error
+	ClusterUpgrade() error
 	ClusterStatus() (*ClusterStatus, error)
-	PrepareNetwork() error
-	ApplyAddons() error
+	AddonsSetup() error
+	AddonsDestroy() error
+}
+
+type LoadBalancerAPI interface {
+	LoadBalancerSetup(lb *HostConfig) error
+	LoadBalancerUpdate(lb *HostConfig) error
+	LoadBalancerDestroy(lb *HostConfig) error
+}
+
+type ClusterDeploymentAPI interface {
+	InfrastructureAPI
+	EtcdAPI
+	ClusterManagerAPI
+	LoadBalancerAPI
+
 	Finish()
 }

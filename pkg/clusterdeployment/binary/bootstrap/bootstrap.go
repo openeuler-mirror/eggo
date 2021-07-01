@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment/binary/commontools"
 	"isula.org/eggo/pkg/clusterdeployment/binary/controlplane"
@@ -33,7 +34,6 @@ import (
 	"isula.org/eggo/pkg/utils/nodemanager"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/task"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -73,15 +73,15 @@ func getTokenString() string {
 	return tokenTask.tokenStr
 }
 
-type BootstrapTask struct {
+type NewWorkerTask struct {
 	ccfg *api.ClusterConfig
 }
 
-func (it *BootstrapTask) Name() string {
-	return "BootstrapTask"
+func (it *NewWorkerTask) Name() string {
+	return "NewWorkerTask"
 }
 
-func (it *BootstrapTask) Run(r runner.Runner, hcg *api.HostConfig) error {
+func (it *NewWorkerTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 	logrus.Info("do join new worker...\n")
 
 	// check worker dependences
@@ -304,15 +304,7 @@ mode: "iptables"
 	return nil
 }
 
-func JoinNode(config *api.ClusterConfig, masters, workers []string) error {
-	if config == nil {
-		return fmt.Errorf("empty cluster config")
-	}
-	if len(masters) == 0 && len(workers) == 0 {
-		logrus.Warn("empty join node")
-		return nil
-	}
-
+func JoinMaster(config *api.ClusterConfig, master *api.HostConfig) error {
 	joinMasterTasks := []task.Task{
 		task.NewTaskInstance(
 			&commontools.CopyCaCertificatesTask{
@@ -322,6 +314,27 @@ func JoinNode(config *api.ClusterConfig, masters, workers []string) error {
 		task.NewTaskInstance(
 			controlplane.NewControlPlaneTask(config),
 		),
+	}
+
+	if err := nodemanager.RunTasksOnNodes(joinMasterTasks, []string{master.Address}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func JoinWorker(config *api.ClusterConfig, controlPlane *api.HostConfig, worker *api.HostConfig) error {
+	if tokenTask == nil {
+		tokenTask = &GetTokenTask{
+			cluster: config,
+		}
+
+		if err := nodemanager.RunTaskOnNodes(task.NewTaskInstance(tokenTask), []string{controlPlane.Address}); err != nil {
+			return err
+		}
+		if err := nodemanager.WaitNodesFinish([]string{controlPlane.Address}, time.Minute*2); err != nil {
+			return err
+		}
 	}
 
 	joinWorkerTasks := []task.Task{
@@ -334,60 +347,15 @@ func JoinNode(config *api.ClusterConfig, masters, workers []string) error {
 			runtime.NewDeployRuntimeTask(config),
 		),
 		task.NewTaskInstance(
-			&BootstrapTask{
+			&NewWorkerTask{
 				ccfg: config,
 			},
 		),
 	}
 
-	if err := nodemanager.RunTasksOnNodes(joinMasterTasks, masters); err != nil {
-		return err
-	}
-
-	if err := nodemanager.RunTasksOnNodes(joinWorkerTasks, workers); err != nil {
-		return err
-	}
-
-	if err := nodemanager.WaitTasksOnNodesFinished(joinMasterTasks, masters, time.Minute*5); err != nil {
-		logrus.Errorf("wait to join masters finish failed: %v", err)
-		return err
-	}
-
-	if err := nodemanager.WaitTasksOnNodesFinished(joinWorkerTasks, workers, time.Minute*5); err != nil {
-		logrus.Errorf("wait to join workers finish failed: %v", err)
+	if err := nodemanager.RunTasksOnNodes(joinWorkerTasks, []string{worker.Address}); err != nil {
 		return err
 	}
 
 	return nil
-}
-
-func Init(config *api.ClusterConfig) error {
-	masters, workers := []string{}, []string{}
-	for _, node := range config.Nodes {
-		if node.Type&api.Master != 0 {
-			masters = append(masters, node.Address)
-		}
-		if node.Type&api.Worker != 0 {
-			workers = append(workers, node.Address)
-		}
-	}
-	if len(masters) == 0 {
-		return fmt.Errorf("no master found for cluster")
-	}
-
-	if tokenTask == nil {
-		tokenTask = &GetTokenTask{
-			cluster: config,
-		}
-
-		tasks := []task.Task{task.NewTaskInstance(tokenTask)}
-		if err := nodemanager.RunTasksOnNode(tasks, masters[0]); err != nil {
-			return err
-		}
-		if err := nodemanager.WaitTasksOnNodeFinished(tasks, masters[0], time.Minute*2); err != nil {
-			return err
-		}
-	}
-
-	return JoinNode(config, masters[1:], workers)
 }

@@ -17,14 +17,13 @@ package nodemanager
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/task"
-	"github.com/sirupsen/logrus"
 )
 
 type NodeManager struct {
@@ -91,79 +90,6 @@ func doRetryPushTask(t task.Task, retryNodes []*Node) error {
 	return nil
 }
 
-func checkFinished(t task.Task, nodes []string) (bool, error) {
-	finished := true
-	var err error
-	for _, id := range nodes {
-		label := t.GetLabel(id)
-		if label == "" {
-			return false, nil
-		}
-		if !task.IsSuccess(label) {
-			logrus.Errorf("%s", label)
-			return true, fmt.Errorf("%s", label)
-		}
-	}
-
-	return finished, err
-}
-
-func WaitTaskOnNodesFinished(t task.Task, nodes []string, timeout time.Duration) error {
-	for {
-		select {
-		case <-time.After(timeout):
-			return fmt.Errorf("timeout for wait task: %s finish", t.Name())
-		default:
-			f, err := checkFinished(t, nodes)
-			if err != nil {
-				return err
-			}
-			if f {
-				logrus.Infof("run task: %s on all nodes: '%s' success", t.Name(), strings.Join(nodes, ", "))
-				return nil
-			}
-			time.Sleep(time.Millisecond * 50)
-		}
-	}
-}
-
-func checkAllFinished(t task.Task) (bool, error) {
-	manager.lock.RLock()
-	defer manager.lock.RUnlock()
-	finished := true
-	var err error
-	for id := range manager.nodes {
-		label := t.GetLabel(id)
-		if label == "" {
-			return false, nil
-		}
-		if task.IsFailed(label) {
-			logrus.Errorf("%s", label)
-			return true, fmt.Errorf("%s", label)
-		}
-	}
-
-	return finished, err
-}
-
-func WaitTaskOnAllFinished(t task.Task, timeout time.Duration) error {
-	for {
-		select {
-		case <-time.After(timeout):
-			return fmt.Errorf("timeout for wait task: %s finish", t.Name())
-		default:
-			f, err := checkAllFinished(t)
-			if err != nil {
-				return err
-			}
-			if f {
-				return nil
-			}
-			time.Sleep(time.Millisecond * 50)
-		}
-	}
-}
-
 func RunTaskOnNodes(t task.Task, nodes []string) error {
 	manager.lock.RLock()
 	defer manager.lock.RUnlock()
@@ -224,41 +150,6 @@ func RunTasksOnNode(tasks []task.Task, node string) error {
 	return nil
 }
 
-func checkTasksFinished(tasks []task.Task, node string) (bool, error) {
-	finished := true
-	var err error
-	for _, t := range tasks {
-		label := t.GetLabel(node)
-		if label == "" {
-			return false, nil
-		}
-		if task.IsFailed(label) {
-			logrus.Errorf("%s", label)
-			return true, fmt.Errorf("%s", label)
-		}
-	}
-
-	return finished, err
-}
-
-func WaitTasksOnNodeFinished(tasks []task.Task, node string, timeout time.Duration) error {
-	for {
-		select {
-		case <-time.After(timeout):
-			return fmt.Errorf("timeout for wait tasks finish at node: %s", node)
-		default:
-			f, err := checkTasksFinished(tasks, node)
-			if err != nil {
-				return err
-			}
-			if f {
-				return nil
-			}
-			time.Sleep(time.Millisecond * 50)
-		}
-	}
-}
-
 func RunTasksOnNodes(tasks []task.Task, nodes []string) error {
 	manager.lock.RLock()
 	defer manager.lock.RUnlock()
@@ -271,43 +162,6 @@ func RunTasksOnNodes(tasks []task.Task, nodes []string) error {
 	}
 
 	return nil
-}
-
-func checkTasksOnNodesFinished(tasks []task.Task, nodes []string) (bool, error) {
-	finished := true
-	var err error
-	for _, n := range nodes {
-		for _, t := range tasks {
-			label := t.GetLabel(n)
-			if label == "" {
-				return false, nil
-			}
-			if task.IsFailed(label) {
-				logrus.Errorf("%s", label)
-				return true, fmt.Errorf("%s", label)
-			}
-		}
-	}
-
-	return finished, err
-}
-
-func WaitTasksOnNodesFinished(tasks []task.Task, nodes []string, timeout time.Duration) error {
-	for {
-		select {
-		case <-time.After(timeout):
-			return fmt.Errorf("timeout for wait tasks finish on nodes: %s", nodes)
-		default:
-			f, err := checkTasksOnNodesFinished(tasks, nodes)
-			if err != nil {
-				return err
-			}
-			if f {
-				return nil
-			}
-			time.Sleep(time.Millisecond * 50)
-		}
-	}
 }
 
 func RunTaskOnOneNode(t task.Task, nodes []string) (string, error) {
@@ -325,4 +179,35 @@ func RunTaskOnOneNode(t task.Task, nodes []string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("all nodes are busy for task %s", t.Name())
+}
+
+func WaitNodesFinish(nodes []string, timeout time.Duration) error {
+	manager.lock.RLock()
+	defer manager.lock.RUnlock()
+	var errmsg string
+
+	for _, id := range nodes {
+		n, ok := manager.nodes[id]
+		if !ok {
+			return fmt.Errorf("unkown node %s", id)
+		}
+		err := n.WaitNodeTasksFinish(timeout)
+		if err != nil {
+			errmsg = fmt.Sprintf("node: %s with error: %v\n%s", id, err, errmsg)
+		}
+	}
+	if errmsg != "" {
+		return fmt.Errorf("%s", errmsg)
+	}
+	return nil
+}
+
+func WaitAllNodesFinished(timeout time.Duration) error {
+	manager.lock.RLock()
+	var nodes []string
+	for id := range manager.nodes {
+		nodes = append(nodes, id)
+	}
+	manager.lock.RUnlock()
+	return WaitNodesFinish(nodes, timeout)
 }

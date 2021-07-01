@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment/binary/commontools"
 	"isula.org/eggo/pkg/constants"
@@ -30,7 +31,6 @@ import (
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/task"
 	"isula.org/eggo/pkg/utils/template"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -280,11 +280,6 @@ func (bc *BinaryCoredns) Setup(cluster *api.ClusterConfig) error {
 		return err
 	}
 
-	if err = nodemanager.WaitTaskOnNodesFinished(st, masterIPs, time.Minute*5); err != nil {
-		logrus.Errorf("wait to coredns service running failed: %v", err)
-		return err
-	}
-
 	sst := task.NewTaskInstance(
 		&BinaryCorednsServerSetupTask{
 			Cluster: cluster,
@@ -297,8 +292,8 @@ func (bc *BinaryCoredns) Setup(cluster *api.ClusterConfig) error {
 		return err
 	}
 
-	if err = nodemanager.WaitTaskOnNodesFinished(sst, masterIPs[0:1], time.Minute*5); err != nil {
-		logrus.Errorf("wait to coredns k8s server apply failed: %v", err)
+	if err = nodemanager.WaitNodesFinish(masterIPs, time.Minute*5); err != nil {
+		logrus.Errorf("coredns setup failed: %v", err)
 		return err
 	}
 
@@ -380,7 +375,7 @@ func (bc *BinaryCoredns) Cleanup(cluster *api.ClusterConfig) error {
 		return nil
 	}
 
-	if err = nodemanager.WaitTaskOnNodesFinished(sst, masterIPs, time.Minute*5); err != nil {
+	if err = nodemanager.WaitNodesFinish(masterIPs, time.Minute*5); err != nil {
 		logrus.Warnf("wait to coredns cleanup failed: %v", err)
 		return nil
 	}
@@ -419,7 +414,7 @@ func (bc *BinaryCoredns) JoinNode(nodeAddr string, cluster *api.ClusterConfig) e
 		return err
 	}
 
-	if err = nodemanager.WaitTaskOnNodesFinished(st, []string{nodeAddr}, time.Minute*5); err != nil {
+	if err = nodemanager.WaitNodesFinish([]string{nodeAddr}, time.Minute*5); err != nil {
 		logrus.Errorf("wait to coredns service running failed: %v", err)
 		return err
 	}
@@ -436,7 +431,7 @@ func (bc *BinaryCoredns) JoinNode(nodeAddr string, cluster *api.ClusterConfig) e
 		return err
 	}
 
-	if err = nodemanager.WaitTaskOnNodesFinished(sst, []string{useMaster}, time.Minute*5); err != nil {
+	if err = nodemanager.WaitNodesFinish([]string{useMaster}, time.Minute*5); err != nil {
 		logrus.Errorf("wait to join new coredns node failed: %v", err)
 		return err
 	}
@@ -458,7 +453,7 @@ func (bc *BinaryCoredns) CleanNode(nodeAddr string, cluster *api.ClusterConfig) 
 		return nil
 	}
 
-	if err = nodemanager.WaitTaskOnNodesFinished(sst, []string{nodeAddr}, time.Minute*5); err != nil {
+	if err = nodemanager.WaitNodesFinish([]string{nodeAddr}, time.Minute*5); err != nil {
 		logrus.Warnf("wait to coredns cleanup failed: %v", err)
 		return nil
 	}

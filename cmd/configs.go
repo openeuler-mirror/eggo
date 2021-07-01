@@ -22,13 +22,23 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"gopkg.in/yaml.v1"
 
+	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/constants"
 	"isula.org/eggo/pkg/utils"
-	"github.com/sirupsen/logrus"
+)
+
+var (
+	toTypeInt = map[string]uint16{
+		"master":      api.Master,
+		"node":        api.Worker,
+		"etcd":        api.ETCD,
+		"loadbalance": api.LoadBalance,
+	}
 )
 
 type ConfigExtraArgs struct {
@@ -91,22 +101,22 @@ type deployConfig struct {
 	Packages           map[string][]*Package       `yaml:"pacakges"` // key: master, node, etcd, loadbalance
 }
 
-func getEggoDir() string {
-	return filepath.Join(utils.GetSysHome(), ".eggo")
-}
-
 func init() {
-	if _, err := os.Stat(getEggoDir()); err == nil {
+	if _, err := os.Stat(utils.GetEggoDir()); err == nil {
 		return
 	}
 
-	if err := os.Mkdir(getEggoDir(), 0700); err != nil {
-		logrus.Errorf("mkdir eggo directory %v failed", getEggoDir())
+	if err := os.Mkdir(utils.GetEggoDir(), 0700); err != nil {
+		logrus.Errorf("mkdir eggo directory %v failed", utils.GetEggoDir())
 	}
 }
 
-func getDefaultDeployConfig() string {
-	return filepath.Join(getEggoDir(), "deploy.yaml")
+func defaultDeployConfigPath() string {
+	return filepath.Join(utils.GetEggoDir(), "deploy.yaml")
+}
+
+func backupedDeployConfigPath() string {
+	return filepath.Join(utils.GetEggoDir(), "deploy_backup.yaml")
 }
 
 func loadDeployConfig(file string) (*deployConfig, error) {
@@ -235,6 +245,115 @@ func addUserPackages(hostconfig *api.HostConfig, userPkgs []*Package) {
 
 func addUserPorts(hostconfig *api.HostConfig, ports []*api.OpenPorts) {
 	hostconfig.OpenPorts = append(hostconfig.OpenPorts, ports...)
+}
+
+func defaultHostName(clusterID string, nodeType string, i int) string {
+	return fmt.Sprintf("%s-%s-%s", clusterID, nodeType, strconv.Itoa(i))
+}
+
+func appendNodeNoDup(hostconfigs []*HostConfig, hostconfig *HostConfig) []*HostConfig {
+	for _, h := range hostconfigs {
+		if h.Ip == hostconfig.Ip {
+			return hostconfigs
+		}
+	}
+	return append(hostconfigs, hostconfig)
+}
+
+func deleteNodebyDelName(hostconfigs []*HostConfig, delName string) ([]*HostConfig, error) {
+	for i, h := range hostconfigs {
+		if h.Ip == delName || h.Name == delName {
+			result := append(hostconfigs[:i], hostconfigs[i+1:]...)
+			if len(result) == 0 {
+				return nil, nil
+			}
+			return result, nil
+		}
+	}
+	return nil, fmt.Errorf("delete node from config failed: %v not found", delName)
+}
+
+func deleteConfig(userConfig *deployConfig, delType string, delName string) error {
+	var err error
+	types := strings.Split(delType, ",")
+	for _, nodeType := range types {
+		if nodeType == "master" {
+			userConfig.Masters, err = deleteNodebyDelName(userConfig.Masters, delName)
+		}
+		if nodeType == "node" {
+			userConfig.Nodes, err = deleteNodebyDelName(userConfig.Nodes, delName)
+		}
+		if nodeType == "etcd" {
+			userConfig.Etcds, err = deleteNodebyDelName(userConfig.Etcds, delName)
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func joinConfig(userConfig *deployConfig, joinType string, joinHost *HostConfig) *api.HostConfig {
+	masters := userConfig.Masters
+	userConfig.Masters = nil
+	nodes := userConfig.Nodes
+	userConfig.Nodes = nil
+	etcds := userConfig.Etcds
+	userConfig.Etcds = nil
+	defer func() {
+		userConfig.Masters = masters
+		userConfig.Nodes = nodes
+		userConfig.Etcds = etcds
+	}()
+
+	types := strings.Split(joinType, ",")
+	for _, nodeType := range types {
+		var hostconfig HostConfig
+		var index int
+
+		if nodeType == "master" {
+			index = len(masters)
+		}
+		if nodeType == "node" {
+			index = len(nodes)
+		}
+		if nodeType == "etcd" {
+			index = len(etcds)
+		}
+
+		if joinHost.Name != "" {
+			hostconfig.Name = joinHost.Name
+		} else {
+			hostconfig.Name = defaultHostName(userConfig.ClusterID, nodeType, index)
+		}
+		hostconfig.Ip = joinHost.Ip
+		setIfStrConfigNotEmpty(&hostconfig.Arch, joinHost.Arch)
+		if joinHost.Port != 0 {
+			hostconfig.Port = joinHost.Port
+		}
+
+		if nodeType == "master" {
+			userConfig.Masters = []*HostConfig{&hostconfig}
+			masters = appendNodeNoDup(masters, &hostconfig)
+		}
+		if nodeType == "node" {
+			userConfig.Nodes = []*HostConfig{&hostconfig}
+			nodes = appendNodeNoDup(nodes, &hostconfig)
+		}
+		if nodeType == "etcd" {
+			userConfig.Etcds = []*HostConfig{&hostconfig}
+			etcds = appendNodeNoDup(etcds, &hostconfig)
+		}
+	}
+
+	config := toClusterdeploymentConfig(userConfig)
+	for _, h := range config.Nodes {
+		if h.Address == joinHost.Ip {
+			return h
+		}
+	}
+	return nil
 }
 
 func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
@@ -769,9 +888,53 @@ func createDeployConfigTemplate(file string) error {
 		return fmt.Errorf("marshal template config failed: %v", err)
 	}
 
-	if err := ioutil.WriteFile(file, d, 0700); err != nil {
+	if err := ioutil.WriteFile(file, d, 0640); err != nil {
 		return fmt.Errorf("write template config file failed: %v", err)
 	}
 
 	return nil
+}
+
+func backupDeployConfig(cc *deployConfig) error {
+	d, err := yaml.Marshal(cc)
+	if err != nil {
+		return fmt.Errorf("marshal template config failed: %v", err)
+	}
+
+	if err = ioutil.WriteFile(backupedDeployConfigPath(), d, 0640); err != nil {
+		return fmt.Errorf("write user deploy config file failed: %v", err)
+	}
+
+	return nil
+}
+
+func loadBackupedDeployConfig() (*deployConfig, error) {
+	yamlStr, err := ioutil.ReadFile(backupedDeployConfigPath())
+	if err != nil {
+		return nil, err
+	}
+
+	conf := &deployConfig{}
+	if err := yaml.Unmarshal([]byte(yamlStr), conf); err != nil {
+		return nil, err
+	}
+
+	return conf, nil
+}
+
+func loadConfig() (*deployConfig, error) {
+	conf, err := loadBackupedDeployConfig()
+	if err != nil {
+		if os.IsNotExist(err) {
+			// try load default user's config if backup file not exist
+			conf, err = loadDeployConfig(opts.deployConfig)
+			if err != nil {
+				return nil, fmt.Errorf("load default user's config failed: %v", err)
+			}
+		} else {
+			return nil, fmt.Errorf("load backuped deploy config failed: %v", err)
+		}
+	}
+
+	return conf, nil
 }

@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment/binary/commontools"
 	"isula.org/eggo/pkg/clusterdeployment/binary/infrastructure"
@@ -37,7 +38,6 @@ import (
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/task"
 	"isula.org/eggo/pkg/utils/template"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -432,7 +432,7 @@ func runKubernetesServices(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.Ho
 	return nil
 }
 
-func JoinMaterNode(conf *api.ClusterConfig, masterNode *api.HostConfig) error {
+func JoinMaterNode(conf *api.ClusterConfig, masterID string) error {
 	joinMasterTasks := []task.Task{
 		task.NewTaskInstance(
 			&commontools.CopyCaCertificatesTask{
@@ -446,28 +446,15 @@ func JoinMaterNode(conf *api.ClusterConfig, masterNode *api.HostConfig) error {
 		),
 	}
 
-	err := nodemanager.RunTasksOnNode(joinMasterTasks, masterNode.Address)
+	err := nodemanager.RunTasksOnNode(joinMasterTasks, masterID)
 	if err != nil {
-		return err
-	}
-
-	if err := nodemanager.WaitTasksOnNodeFinished(joinMasterTasks, masterNode.Address, time.Minute*5); err != nil {
-		logrus.Errorf("wait to init first control plane master finish failed: %v", err)
 		return err
 	}
 
 	return nil
 }
 
-func Init(conf *api.ClusterConfig) error {
-	var firstMaster *api.HostConfig
-	for _, node := range conf.Nodes {
-		if node.Type&api.Master != 0 {
-			firstMaster = node
-			break
-		}
-	}
-
+func Init(conf *api.ClusterConfig, master string) error {
 	// create encryption for cluster
 	err := generateEncryption(api.GetClusterHomePath(conf.Name))
 	if err != nil {
@@ -481,7 +468,7 @@ func Init(conf *api.ClusterConfig) error {
 		return err
 	}
 
-	if err = JoinMaterNode(conf, firstMaster); err != nil {
+	if err = JoinMaterNode(conf, master); err != nil {
 		return err
 	}
 
@@ -490,12 +477,12 @@ func Init(conf *api.ClusterConfig) error {
 			cluster: conf,
 		},
 	)
-	err = nodemanager.RunTaskOnNodes(post, []string{firstMaster.Address})
+	err = nodemanager.RunTaskOnNodes(post, []string{master})
 	if err != nil {
 		return err
 	}
 
-	if err := nodemanager.WaitTaskOnNodesFinished(post, []string{firstMaster.Address}, time.Minute*5); err != nil {
+	if err := nodemanager.WaitNodesFinish([]string{master}, time.Minute*5); err != nil {
 		logrus.Errorf("wait to post task for master finish failed: %v", err)
 		return err
 	}

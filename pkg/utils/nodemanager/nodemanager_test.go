@@ -21,10 +21,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/task"
-	"github.com/sirupsen/logrus"
 )
 
 type MockRunner struct {
@@ -125,7 +125,7 @@ func TestRunTaskOnNodes(t *testing.T) {
 		t.Fatalf("run task on ondes failed: %v\n", err)
 	}
 
-	err = WaitTaskOnNodesFinished(tt, nodes, time.Second*30)
+	err = WaitNodesFinish(nodes, time.Second*30)
 	if err != nil {
 		t.Fatalf("run task on ondes failed: %v\n", err)
 	}
@@ -138,7 +138,7 @@ func TestRunTaskOnNodes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run err task failed: %v", err)
 	}
-	err = WaitTaskOnNodesFinished(errTask, nodes, time.Second*30)
+	err = WaitNodesFinish(nodes, time.Second*30)
 	if err == nil {
 		t.Fatal("run error task on ondes success")
 	}
@@ -156,7 +156,7 @@ func TestRunTaskOnAll(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run task on all node failed: %v\n", err)
 	}
-	err = WaitTaskOnAllFinished(tt, time.Second*30)
+	err = WaitAllNodesFinished(time.Second * 30)
 	if err != nil {
 		t.Fatal("run task on all ondes failed\n")
 	}

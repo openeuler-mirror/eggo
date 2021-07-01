@@ -18,10 +18,11 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
+	"isula.org/eggo/pkg/utils"
 	"isula.org/eggo/pkg/utils/nodemanager"
 	"isula.org/eggo/pkg/utils/runner"
-	"github.com/sirupsen/logrus"
 )
 
 type MockRunner struct {
@@ -86,8 +87,12 @@ func TestInit(t *testing.T) {
 	}
 
 	r := &MockRunner{}
+	var master string
 	for _, node := range conf.Nodes {
 		nodemanager.RegisterNode(node, r)
+		if utils.IsType(node.Type, api.Master) {
+			master = node.Address
+		}
 	}
 	defer func() {
 		nodemanager.UnRegisterAllNodes()
@@ -100,7 +105,7 @@ func TestInit(t *testing.T) {
 	lr.RunCommand(fmt.Sprintf("sudo touch %s/%s/pki/apiserver-etcd-client.crt", api.EggoHomePath, conf.Name))
 	lr.RunCommand(fmt.Sprintf("sudo touch %s/%s/pki/apiserver-etcd-client.key", api.EggoHomePath, conf.Name))
 	lr.RunCommand(fmt.Sprintf("sudo touch %s/%s/pki/etcd/ca.crt", api.EggoHomePath, conf.Name))
-	if err := Init(conf); err != nil {
+	if err := Init(conf, master); err != nil {
 		t.Fatalf("do control plane init failed: %v", err)
 	}
 	//lr.RunCommand(fmt.Sprintf("sudo rm -rf 0777 %s/%s", api.EggoHomePath, conf.Name))

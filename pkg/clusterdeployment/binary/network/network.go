@@ -19,13 +19,13 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/constants"
 	"isula.org/eggo/pkg/utils/kubectl"
 	"isula.org/eggo/pkg/utils/nodemanager"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/task"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -79,7 +79,7 @@ func SetupNetwork(cluster *api.ClusterConfig) error {
 	if err != nil {
 		return err
 	}
-	err = nodemanager.WaitTaskOnNodesFinished(t, []string{useMaster}, 5*time.Minute)
+	err = nodemanager.WaitNodesFinish([]string{useMaster}, 5*time.Minute)
 	if err != nil {
 		return err
 	}
@@ -133,7 +133,7 @@ func CleanupNetwork(cluster *api.ClusterConfig) error {
 	if err != nil {
 		return err
 	}
-	err = nodemanager.WaitTaskOnNodesFinished(t, []string{useMaster}, 5*time.Minute)
+	err = nodemanager.WaitNodesFinish([]string{useMaster}, 5*time.Minute)
 	if err != nil {
 		return err
 	}

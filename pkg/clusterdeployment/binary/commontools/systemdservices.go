@@ -18,11 +18,11 @@ import (
 	"encoding/base64"
 	"fmt"
 
+	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment/runtime"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/template"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -357,7 +357,7 @@ func SetupWorkerServices(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.Host
 	return nil
 }
 
-func SetupLoadBalanceServices(r runner.Runner, ccfg *api.ClusterConfig, command string) error {
+func SetupLoadBalanceServices(r runner.Runner, command string) error {
 	config := `[Unit]
 Description=kube-apiserver nginx proxy
 After=network.target
@@ -406,6 +406,7 @@ func GetSystemdServiceShell(name string, base64Data string, needStart bool) (str
 	shell := `
 #!/bin/bash
 {{- if .content }}
+rm -f /usr/lib/systemd/system/{{ .name }}.service
 echo {{ .content }} | base64 -d > /usr/lib/systemd/system/{{ .name }}.service
 {{- end }}
 which chcon

@@ -22,13 +22,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment/binary/commontools"
 	"isula.org/eggo/pkg/utils"
 	"isula.org/eggo/pkg/utils/nodemanager"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/task"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -214,16 +214,6 @@ func prepareEtcdConfigs(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *ap
 	return nil
 }
 
-func getAllIps(nodes []*api.HostConfig) []string {
-	var ips []string
-
-	for _, node := range nodes {
-		ips = append(ips, node.Address)
-	}
-
-	return ips
-}
-
 func Init(conf *api.ClusterConfig) error {
 	// generate ca certificates and kube-apiserver-etcd-client certificates
 	if err := generateCaAndApiserverEtcdCerts(&runner.LocalRunner{}, conf); err != nil {
@@ -236,12 +226,12 @@ func Init(conf *api.ClusterConfig) error {
 		},
 	)
 
-	nodes := getAllIps(conf.EtcdCluster.Nodes)
+	nodes := utils.GetAllIPs(conf.EtcdCluster.Nodes)
 	if err := nodemanager.RunTaskOnNodes(taskDeployEtcds, nodes); err != nil {
 		return fmt.Errorf("run task on nodes failed: %v", err)
 	}
 
-	if err := nodemanager.WaitTaskOnNodesFinished(taskDeployEtcds, nodes, time.Second*60*5); err != nil {
+	if err := nodemanager.WaitNodesFinish(nodes, time.Minute*5); err != nil {
 		return fmt.Errorf("wait for deploy etcds task finish failed: %v", err)
 	}
 
@@ -255,7 +245,7 @@ func Init(conf *api.ClusterConfig) error {
 		return fmt.Errorf("run task on nodes failed: %v", err)
 	}
 
-	if err := nodemanager.WaitTaskOnNodesFinished(taskPostDeployEtcds, nodes, time.Second*60*5); err != nil {
+	if err := nodemanager.WaitNodesFinish(nodes, time.Minute*5); err != nil {
 		return fmt.Errorf("wait for post deploy etcds task finish failed: %v", err)
 	}
 
