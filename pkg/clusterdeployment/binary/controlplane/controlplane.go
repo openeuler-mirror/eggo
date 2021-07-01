@@ -24,7 +24,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
@@ -479,11 +478,6 @@ func Init(conf *api.ClusterConfig, master string) error {
 	)
 	err = nodemanager.RunTaskOnNodes(post, []string{master})
 	if err != nil {
-		return err
-	}
-
-	if err := nodemanager.WaitNodesFinish([]string{master}, time.Minute*5); err != nil {
-		logrus.Errorf("wait to post task for master finish failed: %v", err)
 		return err
 	}
 

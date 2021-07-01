@@ -17,6 +17,7 @@ package nodemanager
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -179,6 +180,64 @@ func RunTaskOnOneNode(t task.Task, nodes []string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("all nodes are busy for task %s", t.Name())
+}
+
+func checkNodeFinish(nodeID string) (bool, string, error) {
+	manager.lock.RLock()
+	defer manager.lock.RUnlock()
+	n, ok := manager.nodes[nodeID]
+	if !ok {
+		return true, fmt.Sprintf("unknow node: %s", nodeID), fmt.Errorf("unkown node %s", nodeID)
+	}
+	s := n.GetStatus()
+	if s.TasksFinished() {
+		if s.HasError() {
+			return true, s.ShowCounts(), fmt.Errorf("%s", s.Message)
+		}
+		return true, s.ShowCounts(), nil
+	}
+
+	return false, s.ShowCounts(), nil
+}
+
+func WaitNodesFinishWithProgress(nodes []string, timeout time.Duration) error {
+	var errmsg string
+	unfinishedNodes := nodes
+
+	finish := time.After(timeout)
+outfor:
+	for {
+		select {
+		case t := <-finish:
+			return fmt.Errorf("timeout %s for WaitNodesFinishWithProgress", t.String())
+		default:
+			if len(unfinishedNodes) == 0 {
+				break outfor
+			}
+			var sb strings.Builder
+			var nextUnfinished []string
+			for _, id := range unfinishedNodes {
+				f, show, err := checkNodeFinish(id)
+				if err != nil {
+					errmsg = fmt.Sprintf("node: %s with error: %v\n%s", id, err, errmsg)
+				}
+				sb.WriteString("\nnode:")
+				sb.WriteString(id + " ")
+				sb.WriteString(show)
+				if !f {
+					nextUnfinished = append(nextUnfinished, id)
+				}
+			}
+			logrus.Infof("Tasks progress: %s", sb.String())
+			unfinishedNodes = nextUnfinished
+			time.Sleep(time.Second)
+		}
+	}
+
+	if errmsg != "" {
+		return fmt.Errorf("%s", errmsg)
+	}
+	return nil
 }
 
 func WaitNodesFinish(nodes []string, timeout time.Duration) error {

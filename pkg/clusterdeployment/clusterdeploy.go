@@ -62,7 +62,7 @@ func doCreateCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig) er
 
 	// Step2: setup etcd cluster
 	// wait infrastructure task success on nodes of etcd cluster
-	if err := nodemanager.WaitNodesFinish(etcdNodes, time.Minute*5); err != nil {
+	if err := nodemanager.WaitNodesFinishWithProgress(etcdNodes, time.Minute*5); err != nil {
 		return err
 	}
 	if err := handler.EtcdClusterSetup(); err != nil {
@@ -89,7 +89,7 @@ func doCreateCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig) er
 	}
 	//Step5: setup addons for cluster
 	// wait all nodes ready
-	if err := nodemanager.WaitNodesFinish(joinNodeIDs, time.Minute*5); err != nil {
+	if err := nodemanager.WaitNodesFinishWithProgress(joinNodeIDs, time.Minute*5); err != nil {
 		return err
 	}
 
@@ -142,7 +142,7 @@ func doJoinNode(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, hostcon
 	}
 
 	// wait node ready
-	if err := nodemanager.WaitNodesFinish([]string{hostconfig.Address}, time.Minute*5); err != nil {
+	if err := nodemanager.WaitNodesFinishWithProgress([]string{hostconfig.Address}, time.Minute*5); err != nil {
 		return err
 	}
 
@@ -236,7 +236,7 @@ func doRemoveCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig) {
 	}
 
 	allNodes := utils.GetAllIPs(cc.Nodes)
-	if err := nodemanager.WaitNodesFinish(allNodes, time.Minute*5); err != nil {
+	if err = nodemanager.WaitNodesFinish(allNodes, time.Minute*5); err != nil {
 		logrus.Warnf("[cluster] wait cleanup addons failed: %v", err)
 	}
 
@@ -250,7 +250,7 @@ func doRemoveCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig) {
 		}
 	}
 
-	if err := nodemanager.WaitNodesFinish(allNodes, time.Minute*5); err != nil {
+	if err = nodemanager.WaitNodesFinish(allNodes, time.Minute*5); err != nil {
 		logrus.Warnf("[cluster] wait cleanup cloadbalance failed: %v", err)
 	}
 
@@ -289,7 +289,7 @@ func doRemoveCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig) {
 		}
 	}
 
-	if err := nodemanager.WaitNodesFinish(allNodes, time.Minute*5); err != nil {
+	if err = nodemanager.WaitNodesFinishWithProgress(allNodes, time.Minute*5); err != nil {
 		logrus.Warnf("[cluster] wait all cleanup finish failed: %v", err)
 	}
 }
