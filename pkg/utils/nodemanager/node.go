@@ -50,6 +50,10 @@ func (s NodeStatus) TasksFinished() bool {
 	return s.TaskTotalCnt == s.TaskSuccessCnt+s.TaskFailCnt+s.TaskIgnoreCnt
 }
 
+func (ns NodeStatus) ShowCounts() string {
+	return fmt.Sprintf("{ total: %d, success: %d, fail: %d, ignore: %d }", ns.TaskTotalCnt, ns.TaskSuccessCnt, ns.TaskFailCnt, ns.TaskIgnoreCnt)
+}
+
 type Node struct {
 	host *api.HostConfig
 	r    runner.Runner

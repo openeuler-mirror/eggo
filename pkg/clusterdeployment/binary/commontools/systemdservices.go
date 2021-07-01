@@ -427,7 +427,10 @@ systemctl daemon-reload
 
 {{- if .start }}
 systemctl start {{ .name }}
-[[ $? -ne 0 ]] && exit 1
+if [[ $? -ne 0 ]]; then
+	systemctl status {{ .name }} | tail -100
+	exit 1
+fi
 {{- end}}
 
 echo "setup {{ .name }} success"
