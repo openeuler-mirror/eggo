@@ -17,6 +17,13 @@ test:
 	@go test -race -cover -count=1 -timeout=300s  ./...
 	@echo "Units test done!"
 
+images: image-eggo
+
+image-eggo: eggo
+	cp bin/eggo images/eggo/ && \
+	docker build -t eggo:$(VERSION) images/eggo && \
+	rm images/eggo/eggo
+
 .PHONY: install
 install:
 	@echo "install eggo..."
