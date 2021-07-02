@@ -1,11 +1,14 @@
 package kubectl
 
 import (
-	"fmt"
+	"context"
+	"path/filepath"
 
-	"isula.org/eggo/pkg/api"
-	"isula.org/eggo/pkg/utils/runner"
 	"github.com/sirupsen/logrus"
+	"isula.org/eggo/pkg/api"
+	"isula.org/eggo/pkg/constants"
+	k8scorev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type Taint struct {
@@ -14,44 +17,47 @@ type Taint struct {
 	Effect string
 }
 
-func (t Taint) ToString() (string, error) {
-	if t.Key == "" {
-		return "", fmt.Errorf("empty key")
+func NodeTaintAndLabel(cluster string, objectName string, labels map[string]string, taints []Taint) error {
+	path := filepath.Join(api.GetClusterHomePath(cluster), constants.KubeConfigFileNameAdmin)
+	cs, err := GetKubeClient(path)
+	if err != nil {
+		return err
 	}
-	if t.Value != "" {
-		return fmt.Sprintf("%s=%s:%s", t.Key, t.Value, t.Effect), nil
-	}
-	if t.Effect == "" {
-		return t.Key, nil
-	}
-	return fmt.Sprintf("%s:%s", t.Key, t.Effect), nil
-}
 
-func AddNodeTaints(cluster *api.ClusterConfig, r runner.Runner, objectName string, taints []Taint) error {
-	for _, t := range taints {
-		tstr, err := t.ToString()
-		if err != nil {
-			logrus.Warnf("invalid taint: %v", err)
+	n, err := cs.CoreV1().Nodes().Get(context.TODO(), objectName, v1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	var ktaints []k8scorev1.Taint
+
+	for _, taint := range taints {
+		t := k8scorev1.Taint{
+			Key:    taint.Key,
+			Value:  taint.Value,
+			Effect: k8scorev1.TaintEffect(taint.Effect),
+		}
+		flag := false
+		for _, tt := range n.Spec.Taints {
+			if tt == t {
+				flag = true
+				break
+			}
+		}
+		if flag {
 			continue
 		}
-		cmd := fmt.Sprintf("taint nodes %s %s", objectName, tstr)
-		err = RunKubectlCmd(r, cmd, cluster)
-		if err != nil {
-			return err
-		}
+		ktaints = append(ktaints, t)
+	}
+	n.Spec.Taints = append(n.Spec.Taints, ktaints...)
+	for k, v := range labels {
+		n.Labels[k] = v
 	}
 
-	return nil
-}
-
-func AddNodeLabels(cluster *api.ClusterConfig, r runner.Runner, objectName string, lables map[string]string) error {
-	for k, v := range lables {
-		cmd := fmt.Sprintf("label node %s %s=%s", objectName, k, v)
-		err := RunKubectlCmd(r, cmd, cluster)
-		if err != nil {
-			return err
-		}
+	rs, err := cs.CoreV1().Nodes().Update(context.TODO(), n, v1.UpdateOptions{})
+	if err != nil {
+		return err
 	}
+	logrus.Infof("taint and labels node: %s success", rs.GetName())
 
 	return nil
 }

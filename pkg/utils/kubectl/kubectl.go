@@ -15,14 +15,20 @@
 package kubectl
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/constants"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/template"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 var ops map[string]string
@@ -75,67 +81,50 @@ exit 0
 }
 
 func OperatorByYaml(r runner.Runner, operator string, yamlFile string, cluster *api.ClusterConfig) error {
+	// TODO: current apply addons on node of master, future maybe apply in eggo
 	if op, ok := ops[operator]; ok {
 		return runKubectlWithYaml(r, op, yamlFile, cluster)
 	}
 	return fmt.Errorf("unsupport operator: %s", operator)
 }
 
-func RunKubectlCmd(r runner.Runner, subcmd string, cluster *api.ClusterConfig) error {
-	cmdTmpl := `
-#!/bin/bash
-export KUBECONFIG={{ .KubeConfig }}
-kubectl {{ .Subcmd }}
-if [ $? -ne 0 ]; then
-	echo "run {{ .Subcmd }} failed"
-	exit 1
-fi
-exit 0
-`
-	datastore := make(map[string]interface{})
-	datastore["Subcmd"] = subcmd
-	datastore["KubeConfig"] = filepath.Join(cluster.GetConfigDir(), constants.KubeConfigFileNameAdmin)
-
-	cmdStr, err := template.TemplateRender(cmdTmpl, datastore)
+func GetKubeClient(configPath string) (*kubernetes.Clientset, error) {
+	config, err := clientcmd.BuildConfigFromFlags("", configPath)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	cs, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, err
 	}
 
-	_, err = r.RunShell(cmdStr, "kubectlcmd")
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return cs, nil
 }
 
-func WaitNodeJoined(r runner.Runner, name string, cluster *api.ClusterConfig) error {
-	waitTmpl := `
-#!/bin/bash
-export KUBECONFIG={{ .KubeConfig }}
-for i in $(seq 20); do
-	kubectl get nodes | grep {{ .Name }}
-	if [ $? -eq 0 ]; then
-		exit 0
-	fi
-	sleep 6
-done
-echo "wait node: {{ .Name }} join failed"
-exit 1
-`
-	datastore := make(map[string]interface{})
-	datastore["Name"] = name
-	datastore["KubeConfig"] = filepath.Join(cluster.GetConfigDir(), constants.KubeConfigFileNameAdmin)
-
-	cmdStr, err := template.TemplateRender(waitTmpl, datastore)
+func WaitNodeRegister(name string, cluster string) error {
+	path := filepath.Join(api.GetClusterHomePath(cluster), constants.KubeConfigFileNameAdmin)
+	cs, err := GetKubeClient(path)
 	if err != nil {
+		logrus.Errorf("get kube client for cluster: %s failed: %v", cluster, err)
 		return err
 	}
 
-	_, err = r.RunShell(cmdStr, name)
-	if err != nil {
-		return err
+	finish := time.After(time.Second * 120)
+	for {
+		select {
+		case t := <-finish:
+			return fmt.Errorf("timeout %s for wait node: %s", t.String(), name)
+		default:
+			n, err := cs.CoreV1().Nodes().Get(context.TODO(), name, v1.GetOptions{})
+			if err != nil {
+				logrus.Debugf("get node %s, failed: %s", name, err)
+				break
+			}
+			if n != nil {
+				logrus.Debugf("get node: %s success", name)
+				return nil
+			}
+		}
+		time.Sleep(time.Second)
 	}
-
-	return nil
 }
