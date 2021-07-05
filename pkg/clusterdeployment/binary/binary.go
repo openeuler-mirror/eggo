@@ -127,21 +127,12 @@ func (bcp *BinaryClusterDeployment) taintAndLabelMasterNodes() error {
 	for _, node := range bcp.config.Nodes {
 		if (node.Type&api.Master != 0) && (node.Type&api.Worker != 0) {
 			// taint master node
-			r, ok := bcp.connections[node.Address]
-			if !ok {
-				logrus.Warnf("cannot find node: %s connection", node.Name)
-				continue
-			}
-			err := kubectl.WaitNodeJoined(r, node.Name, bcp.config)
+			err := kubectl.WaitNodeRegister(node.Name, bcp.config.Name)
 			if err != nil {
 				logrus.Warnf("wait node: %s joined failed: %v", node.Name, err)
 				continue
 			}
-			err = kubectl.AddNodeTaints(bcp.config, r, node.Name, taints)
-			if err != nil {
-				return err
-			}
-			err = kubectl.AddNodeLabels(bcp.config, r, node.Name, labels)
+			err = kubectl.NodeTaintAndLabel(bcp.config.Name, node.Name, labels, taints)
 			if err != nil {
 				return err
 			}
