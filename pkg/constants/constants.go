@@ -13,9 +13,13 @@ const (
 	EncryptionConfigName         = "encryption-config.yaml"
 
 	// package manager relate constants
-	TempFileHomeDir     = "/tmp/.eggo"
-	DefaultPkgUntarPath = "/tmp/.eggo/pkg"
-	DefaultImagePkgName = "images.tar"
+	DefaultPackagePath = "/etc/kubernetes/package"
+	DefaultPkgPath     = "/pkg"
+	DefaultBinPath     = "/bin"
+	DefaultFilePath    = "/file"
+	DefaultDirPath     = "/dir"
+	DefaultImagePath   = "/image"
+	DefaultYamlPath    = "/yaml"
 
 	// user home dir formats
 	UserHomeFormat               = "/home/%s"

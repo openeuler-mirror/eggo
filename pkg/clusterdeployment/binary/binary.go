@@ -175,11 +175,51 @@ func (bcp *BinaryClusterDeployment) cleanupNetwork() error {
 
 // support new apis
 func (bcp *BinaryClusterDeployment) MachineInfraSetup(hcf *api.HostConfig) error {
-	return infrastructure.NodeInfrastructureSetup(bcp.config, hcf.Address)
+	if hcf == nil {
+		logrus.Warnf("empty host config")
+		return nil
+	}
+
+	logrus.Infof("do setup %s infrastrucure...", hcf.Address)
+
+	role := []uint16{api.Master, api.Worker, api.ETCD, api.LoadBalance}
+	for _, r := range role {
+		if !utils.IsType(hcf.Type, r) {
+			continue
+		}
+
+		err := infrastructure.NodeInfrastructureSetup(bcp.config, hcf.Address, r)
+		if err != nil {
+			return err
+		}
+	}
+
+	logrus.Infof("setup %s infrastrucure success", hcf.Address)
+	return nil
 }
 
 func (bcp *BinaryClusterDeployment) MachineInfraDestroy(hcf *api.HostConfig) error {
-	return infrastructure.NodeInfrastructureDestroy(bcp.config, hcf.Address)
+	if hcf == nil {
+		logrus.Warnf("empty host config")
+		return nil
+	}
+
+	logrus.Infof("do destroy %s infrastrucure...", hcf.Address)
+
+	role := []uint16{api.Master, api.Worker, api.ETCD, api.LoadBalance}
+	for _, r := range role {
+		if !utils.IsType(hcf.Type, r) {
+			continue
+		}
+
+		err := infrastructure.NodeInfrastructureDestroy(bcp.config, hcf.Address, r)
+		if err != nil {
+			logrus.Errorf("role %d infrastructure destory failed: %v", r, err)
+		}
+	}
+
+	logrus.Infof("destroy %s infrastrucure success", hcf.Address)
+	return nil
 }
 
 func (bcp *BinaryClusterDeployment) EtcdClusterSetup() error {

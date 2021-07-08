@@ -28,10 +28,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment/binary/commontools"
-	"isula.org/eggo/pkg/clusterdeployment/binary/infrastructure"
 	"isula.org/eggo/pkg/constants"
 	"isula.org/eggo/pkg/utils"
 	"isula.org/eggo/pkg/utils/certs"
+	"isula.org/eggo/pkg/utils/dependency"
 	"isula.org/eggo/pkg/utils/endpoint"
 	"isula.org/eggo/pkg/utils/nodemanager"
 	"isula.org/eggo/pkg/utils/runner"
@@ -147,7 +147,7 @@ func (ct *ControlPlaneTask) Run(r runner.Runner, hcf *api.HostConfig) error {
 
 func check(r runner.Runner, savePath string) error {
 	// check dependences softwares
-	if err := infrastructure.CheckDependences(r, KubeSoftwares); err != nil {
+	if err := dependency.CheckDependency(r, KubeSoftwares); err != nil {
 		return err
 	}
 

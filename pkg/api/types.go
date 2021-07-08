@@ -16,11 +16,7 @@
 package api
 
 import (
-	"path/filepath"
 	"time"
-
-	"github.com/sirupsen/logrus"
-	"isula.org/eggo/pkg/constants"
 )
 
 const (
@@ -30,29 +26,39 @@ const (
 	LoadBalance = 0x8
 )
 
+type RoleInfra struct {
+	OpenPorts []*OpenPorts     `json:"open-ports"`
+	Softwares []*PackageConfig `json:"softwares"`
+}
+
 type OpenPorts struct {
 	Port     int    `json:"port"`
 	Protocol string `json:"protocol"` // tcp/udp
 }
 
-type Packages struct {
+type PackageConfig struct {
 	Name string `json:"name"`
-	Type string `json:"type"` // repo, pkg, binary
-	Dst  string `json:"dstpath"`
+	Type string `json:"type"` // repo bin file dir image yaml
+	Dst  string `json:"dst"`
+}
+
+type PackageSrcConfig struct {
+	Type    string `json:"type"`     // tar.gz...
+	DstPath string `json:"dst-path"` // untar path on dst node
+	ArmSrc  string `json:"arm-srcpath"`
+	X86Src  string `json:"x86-srcPath"`
 }
 
 type HostConfig struct {
-	Arch           string       `json:"arch"`
-	Name           string       `json:"name"`
-	Address        string       `json:"address"`
-	Port           int          `json:"port"`
-	ExtraIPs       []string     `json:"extra-ips"`
-	OpenPorts      []*OpenPorts `json:"open-ports"`
-	UserName       string       `json:"username"`
-	Password       string       `json:"password"`
-	PrivateKey     string       `json:"private-key"`
-	PrivateKeyPath string       `json:"private-key-path"`
-	Packages       []*Packages  `json:"packages"`
+	Arch           string   `json:"arch"`
+	Name           string   `json:"name"`
+	Address        string   `json:"address"`
+	Port           int      `json:"port"`
+	ExtraIPs       []string `json:"extra-ips"`
+	UserName       string   `json:"username"`
+	Password       string   `json:"password"`
+	PrivateKey     string   `json:"private-key"`
+	PrivateKeyPath string   `json:"private-key-path"`
 
 	// 0x1 is master, 0x2 is worker, 0x4 is etcd
 	// 0x3 is master and worker
@@ -135,21 +141,6 @@ type ServiceClusterConfig struct {
 	DNS     DnsConfig `json:"dns"`
 }
 
-type PackageSrcConfig struct {
-	Type     string `json:"type"`      // tar.gz...
-	DistPath string `json:"dist-path"` // on dist node, untar path
-	ArmSrc   string `json:"arm-srcpath"`
-	X86Src   string `json:"x86-srcPath"`
-}
-
-func (p PackageSrcConfig) GetPkgDistPath() string {
-	if p.DistPath == "" {
-		return constants.DefaultPkgUntarPath
-	}
-
-	return p.DistPath
-}
-
 type EtcdClusterConfig struct {
 	Token     string            `json:"token"`
 	Nodes     []*HostConfig     `json:"nodes"`
@@ -181,7 +172,6 @@ type ClusterRoleBindingConfig struct {
 	SubjectKind string `json:"SubjectKind"`
 	RoleName    string `json:"RoleName"`
 }
-
 type LoadBalancer struct {
 	IP   string `json:"ip"`
 	Port string `json:"port"`
@@ -207,6 +197,7 @@ type ClusterConfig struct {
 	BootStrapTokens []*BootstrapTokenConfig `json:"bootstrap-tokens"`
 	LoadBalancer    LoadBalancer            `json:"loadBalancer"`
 	WorkerConfig    WorkerConfig            `json:"workerconfig"`
+	RoleInfra       map[uint16]*RoleInfra   `json:"role-infra"`
 	Addons          []*AddonConfig          `json:"addons"`
 
 	// TODO: add other configurations at here
@@ -214,40 +205,6 @@ type ClusterConfig struct {
 
 type ClusterStatus struct {
 }
-
-func (c ClusterConfig) GetConfigDir() string {
-	if c.ConfigDir != "" {
-		if !filepath.IsAbs(c.ConfigDir) {
-			logrus.Debugf("ignore invalid config dir: %s, just use default", c.ConfigDir)
-			return constants.DefaultK8SRootDir
-		}
-		return filepath.Clean(c.ConfigDir)
-	}
-	return constants.DefaultK8SRootDir
-}
-
-func (c ClusterConfig) GetCertDir() string {
-	if c.Certificate.SavePath != "" {
-		if !filepath.IsAbs(c.Certificate.SavePath) {
-			logrus.Debugf("ignore invalid certificate save path: %s, just use default", c.Certificate.SavePath)
-			return constants.DefaultK8SCertDir
-		}
-		return filepath.Clean(c.Certificate.SavePath)
-	}
-	return constants.DefaultK8SCertDir
-}
-
-func (c ClusterConfig) GetManifestDir() string {
-	if c.ConfigDir != "" {
-		if !filepath.IsAbs(c.ConfigDir) {
-			logrus.Debugf("ignore invalid config dir: %s, just use default", c.ConfigDir)
-			return constants.DefaultK8SManifestsDir
-		}
-		return filepath.Join(filepath.Clean(c.ConfigDir), "manifests")
-	}
-	return constants.DefaultK8SManifestsDir
-}
-
 type InfrastructureAPI interface {
 	// TODO: should add other dependence cluster configurations
 	MachineInfraSetup(machine *HostConfig) error

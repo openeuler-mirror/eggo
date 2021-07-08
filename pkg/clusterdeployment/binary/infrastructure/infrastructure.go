@@ -16,13 +16,17 @@
 package infrastructure
 
 import (
+	"crypto/md5"
 	"encoding/base64"
 	"fmt"
-	"strconv"
-	"strings"
+	"io"
+	"os"
+	"path/filepath"
+	"sync"
 
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/utils"
+	"isula.org/eggo/pkg/utils/dependency"
 	"isula.org/eggo/pkg/utils/nodemanager"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/task"
@@ -31,20 +35,71 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var itask *task.TaskInstance
-
 var (
-	MasterPorts = []string{"6443/tcp", "10252/tcp", "10251/tcp"}
-	WorkPorts   = []string{"10250/tcp", "10256/tcp"}
-	EtcdPosts   = []string{"2379-2381/tcp"}
+	pmd *packageMD5 = &packageMD5{}
 )
 
 type SetupInfraTask struct {
-	ccfg *api.ClusterConfig
+	packageSrc *api.PackageSrcConfig
+	roleInfra  *api.RoleInfra
 }
 
 func (it *SetupInfraTask) Name() string {
 	return "SetupInfraTask"
+}
+
+func (it *SetupInfraTask) Run(r runner.Runner, hcg *api.HostConfig) error {
+	if err := check(r, hcg, it.packageSrc); err != nil {
+		logrus.Errorf("check failed: %v", err)
+		return err
+	}
+
+	if err := setNetBridge(r); err != nil {
+		logrus.Errorf("set net bridge nf call iptables failed: %v", err)
+		return err
+	}
+
+	if err := copyPackage(r, hcg, it.packageSrc); err != nil {
+		logrus.Errorf("prepare package failed: %v", err)
+		return err
+	}
+
+	if err := dependency.InstallDependency(r, it.roleInfra, hcg, it.packageSrc.GetPkgDstPath()); err != nil {
+		logrus.Errorf("install dependency failed: %v", err)
+		return err
+	}
+
+	if err := setHostname(r, hcg); err != nil {
+		logrus.Errorf("set hostname failed: %v", err)
+		return err
+	}
+
+	if err := addFirewallPort(r, it.roleInfra.OpenPorts); err != nil {
+		logrus.Errorf("add firewall port failed: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func check(r runner.Runner, hcg *api.HostConfig, packageSrc *api.PackageSrcConfig) error {
+	if hcg == nil {
+		return fmt.Errorf("empty host config")
+	}
+
+	if packageSrc == nil {
+		return fmt.Errorf("empty package source config")
+	}
+
+	if !utils.IsX86Arch(hcg.Arch) && !utils.IsArmArch(hcg.Arch) {
+		return fmt.Errorf("invalid Arch %s for %s", hcg.Arch, hcg.Address)
+	}
+
+	if _, err := r.RunCommand("sudo -E /bin/sh -c \"which md5sum\""); err != nil {
+		return fmt.Errorf("no command md5sum on %s", hcg.Address)
+	}
+
+	return nil
 }
 
 func setNetBridge(r runner.Runner) error {
@@ -94,46 +149,57 @@ exit 0
 	return nil
 }
 
-func (it *SetupInfraTask) Run(r runner.Runner, hcg *api.HostConfig) (err error) {
-	if hcg == nil {
-		return fmt.Errorf("empty host config")
+func getPackageSrcPath(arch string, pcfg *api.PackageSrcConfig) string {
+	if utils.IsX86Arch(arch) {
+		return pcfg.X86Src
 	}
 
-	if err = check(hcg); err != nil {
-		logrus.Errorf("check failed: %v", err)
-		return
-	}
-
-	if err = setNetBridge(r); err != nil {
-		logrus.Errorf("set net bridge nf call iptables failed: %v", err)
-		return
-	}
-
-	if err = InstallDependences(r, hcg, it.ccfg.PackageSrc); err != nil {
-		logrus.Errorf("install dependences failed: %v", err)
-		return err
-	}
-
-	if err = setHostname(r, hcg); err != nil {
-		logrus.Errorf("set hostname failed: %v", err)
-		return err
-	}
-
-	if err = addFirewallPort(r, hcg, &it.ccfg.LoadBalancer); err != nil {
-		logrus.Errorf("add firewall port failed: %v", err)
-		return err
-	}
-
-	return nil
+	return pcfg.ArmSrc
 }
 
-func check(hcg *api.HostConfig) error {
-	if !utils.IsX86Arch(hcg.Arch) && !utils.IsArmArch(hcg.Arch) {
-		return fmt.Errorf("invalid Arch %s for %s", hcg.Arch, hcg.Address)
+func copyPackage(r runner.Runner, hcg *api.HostConfig, pcfg *api.PackageSrcConfig) error {
+	src := getPackageSrcPath(hcg.Arch, pcfg)
+	if src == "" {
+		logrus.Warnf("no package source path")
+		return nil
 	}
 
-	if hcg.Type == 0 {
-		return fmt.Errorf("no role for %s", hcg.Address)
+	// 1. calculate package MD5
+	if err := pmd.getMD5(src); err != nil {
+		return fmt.Errorf("get MD5 failed: %v", err)
+	}
+
+	// 2. package exist on remote host
+	file, dstDir := filepath.Base(src), pcfg.GetPkgDstPath()
+	dstPath := filepath.Join(dstDir, file)
+	if pmd.checkMD5(r, dstPath) {
+		logrus.Warnf("package already exist on remote host")
+		return nil
+	}
+
+	// 3. copy package
+	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"mkdir -p %s\"", dstDir)); err != nil {
+		return err
+	}
+	if err := r.Copy(src, dstPath); err != nil {
+		return fmt.Errorf("copy from %s to %s for %s failed: %v", src, dstPath, hcg.Address, err)
+	}
+
+	// 4. check package MD5
+	if !pmd.checkMD5(r, dstPath) {
+		return fmt.Errorf("%s MD5 has changed after copy, maybe it is corrupted", file)
+	}
+
+	// 5. uncompress package
+	// TODO: support other compress method
+	switch pcfg.Type {
+	case "tar.gz":
+		_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"cd %s && tar -zxvf %s\"", dstDir, file))
+		if err != nil {
+			return fmt.Errorf("uncompress %s failed for %s: %v", src, hcg.Address, err)
+		}
+	default:
+		return fmt.Errorf("cannot support uncompress %s", pcfg.Type)
 	}
 
 	return nil
@@ -153,114 +219,20 @@ func setHostname(r runner.Runner, hcg *api.HostConfig) error {
 	return nil
 }
 
-func preparePorts(hcg *api.HostConfig, lbConfig *api.LoadBalancer) []string {
-	ports := []string{}
-
-	if utils.IsType(hcg.Type, api.Master) {
-		ports = append(ports, MasterPorts...)
-	}
-
-	if utils.IsType(hcg.Type, api.Worker) {
-		ports = append(ports, WorkPorts...)
-	}
-
-	if utils.IsType(hcg.Type, api.ETCD) {
-		ports = append(ports, EtcdPosts...)
-	}
-
-	if utils.IsType(hcg.Type, api.LoadBalance) {
-		ports = append(ports, lbConfig.Port+"/tcp")
-	}
-
-	for _, p := range hcg.OpenPorts {
-		port := strconv.Itoa(p.Port) + "/" + p.Protocol
-		ports = append(ports, port)
-	}
-
-	return ports
-}
-
-func addFirewallPort(r runner.Runner, hcg *api.HostConfig, lbConfig *api.LoadBalancer) error {
-	ports := preparePorts(hcg, lbConfig)
-	if len(ports) == 0 {
-		logrus.Warnf("no port for %s", hcg.Address)
-		return nil
-	}
-
-	if err := ExposePorts(r, ports...); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func ExposePorts(r runner.Runner, ports ...string) error {
-	if _, err := r.RunCommand(utils.AddSudo("systemctl status firewalld | grep running")); err != nil {
-		logrus.Warnf("firewall is disable: %v, just ignore", err)
-		return nil
-	}
-
-	var sb strings.Builder
-	sb.WriteString("sudo -E /bin/sh -c \"")
-
-	rPorts := utils.RemoveDupString(ports)
-	for _, p := range rPorts {
-		sb.WriteString(fmt.Sprintf("firewall-cmd --zone=public --add-port=%s && ", p))
-	}
-
-	sb.WriteString("firewall-cmd --runtime-to-permanent \"")
-	if _, err := r.RunCommand(sb.String()); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func ShieldPorts(r runner.Runner, ports ...string) {
-	if _, err := r.RunCommand(utils.AddSudo("systemctl status firewalld | grep running")); err != nil {
-		logrus.Warnf("firewall is disable: %v, just ignore", err)
-		return
-	}
-
-	var sb strings.Builder
-	sb.WriteString("sudo -E /bin/sh -c \"")
-
-	rPorts := utils.RemoveDupString(ports)
-	for _, p := range rPorts {
-		sb.WriteString(fmt.Sprintf("firewall-cmd --zone=public --remove-port=%s ; ", p))
-	}
-
-	sb.WriteString("firewall-cmd --runtime-to-permanent \"")
-	if _, err := r.RunCommand(sb.String()); err != nil {
-		logrus.Errorf("shield port failed: %v", err)
-	}
-}
-
-func Init(config *api.ClusterConfig) error {
+func NodeInfrastructureSetup(config *api.ClusterConfig, nodeID string, role uint16) error {
 	if config == nil {
 		return fmt.Errorf("empty cluster config")
 	}
 
-	itask = task.NewTaskInstance(
-		&SetupInfraTask{
-			ccfg: config,
-		})
-
-	if err := nodemanager.RunTaskOnAll(itask); err != nil {
-		return fmt.Errorf("infrastructure Task failed: %v", err)
+	roleInfra := config.RoleInfra[role]
+	if roleInfra == nil {
+		return fmt.Errorf("do not register %d roleinfra", role)
 	}
 
-	return nil
-}
-
-func NodeInfrastructureSetup(config *api.ClusterConfig, nodeID string) error {
-	if config == nil {
-		return fmt.Errorf("empty cluster config")
-	}
-
-	itask = task.NewTaskInstance(
+	itask := task.NewTaskInstance(
 		&SetupInfraTask{
-			ccfg: config,
+			packageSrc: &config.PackageSrc,
+			roleInfra:  roleInfra,
 		})
 
 	if err := nodemanager.RunTaskOnNodes(itask, []string{nodeID}); err != nil {
@@ -271,51 +243,40 @@ func NodeInfrastructureSetup(config *api.ClusterConfig, nodeID string) error {
 }
 
 type DestroyInfraTask struct {
-	ccfg *api.ClusterConfig
+	packageSrc *api.PackageSrcConfig
+	roleInfra  *api.RoleInfra
 }
 
 func (it *DestroyInfraTask) Name() string {
 	return "DestroyInfraTask"
 }
 
-func (it *DestroyInfraTask) Run(r runner.Runner, hcg *api.HostConfig) (err error) {
+func (it *DestroyInfraTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 	if hcg == nil {
 		return fmt.Errorf("empty host config")
 	}
 
-	if err = RemoveDependences(r, hcg, &it.ccfg.PackageSrc); err != nil {
-		logrus.Errorf("remove dependences failed: %v", err)
-		return err
-	}
+	dependency.RemoveDependency(r, it.roleInfra, hcg, it.packageSrc.GetPkgDstPath())
 
-	if err = removeFirewallPort(r, hcg, &it.ccfg.LoadBalancer); err != nil {
-		logrus.Errorf("add firewall port failed: %v", err)
-		return err
-	}
+	removeFirewallPort(r, it.roleInfra.OpenPorts)
 
 	return nil
 }
 
-func removeFirewallPort(r runner.Runner, hcg *api.HostConfig, lbConfig *api.LoadBalancer) error {
-	ports := preparePorts(hcg, lbConfig)
-	if len(ports) == 0 {
-		logrus.Warnf("no ports for %s", hcg.Address)
-		return nil
-	}
-
-	ShieldPorts(r, ports...)
-
-	return nil
-}
-
-func NodeInfrastructureDestroy(config *api.ClusterConfig, nodeID string) error {
+func NodeInfrastructureDestroy(config *api.ClusterConfig, nodeID string, role uint16) error {
 	if config == nil {
 		return fmt.Errorf("empty cluster config")
 	}
 
-	itask = task.NewTaskInstance(
+	roleInfra := config.RoleInfra[role]
+	if roleInfra == nil {
+		return fmt.Errorf("do not register %d roleinfra", role)
+	}
+
+	itask := task.NewTaskInstance(
 		&DestroyInfraTask{
-			ccfg: config,
+			packageSrc: &config.PackageSrc,
+			roleInfra:  roleInfra,
 		})
 
 	if err := nodemanager.RunTaskOnNodes(itask, []string{nodeID}); err != nil {
@@ -323,4 +284,51 @@ func NodeInfrastructureDestroy(config *api.ClusterConfig, nodeID string) error {
 	}
 
 	return nil
+}
+
+type packageMD5 struct {
+	MD5  string
+	Lock sync.RWMutex
+}
+
+func (pm *packageMD5) getMD5(path string) error {
+	pm.Lock.RLock()
+	md5str := pm.MD5
+	pm.Lock.RUnlock()
+
+	if md5str != "" {
+		return nil
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	h := md5.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return err
+	}
+
+	pm.Lock.Lock()
+	pm.MD5 = fmt.Sprintf("%x", h.Sum(nil))
+	pm.Lock.Unlock()
+
+	return nil
+}
+
+func (pm *packageMD5) checkMD5(r runner.Runner, path string) bool {
+	pm.Lock.RLock()
+	md5str := pm.MD5
+	pm.Lock.RUnlock()
+
+	output, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"md5sum %s | awk '{print \\$1}'\"", path))
+	if err != nil {
+		logrus.Warnf("get %s MD5 failed: %v", path, err)
+		return false
+	}
+
+	logrus.Debugf("package MD5 value: local %s, remote: %s", md5str, output)
+	return md5str == output
 }
