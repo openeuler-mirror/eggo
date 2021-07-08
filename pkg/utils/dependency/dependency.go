@@ -21,6 +21,7 @@ import (
 
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/utils/runner"
+	"isula.org/eggo/pkg/utils/template"
 )
 
 type dependency interface {
@@ -148,16 +149,27 @@ type dependencyFD struct {
 }
 
 func (df *dependencyFD) Install(r runner.Runner) error {
-	// TODO: check file/dir exist before copy
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("sudo -E /bin/sh -c \"cd %s ", df.srcPath))
-	for _, s := range df.software {
-		sb.WriteString(fmt.Sprintf("&& mkdir -p %s && cp -r %s %s ", s.Dst, s.Name, s.Dst))
-	}
-	sb.WriteString("\"")
+	shell := `
+#!/bin/bash
+cd {{ .srcPath }}
+{{- range $i, $v := .software }}
+if [ ! -e {{ JoinPath $v.Dst $v.Name }} ]; then
+    mkdir -p {{ $v.Dst }} && cp -r {{ $v.Name }} {{ $v.Dst }}
+fi
+{{- end }}
+`
+	datastore := make(map[string]interface{})
+	datastore["srcPath"] = df.srcPath
+	datastore["software"] = df.software
 
-	if _, err := r.RunCommand(sb.String()); err != nil {
-		return fmt.Errorf("cp dependency failed: %v", err)
+	shellStr, err := template.TemplateRender(shell, datastore)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.RunShell(shellStr, "install_FD")
+	if err != nil {
+		return err
 	}
 
 	return nil

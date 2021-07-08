@@ -37,8 +37,8 @@ func getTypeOfCoredns(configType string) string {
 	if configType != "" {
 		return configType
 	}
-	// TODO: default coredns type should use binary
-	return CorednsTypeOfPod
+
+	return CorednsTypeOfBinary
 }
 
 func CorednsSetup(cluster *api.ClusterConfig) error {

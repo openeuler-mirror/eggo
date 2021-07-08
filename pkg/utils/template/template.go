@@ -16,6 +16,7 @@ package template
 
 import (
 	"fmt"
+	"path/filepath"
 	"text/template"
 
 	kkutil "github.com/kubesphere/kubekey/pkg/util"
@@ -30,10 +31,15 @@ func NotLast(idx, size int) bool {
 	return idx != size-1
 }
 
+func JoinPath(dir, file string) string {
+	return filepath.Join(dir, file)
+}
+
 var (
 	funcMap = template.FuncMap{
-		"Add":     Add,
-		"NotLast": NotLast,
+		"Add":      Add,
+		"NotLast":  NotLast,
+		"JoinPath": JoinPath,
 	}
 
 	BaseCsrTemplate = `[ req ]
