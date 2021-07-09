@@ -33,37 +33,49 @@
 ```
 $ tree
 .
-├── addons
-│   └── calico.yaml
-├── conntrack-tools-1.4.6-1.oe1.aarch64.rpm
-├── containernetworking-plugins-0.8.2-4.git485be65.oe1.aarch64.rpm
-├── coredns-1.7.0-1.0.oe1.aarch64.rpm
-├── docker-engine-18.09.0-115.oe1.aarch64.rpm
-├── etcd-3.4.14-2.aarch64.rpm
-├── images.tar
-├── kubernetes-client-1.20.2-4.oe1.aarch64.rpm
-├── kubernetes-kubelet-1.20.2-4.oe1.aarch64.rpm
-├── kubernetes-master-1.20.2-4.oe1.aarch64.rpm
-├── kubernetes-node-1.20.2-4.oe1.aarch64.rpm
-├── libcgroup-0.42.2-1.oe1.aarch64.rpm
-├── libnetfilter_cthelper-1.0.0-15.oe1.aarch64.rpm
-├── libnetfilter_cttimeout-1.0.0-13.oe1.aarch64.rpm
-├── libnetfilter_queue-1.0.5-1.oe1.aarch64.rpm
-└── socat-1.7.3.2-8.oe1.aarch64.rpm
+├── bin
+├── dir
+│   └── addons
+│       └── calico.yaml
+├── file
+├── image
+│   └── images.tar
+├── pkg
+│   ├── conntrack-tools-1.4.6-1.oe1.aarch64.rpm
+│   ├── containernetworking-plugins-0.8.2-4.git485be65.oe1.aarch64.rpm
+│   ├── coredns-1.7.0-1.0.oe1.aarch64.rpm
+│   ├── docker-engine-18.09.0-115.oe1.aarch64.rpm
+│   ├── etcd-3.4.14-2.aarch64.rpm
+│   ├── kubernetes-client-1.20.2-4.oe1.aarch64.rpm
+│   ├── kubernetes-kubelet-1.20.2-4.oe1.aarch64.rpm
+│   ├── kubernetes-master-1.20.2-4.oe1.aarch64.rpm
+│   ├── kubernetes-node-1.20.2-4.oe1.aarch64.rpm
+│   ├── libcgroup-0.42.2-1.oe1.aarch64.rpm
+│   ├── libnetfilter_cthelper-1.0.0-15.oe1.aarch64.rpm
+│   ├── libnetfilter_cttimeout-1.0.0-13.oe1.aarch64.rpm
+│   ├── libnetfilter_queue-1.0.5-1.oe1.aarch64.rpm
+│   └── socat-1.7.3.2-8.oe1.aarch64.rpm
+└── yaml
 
-1 directory, 16 files
+7 directories, 16 files
 ```
 
--  addons 目录存放各种插件，例如calico网络插件，该目录存放的插件列表由eggo部署时的配置文件deploy.yaml中的字段addons指定，两者必须一致。
+- 离线部署包的目录结构与集群配置config中的package的类型对应，package类型共有pkg/repo/bin/file/dir/image/yaml七种
 
-- 目录下存放需要安装的rpm/deb包，或者二进制程序或者文件，所有这些安装包或者文件都需要在deploy.yaml中进行了配置才会真正安装。如果是在线部署，则只需要在deploy.yaml中描述对应的安装包并配置为repo方式安装即可，不需要准备对应的安装包。
+-  bin目录存放二进制文件，对应package类型 bin
 
-- images.tar存放部署时需要导入的容器镜像，例如网络插件镜像以及pause镜像。如果是在线安装，则由容器运行时自动从镜像仓库下载，不需要准备images.tar包。以calico插件依赖的容器镜像为例，可以根据calico.yaml里面定义的镜像全名进行下载导出。该tar包包含的镜像必须是使用docker或者isula-build等兼容docker的tar包格式的命令，使用docker save -o images.tar images1:tag images2:tag ......  或类似命令将所有镜像一次性导出到images.tar包中，需要确保执行load镜像时能一次将images.tar导入成功。以上述calico镜像为例，镜像导出命令为：
+-  dir目录存放需要copy到目标机器的目录，对应package类型dir
+
+-  file目录存放需要copy到目标机器的文件，对应package类型file
+
+- image目录存放需要导入的容器镜像，例如网络插件镜像以及pause镜像。对应package类型image。如果是在线安装，则由容器运行时自动从镜像仓库下载，不需要准备images.tar包。以calico插件依赖的容器镜像为例，可以根据calico.yaml里面定义的镜像全名进行下载导出。该tar包包含的镜像必须是使用docker或者isula-build等兼容docker的tar包格式的命令，使用docker save -o images.tar images1:tag images2:tag ......  或类似命令将所有镜像一次性导出到images.tar包中，需要确保执行load镜像时能一次将images.tar导入成功。以上述calico镜像为例，镜像导出命令为：
 
   ```
   $ docker save -o images.tar calico/node:v3.19.1 calico/cni:v3.19.1 calico/kube-controllers:v3.19.1 calico/pod2daemon-flexvol:v3.19.1 k8s.gcr.io/pause:3.2
 
-- 如果coredns使用pod的方式部署，则images.tar里面需要包含coredns的镜像，而coredns对应的二进制包可以删除。
+- pkg目录下存放需要安装的rpm/deb包，对应package类型pkg
+
+- yaml目录存放需要kubectl apply的文件，对应package类型yaml（注：暂未实现）
 
 3)  准备eggo部署时使用的yaml配置文件。可以使用下面的命令生成一个模板配置，并打开yaml文件对其进行增删改来满足不同的部署需求。
 
@@ -112,34 +124,34 @@ $ eggo -d cleanup -f deploy.yaml
 下面的配置中，不同节点类型的节点可以同时部署在同一台机器(注意配置必须一致)。
 
 ```
-cluster-id: k8s-cluster          // 集群名称
-username: root                   // 需要部署k8s集群的机器的ssh登录用户名，所有机器都需要使用同一个用户名
-password: 123456                 // 需要部署k8s集群的机器的ssh登录密码，所有机器都需要使用同一个密码
-masters:                         // 配置master节点的列表，建议每个master节点同时作为node节点，否则master节点可以无法直接访问pod
-- name: test0                    // 该节点的名称，会设置该名称为该节点的hostname并设置为k8s集群看到的该节点的名称
-  ip: 192.168.0.1                // 该节点的ip地址
-  port: 22                       // ssh登录的端口
-  arch: arm64                    // 机器架构，x86_64的填amd64
-nodes:                           // 配置worker节点的列表
-- name: test0                    // 该节点的名称，会设置该名称为该节点的hostname并设置为k8s集群看到的该节点的名称
-  ip: 192.168.0.2                // 该节点的ip地址
-  port: 22                       // ssh登录的端口
-  arch: arm64                    // 机器架构，x86_64的填amd64
+cluster-id: k8s-cluster           // 集群名称
+username: root                    // 需要部署k8s集群的机器的ssh登录用户名，所有机器都需要使用同一个用户名
+password: 123456                  // 需要部署k8s集群的机器的ssh登录密码，所有机器都需要使用同一个密码
+masters:                          // 配置master节点的列表，建议每个master节点同时作为node节点，否则master节点可以无法直接访问pod
+- name: test0                     // 该节点的名称，会设置该名称为该节点的hostname并设置为k8s集群看到的该节点的名称
+  ip: 192.168.0.1                 // 该节点的ip地址
+  port: 22                        // ssh登录的端口
+  arch: arm64                     // 机器架构，x86_64的填amd64
+workers:                          // 配置worker节点的列表
+- name: test0                     // 该节点的名称，会设置该名称为该节点的hostname并设置为k8s集群看到的该节点的名称
+  ip: 192.168.0.2                 // 该节点的ip地址
+  port: 22                        // ssh登录的端口
+  arch: arm64                     // 机器架构，x86_64的填amd64
 - name: test1
   ip: 192.168.0.3
   port: 22
   arch: arm64
-etcds:                           // 配置etcd节点的列表，如果该项为空，则将会为每个master节点部署一个etcd，否则只会部署配置的etcd节点
-- name: etcd-0                   // 该节点的名称，会设置该名称为该节点的hostname并设置为k8s集群看到的该节点的名称
-  ip: 192.168.0.4                // 该节点的ip地址
-  port: 22                       // ssh登录的端口
-  arch: amd64                    // 机器架构，x86_64的填amd64
-loadbalance:                     // 配置loadbalance节点
-  name: k8s-loadbalance          // 该节点的名称，会设置该名称为该节点的hostname并设置为k8s集群看到的该节点的名称
-  ip: 192.168.0.5                // 该节点的ip地址
-  port: 22                       // ssh登录的端口
-  arch: amd64                    // 机器架构，x86_64的填amd64
-  bind-port: 8443                // 负载均衡服务监听的端口 
+etcds:                            // 配置etcd节点的列表，如果该项为空，则将会为每个master节点部署一个etcd，否则只会部署配置的etcd节点
+- name: etcd-0                    // 该节点的名称，会设置该名称为该节点的hostname并设置为k8s集群看到的该节点的名称
+  ip: 192.168.0.4                 // 该节点的ip地址
+  port: 22                        // ssh登录的端口
+  arch: amd64                     // 机器架构，x86_64的填amd64
+loadbalance:                      // 配置loadbalance节点
+  name: k8s-loadbalance           // 该节点的名称，会设置该名称为该节点的hostname并设置为k8s集群看到的该节点的名称
+  ip: 192.168.0.5                 // 该节点的ip地址
+  port: 22                        // ssh登录的端口
+  arch: amd64                     // 机器架构，x86_64的填amd64
+  bind-port: 8443                 // 负载均衡服务监听的端口 
 external-ca: false                          // 是否使用外部ca证书，该功能还未实现
 external-ca-path: /opt/externalca           // 外部ca证书文件的路径
 service:                                    // k8s创建的service的配置
@@ -179,106 +191,70 @@ open-ports:                                 // 配置需要额外打开的端口
     protocol: tcp                           // 端口类型，tcp/udp
   - port: 179
     protocol: tcp
-package-src:                                // 配置安装包的详细信息
-  type: tar.gz                              // 安装包的压缩类型，目前只支持tar.gz类型的安装包
-  armsrc: /root/rpms/pacakges-arm.tar.gz    // arm类型安装包的路径，配置的机器中存在arm机器场景下需要配置
-  x86src: /root/rpms/packages-x86.tar.gz    // x86类型安装包的路径，配置的机器中存在x86机器场景下需要配置
-pacakges:                                   // 配置各种类型节点上需要安装的安装包或者二进制文件的详细信息，注意将对应文件放到在tar.gz安装包中
+install:                                    // 配置各种类型节点上需要安装的安装包或者二进制文件的详细信息，注意将对应文件放到在tar.gz安装包中
+  package-src:                              // 配置安装包的详细信息
+    type: tar.gz                            // 安装包的压缩类型，目前只支持tar.gz类型的安装包
+    dstpath: ""                             // 安装包在对端机器上的路径
+    armsrc: /root/rpms/pacakges-arm.tar.gz  // arm类型安装包的路径，配置的机器中存在arm机器场景下需要配置
+    x86src: /root/rpms/packages-x86.tar.gz  // x86类型安装包的路径，配置的机器中存在x86机器场景下需要配置                                 
   etcd:                                     // etcd类型节点需要安装的包或二进制文件列表
   - name: etcd                              // 需要安装的包或二进制文件的名称，如果是安装包则只写名称，不填写具体的版本号，安装时会使用`$name*`来识别
-    type: pkg                               // package的类型，pkg/repo/binary三种类型，如果配置为repo请在对应节点上配置好repo源
-    dstpath: ""                             // 目的文件夹路径，binary类型下需要配置，表示将二进制放到节点的哪个目录下，为了防止用户误配置路径，此配置必须符合白名单，参见下一小节
-  master:                                   // master类型节点需要安装的包或二进制文件列表
-  - name: kubernetes-client
+    type: pkg                               // package的类型，pkg/repo/bin/file/dir/image/yaml七种类型，如果配置为repo请在对应节点上配置好repo源
+    dst: ""                                 // 目的文件夹路径，bin/file/dir类型下需要配置，表示将文件(夹)放到节点的哪个目录下，为了防止用户误配置路径，导致cleanup时删除重要文件，此配置必须符合白名单，参见下一小节
+  kubernetes-master:                        // k8s master类型节点需要安装的包或二进制文件列表
+  - name: kubernetes-client,kubernetes-master
     type: pkg
-    dstpath: ""
-  - name: kubernetes-master
+  kubernetes-worker:                        // k8s worker类型节点需要安装的包或二进制文件列表
+  - name: docker-engine,kubernetes-client,kubernetes-node,kubernetes-kubelet
     type: pkg
-    dstpath: ""
-  - name: coredns
+    dst: ""
+  - name: conntrack-tools,socat
     type: pkg
-    dstpath: ""
-  - name: addons
-    type: binary
-    dstpath: /etc/kubernetes
-  node:                                     // worker类型节点需要安装的包或二进制文件列表
-  - name: libnetfilter_cthelper
-    type: pkg
-    dstpath: ""
-  - name: libnetfilter_cttimeout
-    type: pkg
-    dstpath: ""
-  - name: libnetfilter_queue
-    type: pkg
-    dstpath: ""
-  - name: conntrack-tools
-    type: pkg
-    dstpath: ""
-  - name: socat
-    type: pkg
-    dstpath: ""
+    dst: ""
+  network:                                  // 网络需要安装的包或二进制文件列表
   - name: containernetworking-plugins
     type: pkg
-    dstpath: ""
-  - name: libcgroup
+    dst: ""
+  loadbalance:                              // loadbalance类型节点需要安装的包或二进制文件列表
+  - name: gd,gperftools-libs,libunwind,libwebp,libxslt
     type: pkg
-    dstpath: ""
-  - name: docker-engine
+    dst: ""
+  - name: nginx,nginx-all-modules,nginx-filesystem,nginx-mod-http-image-filter,nginx-mod-http-perl,nginx-mod-http-xslt-filter,nginx-mod-mail,nginx-mod-stream
     type: pkg
-    dstpath: ""
-  - name: kubernetes-client
+    dst: ""
+  container:                                // 容器需要安装的包或二进制文件列表
+  - name: emacs-filesystem,gflags,gpm-libs,re2,rsync,vim-filesystem,vim-common,vim-enhanced,zlib-devel
     type: pkg
-    dstpath: ""
-  - name: kubernetes-node
+    dst: ""
+  - name: libwebsockets,protobuf,protobuf-devel,grpc,libcgroup
     type: pkg
-    dstpath: ""
-  - name: kubernetes-kubelet
+    dst: ""
+  - name: yajl,lxc,lxc-libs,lcr,clibcni,iSulad
     type: pkg
-    dstpath: ""
-  loadbalance:                               // loadbalance类型节点需要安装的包或二进制文件列表
-  - name: nginx
-    type: pkg
-    dstpath: ""
-  - name: gd
-    type: pkg
-    dstpath: ""
-  - name: gperftools-libs
-    type: pkg
-    dstpath: ""
-  - name: libunwind
-    type: pkg
-    dstpath: ""
-  - name: libwebp
-    type: pkg
-    dstpath: ""
-  - name: libxslt
-    type: pkg
-    dstpath: ""
-  - name: nginx-all-modules
-    type: pkg
-    dstpath: ""
-  - name: nginx-filesystem
-    type: pkg
-    dstpath: ""
-  - name: nginx-mod-http-image-filter
-    type: pkg
-    dstpath: ""
-  - name: nginx-mod-http-perl
-    type: pkg
-    dstpath: ""
-  - name: nginx-mod-http-xslt-filter
-    type: pkg
-    dstpath: ""
-  - name: nginx-mod-mail
-    type: pkg
-    dstpath: ""
-  - name: nginx-mod-stream
-    type: pkg
-    dstpath: ""
+    dst: ""
+  image:                                    // 容器镜像tar包
+  - name: pause.tar
+    type: image
+    dst: ""
+  addition:                                 // 额外的安装包或二进制文件列表
+    master:
+    - name: addons
+      type: dir
+      dst: /etc/kubernetes
+    - name: calico.yaml
+      type: yaml
+      dst: ""
+    - name: coredns
+      type: pkg
+      dst: ""
+    worker:
+    - name: docker.service
+      type: file
+      dst: /usr/lib/systemd/system/
 ```
 
-### dstpath 白名单
-dstpath可以配置为白名单中的目录，或者其子目录
+### dst 白名单
+dst可以配置为白名单中的目录，或者其子目录
 ```
 "/usr/bin", "/usr/local/bin", "/opt/cni/bin", "/usr/libexec/cni",
 "/etc/kubernetes",

@@ -23,14 +23,17 @@ config其他详细的配置请参见eggo操作手册
 ### 准备packages压缩包
 用户根据config中的packages配置准备离线安装包。以openEuler.config为例，压缩包需要包含
 ```
-$ tree /root/pkgs
-/root/pkgs
-├── addons
-│   └── calico.yaml
-├── coredns-1.7.0-1.0.oe1.aarch64.rpm
-└── images.tar 
+$ tree /root/pacakges
+/root/pacakges
+├── dir
+│   └── addons
+│       └── calico.yaml
+├── image
+│   └── images.tar
+└── pkg
+    └── coredns-1.7.0-1.0.oe1.aarch64.rpm
 
-1 directory, 3 files
+4 directories, 3 files
 ```
 
 其中images.tar为集群部署中使用到的镜像，包含
@@ -46,7 +49,7 @@ k8s.gcr.io/pause            3.2       80d28bedfe5d   16 months ago   683kB
 
 打包压缩生成packages压缩包
 ```
-$ cd /root/pkgs
+$ cd /root/packages
 $ tar -zcvf packages-arm.tar.gz ./*
 ```
 如果混部ARM和X86两种架构，则需再准备一份X86架构的packages压缩包

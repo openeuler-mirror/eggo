@@ -258,7 +258,7 @@ func separateSofeware(softwares []*api.PackageConfig) ([]*api.PackageConfig, []*
 		case "pkg":
 			pkg = append(pkg, p)
 		case "bin":
-			pkg = append(bin, p)
+			bin = append(bin, p)
 		case "file":
 			file = append(file, p)
 		case "dir":

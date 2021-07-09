@@ -2,6 +2,7 @@ package kubectl
 
 import (
 	"context"
+	"encoding/json"
 	"path/filepath"
 
 	"github.com/sirupsen/logrus"
@@ -9,6 +10,8 @@ import (
 	"isula.org/eggo/pkg/constants"
 	k8scorev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 )
 
 type Taint struct {
@@ -28,6 +31,11 @@ func NodeTaintAndLabel(cluster string, objectName string, labels map[string]stri
 	if err != nil {
 		return err
 	}
+	oldData, err := json.Marshal(n)
+	if err != nil {
+		return err
+	}
+
 	var ktaints []k8scorev1.Taint
 
 	for _, taint := range taints {
@@ -53,7 +61,16 @@ func NodeTaintAndLabel(cluster string, objectName string, labels map[string]stri
 		n.Labels[k] = v
 	}
 
-	rs, err := cs.CoreV1().Nodes().Update(context.TODO(), n, v1.UpdateOptions{})
+	newData, err := json.Marshal(n)
+	if err != nil {
+		return err
+	}
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, k8scorev1.Node{})
+	if err != nil {
+		return err
+	}
+
+	rs, err := cs.CoreV1().Nodes().Patch(context.TODO(), n.Name, types.StrategicMergePatchType, patchBytes, v1.PatchOptions{})
 	if err != nil {
 		return err
 	}

@@ -229,15 +229,30 @@ func createCommonHostConfig(userHostconfig *HostConfig, defaultName string, user
 	return hostconfig
 }
 
-func appendSoftware(s, pc, dpc []*api.PackageConfig) []*api.PackageConfig {
-	if len(pc) != 0 {
-		return append(s, pc...)
+func appendSoftware(software, packageConfig, defaultPackage []*api.PackageConfig) []*api.PackageConfig {
+	var packages []*api.PackageConfig
+	if len(packageConfig) != 0 {
+		packages = packageConfig
 	} else {
-		return append(s, dpc...)
+		packages = defaultPackage
 	}
+
+	result := software
+	for _, p := range packages {
+		splitSoftware := strings.Split(p.Name, ",")
+		for _, s := range splitSoftware {
+			result = append(result, &api.PackageConfig{
+				Name: s,
+				Type: p.Type,
+				Dst:  p.Dst,
+			})
+		}
+	}
+
+	return result
 }
 
-func fillPackageConfig(ccfg *api.ClusterConfig, icfg *InstallConfig, dnsType string) {
+func fillPackageConfig(ccfg *api.ClusterConfig, icfg *InstallConfig) {
 	if icfg.PackageSrc != nil {
 		setIfStrConfigNotEmpty(&ccfg.PackageSrc.Type, icfg.PackageSrc.Type)
 		setIfStrConfigNotEmpty(&ccfg.PackageSrc.ArmSrc, icfg.PackageSrc.ArmSrc)
@@ -273,7 +288,7 @@ func fillPackageConfig(ccfg *api.ClusterConfig, icfg *InstallConfig, dnsType str
 			continue
 		}
 
-		ccfg.RoleInfra[role].Softwares = append(ccfg.RoleInfra[role].Softwares, p...)
+		ccfg.RoleInfra[role].Softwares = appendSoftware(ccfg.RoleInfra[role].Softwares, p, []*api.PackageConfig{})
 	}
 }
 
@@ -289,7 +304,7 @@ func fillOpenPort(ccfg *api.ClusterConfig, openports map[string][]*api.OpenPorts
 		ccfg.RoleInfra[role].OpenPorts = append(ccfg.RoleInfra[role].OpenPorts, p...)
 	}
 
-	if dnsType == "binary" {
+	if dnsType == "binary" || dnsType == "" {
 		ccfg.RoleInfra[api.Master].OpenPorts =
 			append(ccfg.RoleInfra[api.Master].OpenPorts, infra.CorednsPorts...)
 	} else if dnsType == "pod" {
@@ -608,7 +623,7 @@ func toClusterdeploymentConfig(conf *deployConfig) *api.ClusterConfig {
 	setStrArray(&ccfg.WorkerConfig.ContainerEngineConf.InsecureRegistries, conf.InsecureRegistries)
 	fillLoadBalance(&ccfg.LoadBalancer, conf.LoadBalance)
 	fillAPIEndPoint(&ccfg.APIEndpoint, conf)
-	fillPackageConfig(ccfg, &conf.InstallConfig, conf.Service.DNS.CorednsType)
+	fillPackageConfig(ccfg, &conf.InstallConfig)
 	fillOpenPort(ccfg, conf.OpenPorts, conf.Service.DNS.CorednsType)
 
 	ccfg.Addons = append(ccfg.Addons, conf.Addons...)
@@ -726,132 +741,36 @@ func createDeployConfigTemplate(file string) error {
 		InstallConfig: InstallConfig{
 			PackageSrc: &api.PackageSrcConfig{
 				Type:   "tar.gz",
-				ArmSrc: "/root/pkgs/pacakges-arm.tar.gz",
-				X86Src: "/root/pkgs/packages-x86.tar.gz",
+				ArmSrc: "/root/packages/pacakges-arm.tar.gz",
+				X86Src: "/root/packages/packages-x86.tar.gz",
 			},
 			KubernetesMaster: []*api.PackageConfig{
 				{
-					Name: "kubernetes-client",
-					Type: "pkg",
-				},
-				{
-					Name: "kubernetes-master",
-					Type: "pkg",
-				},
-				{
-					Name: "coredns",
+					Name: "kubernetes-client,kubernetes-master",
 					Type: "pkg",
 				},
 			},
 			KubernetesWorker: []*api.PackageConfig{
 				{
-					Name: "docker-engine",
+					Name: "docker-engine,kubernetes-client,kubernetes-node,kubernetes-kubelet",
 					Type: "pkg",
 				},
 				{
-					Name: "kubernetes-client",
-					Type: "pkg",
-				},
-				{
-					Name: "kubernetes-node",
-					Type: "pkg",
-				},
-				{
-					Name: "kubernetes-kubelet",
-					Type: "pkg",
-				},
-				{
-					Name: "conntrack-tools",
-					Type: "pkg",
-				},
-				{
-					Name: "socat",
+					Name: "conntrack-tools,socat",
 					Type: "pkg",
 				},
 			},
 			Container: []*api.PackageConfig{
 				{
-					Name: "emacs-filesystem",
+					Name: "emacs-filesystem,gflags,gpm-libs,re2,rsync,vim-filesystem,vim-common,vim-enhanced,zlib-devel",
 					Type: "pkg",
 				},
 				{
-					Name: "gflags",
+					Name: "libwebsockets,protobuf,protobuf-devel,grpc,libcgroup",
 					Type: "pkg",
 				},
 				{
-					Name: "gpm-libs",
-					Type: "pkg",
-				},
-				{
-					Name: "http-parser",
-					Type: "pkg",
-				},
-				{
-					Name: "libwebsockets",
-					Type: "pkg",
-				},
-				{
-					Name: "re2",
-					Type: "pkg",
-				},
-				{
-					Name: "rsync",
-					Type: "pkg",
-				},
-				{
-					Name: "vim-filesystem",
-					Type: "pkg",
-				},
-				{
-					Name: "vim-common",
-					Type: "pkg",
-				},
-				{
-					Name: "vim-enhanced",
-					Type: "pkg",
-				},
-				{
-					Name: "yajl",
-					Type: "pkg",
-				},
-				{
-					Name: "zlib-devel",
-					Type: "pkg",
-				},
-				{
-					Name: "protobuf",
-					Type: "pkg",
-				},
-				{
-					Name: "protobuf-devel",
-					Type: "pkg",
-				},
-				{
-					Name: "grpc",
-					Type: "pkg",
-				},
-				{
-					Name: "lxc",
-					Type: "pkg",
-				},
-				{
-					Name: "lxc-libs",
-					Type: "pkg",
-				},
-				{
-					Name: "lcr",
-					Type: "pkg",
-				},
-				{
-					Name: "clibcni",
-					Type: "pkg",
-				},
-				{
-					Name: "libcgroup",
-					Type: "pkg",
-				},
-				{
-					Name: "iSulad",
+					Name: "yajl,lxc,lxc-libs,lcr,clibcni,iSulad",
 					Type: "pkg",
 				},
 			},
@@ -869,55 +788,11 @@ func createDeployConfigTemplate(file string) error {
 			},
 			LoadBalance: []*api.PackageConfig{
 				{
-					Name: "nginx",
+					Name: "gd,gperftools-libs,libunwind,libwebp,libxslt",
 					Type: "pkg",
 				},
 				{
-					Name: "gd",
-					Type: "pkg",
-				},
-				{
-					Name: "gperftools-libs",
-					Type: "pkg",
-				},
-				{
-					Name: "libunwind",
-					Type: "pkg",
-				},
-				{
-					Name: "libwebp",
-					Type: "pkg",
-				},
-				{
-					Name: "libxslt",
-					Type: "pkg",
-				},
-				{
-					Name: "nginx-all-modules",
-					Type: "pkg",
-				},
-				{
-					Name: "nginx-filesystem",
-					Type: "pkg",
-				},
-				{
-					Name: "nginx-mod-http-image-filter",
-					Type: "pkg",
-				},
-				{
-					Name: "nginx-mod-http-perl",
-					Type: "pkg",
-				},
-				{
-					Name: "nginx-mod-http-xslt-filter",
-					Type: "pkg",
-				},
-				{
-					Name: "nginx-mod-mail",
-					Type: "pkg",
-				},
-				{
-					Name: "nginx-mod-stream",
+					Name: "nginx,nginx-all-modules,nginx-filesystem,nginx-mod-http-image-filter,nginx-mod-http-perl,nginx-mod-http-xslt-filter,nginx-mod-mail,nginx-mod-stream",
 					Type: "pkg",
 				},
 			},
@@ -932,6 +807,10 @@ func createDeployConfigTemplate(file string) error {
 					{
 						Name: "calico.yaml",
 						Type: "yaml",
+					},
+					{
+						Name: "coredns",
+						Type: "pkg",
 					},
 				},
 				"worker": {
