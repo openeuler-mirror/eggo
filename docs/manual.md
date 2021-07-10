@@ -105,17 +105,47 @@ $ eggo -d deploy -f deploy.yaml
 
   说明：集群部署结束后可以执行命令`echo $?`来判断是否部署成功，输出为0则为部署成功。如果部署失败，则`echo $?`为非0,并且终端也会打印错误信息。
 
-## 清理拆除集群
+### 3. 将master或者worker加入到k8s集群
 
 ```
-$ eggo -d cleanup -f deploy.yaml
+$ eggo -d join --id k8s-cluster --type master,worker --arch arm64 --port 22 192.168.0.5
+
+* -d参数表示打印调试信息
+* --id集群的id
+* --type可以为master或者worker，默认为worker，也可以同时作为master和worker加入，值为master,worker
+* --arch机器架构，支持amd64或者arm64，不填则使用原有配置，无配置则用默认值amd64
+* --port使用ssh登录的端口号，不填则使用原有配置，无配置则用默认值22
+
+
+
+## 清理拆除集群
+
+#### 1. 拆除整个集群
+
+```
+$ eggo -d cleanup --id k8s-cluster -f deploy.yaml
 ```
 
 - -d参数表示打印调试信息
 
-- -f参数指定部署时使用的配置文件，不指定的话会从默认文件~/.eggo/deploy.yaml加载配置进行集群的清理拆除。
+- --id集群的id
+
+- -f参数指定部署时使用的配置文件，不指定的话会从默认文件/etc/eggo/$ClusterID/deploy.yaml加载配置进行集群的清理拆除。建议不要加-f参数，而是使用保存的配置文件进行集群拆除。
 
   说明：当前集群拆除过程不会清理容器和镜像，但如果部署时配置了需要安装容器引擎，则容器引擎会被清除，可能会导致容器本身运行异常。另外清理过程中可能会打印一些错误信息，一般都是由于清理过程中操作集群时返回了错误的结果导致，不需要过多关注，集群依然能正常拆除。
+
+
+
+####  2. 也可以只拆除master和worker
+
+```
+$ eggo -d delete --id k8s-cluster --type master,worker 192.168.0.5
+```
+
+* -d参数表示打印调试信息
+* --id集群的id
+* --type可以为master或者worker，默认worker
+* 192.168.0.5 需要删除的机器的IP地址或者名称
 
 
 

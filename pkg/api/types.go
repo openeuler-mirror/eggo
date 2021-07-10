@@ -228,6 +228,7 @@ type ClusterManagerAPI interface {
 	ClusterStatus() (*ClusterStatus, error)
 	AddonsSetup() error
 	AddonsDestroy() error
+	TaintAndLabelNode(name string) error
 }
 
 type LoadBalancerAPI interface {

@@ -17,27 +17,27 @@ package main
 
 import (
 	"fmt"
-	"strings"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment"
+	"isula.org/eggo/pkg/utils"
 )
 
-func typeStrToInt(delType string) (uint16, error) {
-	if delType == "" {
-		return 0, fmt.Errorf("invalid none type")
+func getDelType(hostconfig *api.HostConfig) string {
+	var delType string
+	if utils.IsType(hostconfig.Type, api.Master) {
+		delType = "master"
 	}
-	types := strings.Split(delType, ",")
-	var resType uint16
-	for _, t := range types {
-		typeInt, ok := toTypeInt[t]
-		if !ok {
-			return 0, fmt.Errorf("invalid node type %v", t)
+	if utils.IsType(hostconfig.Type, api.Worker) {
+		if delType != "" {
+			delType += ","
 		}
-		resType |= typeInt
+		delType += "worker"
 	}
-	return resType, nil
+	return delType
 }
 
 func deleteCluster(cmd *cobra.Command, args []string) error {
@@ -50,28 +50,45 @@ func deleteCluster(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("delete command need exactly one argument")
 	}
 
+	if opts.delClusterID == "" {
+		return fmt.Errorf("please specify cluster id")
+	}
+
+	// support delete master and worker at one time only currently
 	opts.delName = args[0]
 
-	conf, err := loadConfig()
+	conf, err := loadDeployConfig(savedDeployConfigPath(opts.delClusterID))
 	if err != nil {
-		return fmt.Errorf("load backuped deploy config failed: %v", err)
+		return fmt.Errorf("load saved deploy config failed: %v", err)
 	}
-
-	delType, err := typeStrToInt(opts.delType)
-	if err != nil {
-		return err
-	}
-
 	// TODO: make sure config valid
-	if err = clusterdeployment.DeleteNode(toClusterdeploymentConfig(conf), opts.delName, delType); err != nil {
+
+	clusterConfig := toClusterdeploymentConfig(conf)
+	h := getHostConfigByName(clusterConfig.Nodes, opts.delName)
+	if h == nil {
+		return fmt.Errorf("cannot found host by %v in %v", opts.delName, opts.delClusterID)
+	}
+
+	delType := getDelType(h)
+	if delType == "" {
+		logrus.Errorf("no master or worker found by %v in %v, ignore delete", opts.delName, opts.delClusterID)
+		return nil
+	}
+
+	_, diffHostconfig, err := joinConfig(conf, delType, &HostConfig{Ip: h.Address})
+	if diffHostconfig == nil || err != nil {
+		return fmt.Errorf("get diff config failed: %v", err)
+	}
+
+	if err = clusterdeployment.DeleteNode(toClusterdeploymentConfig(conf), diffHostconfig); err != nil {
 		return err
 	}
 
-	if err = deleteConfig(conf, opts.delType, opts.delName); err != nil {
+	if err = deleteConfig(conf, delType, opts.delName); err != nil {
 		return fmt.Errorf("delete config from userconfig failed")
 	}
 
-	if err = backupDeployConfig(conf); err != nil {
+	if err = saveDeployConfig(conf, savedDeployConfigPath(opts.delClusterID)); err != nil {
 		return err
 	}
 
@@ -81,7 +98,7 @@ func deleteCluster(cmd *cobra.Command, args []string) error {
 func NewDeleteCmd() *cobra.Command {
 	deleteCmd := &cobra.Command{
 		Use:   "delete NAME",
-		Short: "delete a node from cluster",
+		Short: "delete the master and worker from cluster",
 		RunE:  deleteCluster,
 	}
 

@@ -128,8 +128,40 @@ func defaultDeployConfigPath() string {
 	return filepath.Join(utils.GetEggoDir(), "deploy.yaml")
 }
 
-func backupedDeployConfigPath() string {
-	return filepath.Join(utils.GetEggoDir(), "deploy_backup.yaml")
+func savedDeployConfigPath(ClusterID string) string {
+	return filepath.Join(api.EggoHomePath, ClusterID, "deploy.yaml")
+}
+
+func saveDeployConfig(cc *deployConfig, filePath string) error {
+	d, err := yaml.Marshal(cc)
+	if err != nil {
+		return fmt.Errorf("marshal template config failed: %v", err)
+	}
+
+	cleanPath := filepath.Clean(filePath)
+	if !strings.HasPrefix(cleanPath, api.EggoHomePath) {
+		return fmt.Errorf("invalid config file path %v", filePath)
+	}
+
+	if err = os.MkdirAll(filepath.Dir(cleanPath), 0750); err != nil {
+		return fmt.Errorf("create dir %v to save deploy config failed: %v", filepath.Dir(cleanPath), err)
+	}
+
+	if err = ioutil.WriteFile(filePath, d, 0640); err != nil {
+		return fmt.Errorf("write user deploy config file failed: %v", err)
+	}
+
+	return nil
+}
+
+func fillEtcdsIfNotExist(cc *deployConfig) {
+	if len(cc.Etcds) != 0 {
+		return
+	}
+
+	for _, h := range cc.Masters {
+		cc.Etcds = append(cc.Etcds, h)
+	}
 }
 
 func loadDeployConfig(file string) (*deployConfig, error) {
@@ -142,6 +174,9 @@ func loadDeployConfig(file string) (*deployConfig, error) {
 	if err := yaml.Unmarshal([]byte(yamlStr), conf); err != nil {
 		return nil, err
 	}
+
+	// default install etcds to masters if etcds not configed
+	fillEtcdsIfNotExist(conf)
 
 	return conf, nil
 }
@@ -360,21 +395,75 @@ func deleteConfig(userConfig *deployConfig, delType string, delName string) erro
 	return nil
 }
 
-func joinConfig(userConfig *deployConfig, joinType string, joinHost *HostConfig) *api.HostConfig {
+func getHostConfigByIp(nodes []*HostConfig, ip string) *HostConfig {
+	for _, node := range nodes {
+		if node.Ip == ip {
+			return node
+		}
+	}
+	return nil
+}
+
+func checkJoinParam(joinHost *HostConfig, host *HostConfig) error {
+	if host == nil {
+		return nil
+	}
+
+	if joinHost.Name != "" && joinHost.Name != host.Name {
+		return fmt.Errorf("name confliect with existing node, join: %v existing: %v", joinHost.Name, host.Name)
+	}
+
+	if joinHost.Port != 0 && joinHost.Port != host.Port {
+		return fmt.Errorf("port confliect with existing node, join: %v existing: %v", joinHost.Port, host.Port)
+	}
+
+	if joinHost.Arch != "" && joinHost.Arch != host.Arch {
+		return fmt.Errorf("arch confliect with existing node, join: %v existing: %v", joinHost.Arch, host.Arch)
+	}
+
+	return nil
+}
+
+func getHostConfigByName(hostconfigs []*api.HostConfig, name string) *api.HostConfig {
+	for _, h := range hostconfigs {
+		if h.Name == name || h.Address == name {
+			return h
+		}
+	}
+	return nil
+}
+
+func joinConfig(userConfig *deployConfig, joinType string, joinHost *HostConfig) (*deployConfig, *api.HostConfig, error) {
+	mergedConf := *userConfig
 	masters := userConfig.Masters
 	userConfig.Masters = nil
 	workers := userConfig.Workers
 	userConfig.Workers = nil
 	etcds := userConfig.Etcds
 	userConfig.Etcds = nil
+	loadbalance := userConfig.LoadBalance
+	userConfig.LoadBalance = LoadBalance{}
 	defer func() {
 		userConfig.Masters = masters
 		userConfig.Workers = workers
 		userConfig.Etcds = etcds
+		userConfig.LoadBalance = loadbalance
 	}()
+
+	host := getHostConfigByIp(masters, joinHost.Ip)
+	if host == nil {
+		host = getHostConfigByIp(workers, joinHost.Ip)
+	}
+	if err := checkJoinParam(joinHost, host); err != nil {
+		return nil, nil, err
+	}
 
 	types := strings.Split(joinType, ",")
 	for _, nodeType := range types {
+		if nodeType != MasterRole && nodeType != WorkerRole {
+			return nil, nil, fmt.Errorf("invalid join type %v, only support master and worker currently", nodeType)
+		}
+
 		var hostconfig HostConfig
 		var index int
 
@@ -384,42 +473,56 @@ func joinConfig(userConfig *deployConfig, joinType string, joinHost *HostConfig)
 		if nodeType == WorkerRole {
 			index = len(workers)
 		}
-		if nodeType == ETCDRole {
-			index = len(etcds)
-		}
 
-		if joinHost.Name != "" {
-			hostconfig.Name = joinHost.Name
+		if host != nil {
+			hostconfig.Name = host.Name
+			hostconfig.Arch = host.Arch
+			hostconfig.Port = host.Port
 		} else {
-			hostconfig.Name = defaultHostName(userConfig.ClusterID, nodeType, index)
+			if joinHost.Name != "" {
+				hostconfig.Name = joinHost.Name
+			} else {
+				hostconfig.Name = defaultHostName(userConfig.ClusterID, nodeType, index)
+			}
+			if joinHost.Arch != "" {
+				hostconfig.Arch = joinHost.Arch
+			} else {
+				hostconfig.Arch = "amd64"
+			}
+			if joinHost.Port != 0 {
+				hostconfig.Port = joinHost.Port
+			} else {
+				hostconfig.Port = 22
+			}
 		}
 		hostconfig.Ip = joinHost.Ip
-		setIfStrConfigNotEmpty(&hostconfig.Arch, joinHost.Arch)
-		if joinHost.Port != 0 {
-			hostconfig.Port = joinHost.Port
-		}
 
 		if nodeType == MasterRole {
 			userConfig.Masters = []*HostConfig{&hostconfig}
-			masters = appendNodeNoDup(masters, &hostconfig)
+			mergedConf.Masters = appendNodeNoDup(masters, &hostconfig)
 		}
 		if nodeType == WorkerRole {
 			userConfig.Workers = []*HostConfig{&hostconfig}
-			workers = appendNodeNoDup(workers, &hostconfig)
+			mergedConf.Workers = appendNodeNoDup(workers, &hostconfig)
 		}
-		if nodeType == ETCDRole {
-			userConfig.Etcds = []*HostConfig{&hostconfig}
-			etcds = appendNodeNoDup(etcds, &hostconfig)
-		}
+
+		host = &hostconfig
 	}
 
+	var joinHostConfig *api.HostConfig
 	config := toClusterdeploymentConfig(userConfig)
 	for _, h := range config.Nodes {
 		if h.Address == joinHost.Ip {
-			return h
+			joinHostConfig = h
+			break
 		}
 	}
-	return nil
+	if joinHostConfig == nil {
+		// This should never happen
+		return nil, nil, fmt.Errorf("can not found join host config")
+	}
+
+	return &mergedConf, joinHostConfig, nil
 }
 
 func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
@@ -457,14 +560,7 @@ func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
 		nodes = append(nodes, hostconfig)
 	}
 
-	// if no etcd configed, default to install to master
-	var etcds []*HostConfig
-	if len(conf.Etcds) == 0 {
-		etcds = conf.Masters
-	} else {
-		etcds = conf.Etcds
-	}
-	for i, etcd := range etcds {
+	for i, etcd := range conf.Etcds {
 		idx, exist := cache[etcd.Ip]
 		if !exist {
 			hostconfig = createCommonHostConfig(etcd, conf.ClusterID+"-etcd-"+strconv.Itoa(i),
@@ -834,48 +930,4 @@ func createDeployConfigTemplate(file string) error {
 	}
 
 	return nil
-}
-
-func backupDeployConfig(cc *deployConfig) error {
-	d, err := yaml.Marshal(cc)
-	if err != nil {
-		return fmt.Errorf("marshal template config failed: %v", err)
-	}
-
-	if err = ioutil.WriteFile(backupedDeployConfigPath(), d, 0640); err != nil {
-		return fmt.Errorf("write user deploy config file failed: %v", err)
-	}
-
-	return nil
-}
-
-func loadBackupedDeployConfig() (*deployConfig, error) {
-	yamlStr, err := ioutil.ReadFile(backupedDeployConfigPath())
-	if err != nil {
-		return nil, err
-	}
-
-	conf := &deployConfig{}
-	if err := yaml.Unmarshal([]byte(yamlStr), conf); err != nil {
-		return nil, err
-	}
-
-	return conf, nil
-}
-
-func loadConfig() (*deployConfig, error) {
-	conf, err := loadBackupedDeployConfig()
-	if err != nil {
-		if os.IsNotExist(err) {
-			// try load default user's config if backup file not exist
-			conf, err = loadDeployConfig(opts.deployConfig)
-			if err != nil {
-				return nil, fmt.Errorf("load default user's config failed: %v", err)
-			}
-		} else {
-			return nil, fmt.Errorf("load backuped deploy config failed: %v", err)
-		}
-	}
-
-	return conf, nil
 }

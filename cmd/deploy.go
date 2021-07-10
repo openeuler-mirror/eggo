@@ -32,6 +32,7 @@ func deployCluster(cmd *cobra.Command, args []string) error {
 	if opts.debug {
 		initLog()
 	}
+
 	conf, err := loadDeployConfig(opts.deployConfig)
 	if err != nil {
 		return fmt.Errorf("load deploy config file failed: %v", err)
@@ -39,12 +40,12 @@ func deployCluster(cmd *cobra.Command, args []string) error {
 
 	// TODO: make sure config valid
 
-	if err := deploy(toClusterdeploymentConfig(conf)); err != nil {
-		return err
+	if err := saveDeployConfig(conf, savedDeployConfigPath(conf.ClusterID)); err != nil {
+		return fmt.Errorf("save deploy config failed: %v", err)
 	}
 
-	if err := backupDeployConfig(conf); err != nil {
-		return fmt.Errorf("backup deploy config failed: %v", err)
+	if err := deploy(toClusterdeploymentConfig(conf)); err != nil {
+		return err
 	}
 
 	return nil

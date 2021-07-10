@@ -146,8 +146,8 @@ func parseEtcdMemberList(output string) []*etcdMember {
 			leader = true
 		}
 		members = append(members, &etcdMember{
-			id:     items[0],
-			name:   items[2],
+			id:     strings.TrimSpace(items[0]),
+			name:   strings.TrimSpace(items[2]),
 			leader: leader,
 		})
 	}
@@ -184,7 +184,7 @@ func (t *removeEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfig) error
 	etcds := getEtcdMembers(t.ccfg.GetCertDir(), r)
 	for _, member := range etcds {
 		// do not delete self
-		if member.name == hostConfig.Address {
+		if member.name == hostConfig.Name {
 			continue
 		}
 		if err := removeEtcd(r, t.ccfg.GetCertDir(), member.id); err != nil {

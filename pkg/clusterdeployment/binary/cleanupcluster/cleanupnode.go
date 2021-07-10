@@ -173,7 +173,7 @@ func (t *cleanupNodeTask) Run(r runner.Runner, hostConfig *api.HostConfig) error
 		removePathes(r, []string{filepath.Join(t.ccfg.GetCertDir(), "ca.crt")})
 	}
 
-	postCleanup(r)
+	PostCleanup(r)
 
 	return nil
 }

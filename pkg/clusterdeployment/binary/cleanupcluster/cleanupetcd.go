@@ -67,7 +67,7 @@ func (t *cleanupEtcdMemberTask) Run(r runner.Runner, hostConfig *api.HostConfig)
 
 	removePathes(r, getEtcdPathes(t.ccfg))
 
-	postCleanup(r)
+	PostCleanup(r)
 
 	return nil
 }
