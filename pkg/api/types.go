@@ -26,6 +26,15 @@ const (
 	LoadBalance = 0x8
 )
 
+type Schedule string
+
+const (
+	SchedulePreJoin     Schedule = "prejoin"
+	SchedulePostJoin    Schedule = "postjoin"
+	SchedulePreCleanup  Schedule = "precleanup"
+	SchedulePostCleanup Schedule = "postcleanup"
+)
+
 type RoleInfra struct {
 	OpenPorts []*OpenPorts     `json:"open-ports"`
 	Softwares []*PackageConfig `json:"softwares"`
@@ -37,9 +46,11 @@ type OpenPorts struct {
 }
 
 type PackageConfig struct {
-	Name string `json:"name"`
-	Type string `json:"type"` // repo bin file dir image yaml
-	Dst  string `json:"dst"`
+	Name     string   `json:"name"`
+	Type     string   `json:"type"` // repo bin file dir image yaml shell
+	Dst      string   `json:"dst,omitempty"`
+	Schedule Schedule `json:"schedule,omitempty"`
+	TimeOut  string   `json:"timeout,omitempty"`
 }
 
 type PackageSrcConfig struct {
@@ -98,6 +109,7 @@ type Kubelet struct {
 	PauseImage    string            `json:"pause-image"`
 	NetworkPlugin string            `json:"network-plugin"`
 	CniBinDir     string            `json:"cni-bin-dir"`
+	CniConfDir    string            `json:"cni-conf-dir"`
 	ExtraArgs     map[string]string `json:"extra-args,omitempty"`
 }
 
@@ -198,7 +210,6 @@ type ClusterConfig struct {
 	LoadBalancer    LoadBalancer            `json:"loadBalancer"`
 	WorkerConfig    WorkerConfig            `json:"workerconfig"`
 	RoleInfra       map[uint16]*RoleInfra   `json:"role-infra"`
-	Addons          []*AddonConfig          `json:"addons"`
 
 	// TODO: add other configurations at here
 }

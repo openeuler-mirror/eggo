@@ -33,6 +33,7 @@
 ```
 $ tree
 .
+.
 ├── bin
 ├── dir
 │   └── addons
@@ -40,33 +41,32 @@ $ tree
 ├── file
 ├── image
 │   └── images.tar
-├── pkg
-│   ├── conntrack-tools-1.4.6-1.oe1.aarch64.rpm
-│   ├── containernetworking-plugins-0.8.2-4.git485be65.oe1.aarch64.rpm
-│   ├── coredns-1.7.0-1.0.oe1.aarch64.rpm
-│   ├── docker-engine-18.09.0-115.oe1.aarch64.rpm
-│   ├── etcd-3.4.14-2.aarch64.rpm
-│   ├── kubernetes-client-1.20.2-4.oe1.aarch64.rpm
-│   ├── kubernetes-kubelet-1.20.2-4.oe1.aarch64.rpm
-│   ├── kubernetes-master-1.20.2-4.oe1.aarch64.rpm
-│   ├── kubernetes-node-1.20.2-4.oe1.aarch64.rpm
-│   ├── libcgroup-0.42.2-1.oe1.aarch64.rpm
-│   ├── libnetfilter_cthelper-1.0.0-15.oe1.aarch64.rpm
-│   ├── libnetfilter_cttimeout-1.0.0-13.oe1.aarch64.rpm
-│   ├── libnetfilter_queue-1.0.5-1.oe1.aarch64.rpm
-│   └── socat-1.7.3.2-8.oe1.aarch64.rpm
-└── yaml
+└── pkg
+    ├── conntrack-tools-1.4.6-1.oe1.aarch64.rpm
+    ├── containernetworking-plugins-0.8.2-4.git485be65.oe1.aarch64.rpm
+    ├── coredns-1.7.0-1.0.oe1.aarch64.rpm
+    ├── docker-engine-18.09.0-115.oe1.aarch64.rpm
+    ├── etcd-3.4.14-2.aarch64.rpm
+    ├── kubernetes-client-1.20.2-4.oe1.aarch64.rpm
+    ├── kubernetes-kubelet-1.20.2-4.oe1.aarch64.rpm
+    ├── kubernetes-master-1.20.2-4.oe1.aarch64.rpm
+    ├── kubernetes-node-1.20.2-4.oe1.aarch64.rpm
+    ├── libcgroup-0.42.2-1.oe1.aarch64.rpm
+    ├── libnetfilter_cthelper-1.0.0-15.oe1.aarch64.rpm
+    ├── libnetfilter_cttimeout-1.0.0-13.oe1.aarch64.rpm
+    ├── libnetfilter_queue-1.0.5-1.oe1.aarch64.rpm
+    └── socat-1.7.3.2-8.oe1.aarch64.rpm
 
-7 directories, 16 files
+6 directories, 16 files
 ```
 
-- 离线部署包的目录结构与集群配置config中的package的类型对应，package类型共有pkg/repo/bin/file/dir/image/yaml七种
+- 离线部署包的目录结构与集群配置config中的package的类型对应，package类型共有pkg/repo/bin/file/dir/image/yaml/shell八种
 
 -  bin目录存放二进制文件，对应package类型 bin
 
--  dir目录存放需要copy到目标机器的目录，对应package类型dir
+-  dir目录存放需要copy到目标机器的目录，需要配置dst目的地路径，对应package类型dir
 
--  file目录存放需要copy到目标机器的文件，对应package类型file
+-  file目录存放file、yaml、shell三种类型的文件。其中file类型代表需要copy到目标机器的文件，同时需要配置dst目的地路径；yaml类型代表用户自定义的yaml文件，会在集群部署完成后apply该文件；shell类型代表用户想要执行的脚本，同时需要配置schedule执行时机，执行时机包括prejoin节点加入前、postjoin节点加入后、precleanup节点退出前、postcleanup节点退出后四个阶段
 
 - image目录存放需要导入的容器镜像，例如网络插件镜像以及pause镜像。对应package类型image。如果是在线安装，则由容器运行时自动从镜像仓库下载，不需要准备images.tar包。以calico插件依赖的容器镜像为例，可以根据calico.yaml里面定义的镜像全名进行下载导出。该tar包包含的镜像必须是使用docker或者isula-build等兼容docker的tar包格式的命令，使用docker save -o images.tar images1:tag images2:tag ......  或类似命令将所有镜像一次性导出到images.tar包中，需要确保执行load镜像时能一次将images.tar导入成功。以上述calico镜像为例，镜像导出命令为：
 
@@ -74,8 +74,6 @@ $ tree
   $ docker save -o images.tar calico/node:v3.19.1 calico/cni:v3.19.1 calico/kube-controllers:v3.19.1 calico/pod2daemon-flexvol:v3.19.1 k8s.gcr.io/pause:3.2
 
 - pkg目录下存放需要安装的rpm/deb包，对应package类型pkg
-
-- yaml目录存放需要kubectl apply的文件，对应package类型yaml（注：暂未实现）
 
 3)  准备eggo部署时使用的yaml配置文件。可以使用下面的命令生成一个模板配置，并打开yaml文件对其进行增删改来满足不同的部署需求。
 
@@ -268,9 +266,10 @@ install:                                    // 配置各种类型节点上需要
     dst: ""
   addition:                                 // 额外的安装包或二进制文件列表
     master:
-    - name: addons
-      type: dir
-      dst: /etc/kubernetes
+    - name: prejoin.sh
+      type: shell                           // shell脚本
+      schedule: "prejoin"                   // 执行时间master节点加入集群前
+      TimeOut:  "30s"                       // 脚本执行时间，超时则被杀死，未配置默认30s
     - name: calico.yaml
       type: yaml
       dst: ""
@@ -281,6 +280,9 @@ install:                                    // 配置各种类型节点上需要
     - name: docker.service
       type: file
       dst: /usr/lib/systemd/system/
+    - name: postjoin.sh
+      type: shell                           // shell脚本
+      schedule: "postjoin"                  // 执行时间worker节点加入集群后
 ```
 
 ### dst 白名单

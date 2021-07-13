@@ -129,6 +129,7 @@ func CleanupNetwork(cluster *api.ClusterConfig) error {
 		}
 	}
 
+	task.SetIgnoreErrorFlag(t)
 	useMaster, err := nodemanager.RunTaskOnOneNode(t, masters)
 	if err != nil {
 		return err

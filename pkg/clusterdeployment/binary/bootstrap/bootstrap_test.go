@@ -92,6 +92,9 @@ func TestJoinMaster(t *testing.T) {
 			},
 			&masterNode,
 		},
+		RoleInfra: map[uint16]*api.RoleInfra{
+			api.Master: {},
+		},
 	}
 
 	r := &MockRunner{}
@@ -150,6 +153,9 @@ func TestJoinWorker(t *testing.T) {
 		Nodes: []*api.HostConfig{
 			&controlplane,
 			&workerNode,
+		},
+		RoleInfra: map[uint16]*api.RoleInfra{
+			api.Worker: {},
 		},
 	}
 

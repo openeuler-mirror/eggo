@@ -44,7 +44,7 @@ func (ir *isuladRuntime) GetRuntimeService() string {
 }
 
 func (ir *isuladRuntime) PrepareRuntimeJson(r runner.Runner, WorkerConfig *api.WorkerConfig) error {
-	pauseImage, cniBinDir := "k8s.gcr.io/pause:3.2", "/usr/libexec/cni,/opt/cni/bin"
+	pauseImage, cniBinDir, cniConfDir := "k8s.gcr.io/pause:3.2", "/usr/libexec/cni,/opt/cni/bin", "/etc/cni/net.d"
 	registry := []string{"docker.io"}
 	insecure := []string{"quay.io", "k8s.gcr.io"}
 
@@ -53,6 +53,9 @@ func (ir *isuladRuntime) PrepareRuntimeJson(r runner.Runner, WorkerConfig *api.W
 	}
 	if WorkerConfig.KubeletConf.CniBinDir != "" {
 		cniBinDir = WorkerConfig.KubeletConf.CniBinDir
+	}
+	if WorkerConfig.KubeletConf.CniConfDir != "" {
+		cniConfDir = WorkerConfig.KubeletConf.CniConfDir
 	}
 	if len(WorkerConfig.ContainerEngineConf.RegistryMirrors) != 0 || len(WorkerConfig.ContainerEngineConf.InsecureRegistries) != 0 {
 		registry = WorkerConfig.ContainerEngineConf.RegistryMirrors
@@ -64,6 +67,7 @@ func (ir *isuladRuntime) PrepareRuntimeJson(r runner.Runner, WorkerConfig *api.W
 sed -i "s#network-plugin\": \"#network-plugin\": \"cni#g" /etc/isulad/daemon.json
 sed -i "s#pod-sandbox-image\": \"#pod-sandbox-image\": \"{{ .pauseImage }}#g" /etc/isulad/daemon.json
 sed -i "s#cni-bin-dir\": \"#cni-bin-dir\": \"{{ .cniBinDir }}#g" /etc/isulad/daemon.json
+sed -i "s#cni-conf-dir\": \"#cni-conf-dir\": \"{{ .cniConfDir }}#g" /etc/isulad/daemon.json
 {{- range $i, $v := .registry }}
 sed -i "/registry-mirrors/a\    \t\"{{ $v }}\"{{ if ne $i 0 }},{{ end }}" /etc/isulad/daemon.json
 {{- end }}
@@ -74,6 +78,7 @@ sed -i "/insecure-registries/a\    \t\"{{ $v }}\"{{ if ne $i 0 }},{{ end }}" /et
 	datastore := map[string]interface{}{}
 	datastore["pauseImage"] = pauseImage
 	datastore["cniBinDir"] = cniBinDir
+	datastore["cniConfDir"] = cniConfDir
 	datastore["registry"] = registry
 	datastore["insecure"] = insecure
 	shell, err := template.TemplateRender(isuladConfig, datastore)
@@ -194,7 +199,8 @@ func (ct *DeployRuntimeTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 	}
 
 	// start service
-	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"systemctl restart %s\"", ct.runtime.GetRuntimeService())); err != nil {
+	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"systemctl daemon-reload && systemctl restart %s\"",
+		ct.runtime.GetRuntimeService())); err != nil {
 		logrus.Errorf("start %s failed: %v", ct.runtime.GetRuntimeService(), err)
 		return err
 	}

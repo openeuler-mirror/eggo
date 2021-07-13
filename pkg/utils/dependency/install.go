@@ -23,13 +23,33 @@ import (
 	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/constants"
+	"isula.org/eggo/pkg/utils"
+	"isula.org/eggo/pkg/utils/nodemanager"
 	"isula.org/eggo/pkg/utils/runner"
+	"isula.org/eggo/pkg/utils/task"
 )
 
 const (
 	PrmTest = "if [ x != x$(which apt 2>/dev/null) ]; then echo apt ; elif [ x != x$(which yum 2>/dev/null) ]; then echo yum ; fi"
 	PmTest  = "if [ x != x$(which dpkg 2>/dev/null) ]; then echo dpkg ; elif [ x != x$(which rpm 2>/dev/null) ]; then echo rpm ; fi"
 )
+
+type DependencyTask struct {
+	dp dependency
+}
+
+func (dt *DependencyTask) Name() string {
+	return "DependencyTask"
+}
+
+func (dt *DependencyTask) Run(r runner.Runner, hcf *api.HostConfig) error {
+	if err := dt.dp.Install(r); err != nil {
+		logrus.Errorf("install failed for %s: %v", hcf.Address, err)
+		return err
+	}
+
+	return nil
+}
 
 func installRepo(r runner.Runner, software []*api.PackageConfig, hcf *api.HostConfig) error {
 	if len(software) == 0 {
@@ -312,5 +332,62 @@ func CheckDependency(r runner.Runner, softwares []string) error {
 		}
 		logrus.Debugf("check software: %s success\n", s)
 	}
+	return nil
+}
+
+func getShell(roleInfra *api.RoleInfra, schedule api.Schedule) []*api.PackageConfig {
+	shell := []*api.PackageConfig{}
+	for _, s := range roleInfra.Softwares {
+		if s.Type == "shell" && s.Schedule == schedule {
+			shell = append(shell, s)
+		}
+	}
+
+	return shell
+}
+
+func ExecuteShell(roleInfra *api.RoleInfra, packagePath string, hcf *api.HostConfig, schedule api.Schedule) error {
+	shell := getShell(roleInfra, schedule)
+	if len(shell) == 0 {
+		return nil
+	}
+
+	dp := &dependencyShell{
+		srcPath: path.Join(packagePath, constants.DefaultFilePath),
+		shell:   shell,
+	}
+
+	dependencyTask := task.NewTaskInstance(&DependencyTask{
+		dp: dp,
+	})
+
+	if api.IsCleanupSchedule(schedule) {
+		task.SetIgnoreErrorFlag(dependencyTask)
+	}
+	if err := nodemanager.RunTaskOnNodes(dependencyTask, []string{hcf.Address}); err != nil {
+		logrus.Errorf("Hook %s failed for %s: %v", string(api.SchedulePreJoin), hcf.Address, err)
+		return err
+	}
+
+	return nil
+}
+
+func HookSchedule(ccfg *api.ClusterConfig, nodes []*api.HostConfig, role []uint16, schedule api.Schedule) error {
+	for _, n := range nodes {
+		for _, r := range role {
+			if !utils.IsType(n.Type, r) {
+				continue
+			}
+
+			if err := ExecuteShell(ccfg.RoleInfra[r], ccfg.PackageSrc.GetPkgDstPath(), n, schedule); err != nil {
+				if api.IsCleanupSchedule(schedule) {
+					logrus.Errorf("execute shell failed for %s at %s: %v", n.Address, string(schedule), err)
+				} else {
+					return err
+				}
+			}
+		}
+	}
+
 	return nil
 }

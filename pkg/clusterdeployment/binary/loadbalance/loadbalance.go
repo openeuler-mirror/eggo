@@ -37,8 +37,10 @@ const (
 )
 
 type LoadBalanceTask struct {
-	lbConfig *api.LoadBalancer
-	masters  []string
+	lbConfig    *api.LoadBalancer
+	masters     []string
+	infra       *api.RoleInfra
+	packagePath string
 }
 
 func (it *LoadBalanceTask) Name() string {
@@ -166,8 +168,10 @@ func SetupLoadBalancer(config *api.ClusterConfig, lb *api.HostConfig) error {
 
 	taskSetupLoadBalancer := task.NewTaskInstance(
 		&LoadBalanceTask{
-			lbConfig: &config.LoadBalancer,
-			masters:  masterIPs,
+			lbConfig:    &config.LoadBalancer,
+			masters:     masterIPs,
+			infra:       config.RoleInfra[api.LoadBalance],
+			packagePath: config.PackageSrc.GetPkgDstPath(),
 		},
 	)
 
