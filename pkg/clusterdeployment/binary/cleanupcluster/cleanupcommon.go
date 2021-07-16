@@ -34,7 +34,7 @@ func removePathes(r runner.Runner, pathes []string) {
 	}
 }
 
-func postCleanup(r runner.Runner) {
+func PostCleanup(r runner.Runner) {
 	// daemon-reload
 	if output, err := r.RunCommand(utils.AddSudo("systemctl daemon-reload")); err != nil {
 		logrus.Errorf("daemon-reload failed: %v\noutput: %v", err, output)

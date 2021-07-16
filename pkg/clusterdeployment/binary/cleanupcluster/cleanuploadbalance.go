@@ -50,7 +50,7 @@ func (t *cleanupLoadBalanceTask) Run(r runner.Runner, hostConfig *api.HostConfig
 
 	removePathes(r, getLoadBalancePathes())
 
-	postCleanup(r)
+	PostCleanup(r)
 
 	return nil
 }

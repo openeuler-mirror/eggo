@@ -113,7 +113,7 @@ func (bcp *BinaryClusterDeployment) registerNodes() error {
 	return nil
 }
 
-func (bcp *BinaryClusterDeployment) taintAndLabelMasterNodes() error {
+func taintAndLabelNode(clusterID string, name string) error {
 	taints := []kubectl.Taint{
 		{
 			Key:    "node-role.kubernetes.io/master",
@@ -124,16 +124,27 @@ func (bcp *BinaryClusterDeployment) taintAndLabelMasterNodes() error {
 	labels := make(map[string]string)
 	labels["node-role.kubernetes.io/master"] = ""
 	labels["node-role.kubernetes.io/control-plane"] = ""
+	err := kubectl.WaitNodeRegister(name, clusterID)
+	if err != nil {
+		logrus.Errorf("wait node: %s joined failed: %v", name, err)
+		return err
+	}
+	err = kubectl.NodeTaintAndLabel(clusterID, name, labels, taints)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (bcp *BinaryClusterDeployment) TaintAndLabelNode(name string) error {
+	return taintAndLabelNode(bcp.config.Name, name)
+}
+
+func (bcp *BinaryClusterDeployment) taintAndLabelMasterNodes() error {
 	for _, node := range bcp.config.Nodes {
 		if (node.Type&api.Master != 0) && (node.Type&api.Worker != 0) {
-			// taint master node
-			err := kubectl.WaitNodeRegister(node.Name, bcp.config.Name)
-			if err != nil {
-				logrus.Warnf("wait node: %s joined failed: %v", node.Name, err)
-				continue
-			}
-			err = kubectl.NodeTaintAndLabel(bcp.config.Name, node.Name, labels, taints)
-			if err != nil {
+			if err := taintAndLabelNode(bcp.config.Name, node.Name); err != nil {
 				return err
 			}
 		}
@@ -182,6 +193,11 @@ func (bcp *BinaryClusterDeployment) MachineInfraSetup(hcf *api.HostConfig) error
 
 	logrus.Infof("do setup %s infrastrucure...", hcf.Address)
 
+	if err := bcp.registerNode(hcf); err != nil {
+		logrus.Errorf("register node failed: %v", err)
+		return err
+	}
+
 	role := []uint16{api.Master, api.Worker, api.ETCD, api.LoadBalance}
 	for _, r := range role {
 		if !utils.IsType(hcf.Type, r) {
@@ -206,16 +222,9 @@ func (bcp *BinaryClusterDeployment) MachineInfraDestroy(hcf *api.HostConfig) err
 
 	logrus.Infof("do destroy %s infrastrucure...", hcf.Address)
 
-	role := []uint16{api.Master, api.Worker, api.ETCD, api.LoadBalance}
-	for _, r := range role {
-		if !utils.IsType(hcf.Type, r) {
-			continue
-		}
-
-		err := infrastructure.NodeInfrastructureDestroy(bcp.config, hcf.Address, r)
-		if err != nil {
-			logrus.Errorf("role %d infrastructure destory failed: %v", r, err)
-		}
+	err := infrastructure.NodeInfrastructureDestroy(bcp.config, hcf)
+	if err != nil {
+		logrus.Errorf("role %d infrastructure destory failed: %v", hcf.Type, err)
 	}
 
 	logrus.Infof("destroy %s infrastrucure success", hcf.Address)

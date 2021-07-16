@@ -25,6 +25,7 @@ import (
 	"sync"
 
 	"isula.org/eggo/pkg/api"
+	"isula.org/eggo/pkg/clusterdeployment/binary/cleanupcluster"
 	"isula.org/eggo/pkg/utils"
 	"isula.org/eggo/pkg/utils/dependency"
 	"isula.org/eggo/pkg/utils/nodemanager"
@@ -260,17 +261,81 @@ func (it *DestroyInfraTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 
 	removeFirewallPort(r, it.roleInfra.OpenPorts)
 
+	cleanupcluster.PostCleanup(r)
+
 	return nil
 }
 
-func NodeInfrastructureDestroy(config *api.ClusterConfig, nodeID string, role uint16) error {
+func deleteSoftwareIfExist(infras *api.RoleInfra, delSoftware *api.PackageConfig) {
+	for {
+		var found bool
+		for i, software := range infras.Softwares {
+			if software.Name == delSoftware.Name && software.Type == delSoftware.Type &&
+				software.Dst == delSoftware.Dst {
+				infras.Softwares = append(infras.Softwares[:i], infras.Softwares[i+1:]...)
+				found = true
+				break
+			}
+		}
+		if !found {
+			break
+		}
+	}
+}
+
+func getRoleInfra(ccfg *api.ClusterConfig, ip string, delRoles uint16) *api.RoleInfra {
+	var infras api.RoleInfra
+	for _, r := range []uint16{api.Worker, api.Master, api.LoadBalance, api.ETCD} {
+		if utils.IsType(delRoles, r) {
+			roleInfra := ccfg.RoleInfra[r]
+			if roleInfra == nil {
+				logrus.Errorf("have not register %d roleinfra", delRoles)
+				return nil
+			}
+			infras.OpenPorts = append(infras.OpenPorts, roleInfra.OpenPorts...)
+			infras.Softwares = append(infras.Softwares, roleInfra.Softwares...)
+		}
+	}
+
+	var allRoles uint16
+	for _, node := range ccfg.Nodes {
+		if node.Address == ip {
+			allRoles = node.Type
+			break
+		}
+	}
+	remainRoles := allRoles &^ delRoles
+	// if not found, it means no role remain, so delete all
+	if remainRoles == 0 {
+		return &infras
+	}
+
+	for _, r := range []uint16{api.Worker, api.Master, api.LoadBalance, api.ETCD} {
+		if !utils.IsType(remainRoles, r) {
+			continue
+		}
+		roleInfra := ccfg.RoleInfra[r]
+		if roleInfra == nil {
+			logrus.Errorf("have not register %d roleinfra", r)
+			return nil
+		}
+
+		for _, software := range roleInfra.Softwares {
+			deleteSoftwareIfExist(&infras, software)
+		}
+	}
+
+	return &infras
+}
+
+func NodeInfrastructureDestroy(config *api.ClusterConfig, hostconfig *api.HostConfig) error {
 	if config == nil {
 		return fmt.Errorf("empty cluster config")
 	}
 
-	roleInfra := config.RoleInfra[role]
+	roleInfra := getRoleInfra(config, hostconfig.Address, hostconfig.Type)
 	if roleInfra == nil {
-		return fmt.Errorf("do not register %d roleinfra", role)
+		return fmt.Errorf("do not register %d roleinfra", hostconfig.Type)
 	}
 
 	itask := task.NewTaskInstance(
@@ -279,7 +344,7 @@ func NodeInfrastructureDestroy(config *api.ClusterConfig, nodeID string, role ui
 			roleInfra:  roleInfra,
 		})
 
-	if err := nodemanager.RunTaskOnNodes(itask, []string{nodeID}); err != nil {
+	if err := nodemanager.RunTaskOnNodes(itask, []string{hostconfig.Address}); err != nil {
 		return fmt.Errorf("destroy infrastructure Task failed: %v", err)
 	}
 

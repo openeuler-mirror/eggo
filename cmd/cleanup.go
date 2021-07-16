@@ -17,6 +17,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -33,18 +34,26 @@ func cleanupCluster(cmd *cobra.Command, args []string) error {
 		initLog()
 	}
 
+	if opts.cleanupConfig == "" && opts.cleanupClusterID == "" {
+		return fmt.Errorf("please specify cluster id")
+	}
+
 	var conf *deployConfig
 	var err error
-	if opts.cleanupConfig == "" {
-		conf, err = loadConfig()
-		if err != nil {
-			return fmt.Errorf("load config failed: %v", err)
+	confPath := opts.cleanupConfig
+	if confPath == "" {
+		confPath = savedDeployConfigPath(opts.cleanupClusterID)
+		_, err := os.Stat(confPath)
+		if os.IsNotExist(err) {
+			confPath = defaultDeployConfigPath()
+		} else if err != nil {
+			return fmt.Errorf("stat %v failed: %v", confPath, err)
 		}
-	} else {
-		conf, err = loadDeployConfig(opts.cleanupConfig)
-		if err != nil {
-			return fmt.Errorf("load deploy config file failed: %v", err)
-		}
+	}
+
+	conf, err = loadDeployConfig(confPath)
+	if err != nil {
+		return fmt.Errorf("load deploy config file %v failed: %v", confPath, err)
 	}
 
 	// TODO: make sure config valid

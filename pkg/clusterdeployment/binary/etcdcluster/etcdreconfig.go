@@ -146,8 +146,8 @@ func parseEtcdMemberList(output string) []*etcdMember {
 			leader = true
 		}
 		members = append(members, &etcdMember{
-			id:     items[0],
-			name:   items[2],
+			id:     strings.TrimSpace(items[0]),
+			name:   strings.TrimSpace(items[2]),
 			leader: leader,
 		})
 	}
@@ -181,21 +181,12 @@ func removeEtcd(r runner.Runner, certDir string, id string) error {
 }
 
 func (t *removeEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfig) error {
-	var foundLeader bool
-
 	etcds := getEtcdMembers(t.ccfg.GetCertDir(), r)
-	for i, member := range etcds {
-		// do not remove etcd leader
-		if member.leader {
-			foundLeader = true
+	for _, member := range etcds {
+		// do not delete self
+		if member.name == hostConfig.Name {
 			continue
 		}
-
-		// can not remove itself if only one etcd member exist
-		if !foundLeader && i == len(etcds)-1 {
-			continue
-		}
-
 		if err := removeEtcd(r, t.ccfg.GetCertDir(), member.id); err != nil {
 			logrus.Errorf("remove etcd %v failed", member.id)
 		}
@@ -225,6 +216,15 @@ func execRemoveEtcdsTask(conf *api.ClusterConfig, node string) error {
 	return nil
 }
 
+type getEtcdLeaderTask struct {
+	ccfg   *api.ClusterConfig
+	leader string
+}
+
+func (t *getEtcdLeaderTask) Name() string {
+	return "getEtcdLeaderTask"
+}
+
 func getFirstEtcd(nodes []*api.HostConfig) string {
 	for _, node := range nodes {
 		if utils.IsType(node.Type, api.ETCD) {
@@ -234,17 +234,49 @@ func getFirstEtcd(nodes []*api.HostConfig) string {
 	return ""
 }
 
-func ExecRemoveEtcdsTask(conf *api.ClusterConfig) error {
-	if !conf.EtcdCluster.External {
-		node := getFirstEtcd(conf.Nodes)
-		if node != "" {
-			return execRemoveEtcdsTask(conf, node)
-		} else {
-			logrus.Errorf("cann't found etcd node, ignore remove etcds")
+func getNodeIpByName(nodes []*api.HostConfig, name string) string {
+	for _, node := range nodes {
+		if node.Name == name {
+			return node.Address
 		}
-	} else {
-		logrus.Info("external etcd, ignore remove etcds")
+	}
+	return ""
+}
+
+func (t *getEtcdLeaderTask) Run(r runner.Runner, hostConfig *api.HostConfig) error {
+	etcds := getEtcdMembers(t.ccfg.GetCertDir(), r)
+	for _, member := range etcds {
+		if member.leader {
+			t.leader = getNodeIpByName(t.ccfg.Nodes, member.name)
+			return nil
+		}
 	}
 
 	return nil
+}
+
+func getEtcdLeader(conf *api.ClusterConfig, node string) string {
+	t := &getEtcdLeaderTask{ccfg: conf}
+	taskGetEtcdLeader := task.NewTaskInstance(t)
+
+	if err := nodemanager.RunTaskOnNodes(taskGetEtcdLeader, []string{node}); err != nil {
+		logrus.Errorf("run task for get etcd leader failed: %v", err)
+		return ""
+	}
+
+	if err := nodemanager.WaitNodesFinish([]string{node}, time.Minute*2); err != nil {
+		logrus.Warnf("wait get etcd leader task finish failed: %v", err)
+		return ""
+	}
+
+	return t.leader
+}
+
+func ExecRemoveEtcdsTask(conf *api.ClusterConfig) error {
+	firstEtcdNode := getFirstEtcd(conf.Nodes)
+	execNode := getEtcdLeader(conf, firstEtcdNode)
+	if execNode == "" {
+		execNode = firstEtcdNode
+	}
+	return execRemoveEtcdsTask(conf, execNode)
 }

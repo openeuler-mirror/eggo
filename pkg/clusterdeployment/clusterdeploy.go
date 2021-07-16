@@ -146,6 +146,20 @@ func doJoinNode(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, hostcon
 		return err
 	}
 
+	roles := hostconfig.Type
+	for _, node := range cc.Nodes {
+		if node.Name == hostconfig.Name {
+			roles |= node.Type
+			break
+		}
+	}
+
+	if utils.IsType(roles, api.Master) && utils.IsType(roles, api.Worker) {
+		if err := handler.TaintAndLabelNode(hostconfig.Name); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -167,43 +181,49 @@ func JoinNode(cc *api.ClusterConfig, hostconfig *api.HostConfig) error {
 	defer handler.Finish()
 
 	if err := doJoinNode(handler, cc, hostconfig); err != nil {
-		return err
+		logrus.Errorf("join node failed: %v", err)
+		if err1 := doDeleteNode(handler, cc, hostconfig); err1 != nil {
+			logrus.Errorf("try cleanup node failed when join node failed: %v", err1)
+		}
 	}
 
 	logrus.Infof("[cluster] join '%s' to cluster successed", cc.Name)
 	return nil
 }
 
-func getHostConfigByName(hostconfigs []*api.HostConfig, name string) *api.HostConfig {
-	for _, h := range hostconfigs {
-		if h.Name == name || h.Address == name {
-			return h
-		}
-	}
-	return nil
-}
-
-func doDeleteNode(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, name string, delType uint16) error {
-	h := getHostConfigByName(cc.Nodes, name)
-	if h == nil {
-		return fmt.Errorf("get host config by name %v failed", name)
-	}
-	if utils.IsType(delType, api.Worker) || utils.IsType(delType, api.Master) {
-		if err := handler.ClusterNodeCleanup(h, delType); err != nil {
-			return fmt.Errorf("delete master/worker of node %s failed: %v", h.Name, err)
+func doDeleteNode(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, h *api.HostConfig) error {
+	if utils.IsType(h.Type, api.Worker) {
+		if err := handler.ClusterNodeCleanup(h, api.Worker); err != nil {
+			return fmt.Errorf("delete worker %s failed: %v", h.Name, err)
 		}
 	}
 
-	if utils.IsType(delType, api.ETCD) {
+	if utils.IsType(h.Type, api.Master) {
+		if err := handler.ClusterNodeCleanup(h, api.Master); err != nil {
+			return fmt.Errorf("delete master %s failed: %v", h.Name, err)
+		}
+	}
+
+	if utils.IsType(h.Type, api.ETCD) {
 		if err := handler.EtcdNodeDestroy(h); err != nil {
 			return fmt.Errorf("delete etcd of node %s failed: %v", h.Name, err)
 		}
 	}
 
+	if err := handler.MachineInfraDestroy(h); err != nil {
+		logrus.Warnf("cleanup infrastructure for node: %s failed: %v", h.Name, err)
+		return err
+	}
+
+	if err := nodemanager.WaitNodesFinishWithProgress([]string{h.Address}, time.Minute*5); err != nil {
+		logrus.Warnf("wait cleanup finish failed: %v", err)
+		return err
+	}
+
 	return nil
 }
 
-func DeleteNode(cc *api.ClusterConfig, name string, delType uint16) error {
+func DeleteNode(cc *api.ClusterConfig, hostconfig *api.HostConfig) error {
 	if cc == nil {
 		return fmt.Errorf("[cluster] cluster config is required")
 	}
@@ -220,7 +240,7 @@ func DeleteNode(cc *api.ClusterConfig, name string, delType uint16) error {
 	}
 	defer handler.Finish()
 
-	if err := doDeleteNode(handler, cc, name, delType); err != nil {
+	if err := doDeleteNode(handler, cc, hostconfig); err != nil {
 		return err
 	}
 

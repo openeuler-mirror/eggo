@@ -37,25 +37,29 @@ func joinCluster(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("join command need exactly one argument")
 	}
 
+	if opts.joinClusterID == "" {
+		return fmt.Errorf("please specify cluster id")
+	}
+
 	opts.joinHost.Ip = args[0]
 
-	conf, err := loadBackupedDeployConfig()
+	conf, err := loadDeployConfig(savedDeployConfigPath(opts.joinClusterID))
 	if err != nil {
-		return fmt.Errorf("load backuped deploy config failed: %v", err)
+		return fmt.Errorf("load saved deploy config failed: %v", err)
 	}
 
 	// TODO: make sure config valid
 
-	hostconfig := joinConfig(conf, opts.joinType, &opts.joinHost)
-	if hostconfig == nil {
-		return fmt.Errorf("join userconfig failed")
+	mergedConf, hostconfig, err := joinConfig(conf, opts.joinType, &opts.joinHost)
+	if mergedConf == nil || hostconfig == nil || err != nil {
+		return fmt.Errorf("join userconfig failed: %v", err)
 	}
 
 	if err = join(toClusterdeploymentConfig(conf), hostconfig); err != nil {
 		return err
 	}
 
-	if err = backupDeployConfig(conf); err != nil {
+	if err = saveDeployConfig(mergedConf, savedDeployConfigPath(opts.joinClusterID)); err != nil {
 		return err
 	}
 
@@ -65,7 +69,7 @@ func joinCluster(cmd *cobra.Command, args []string) error {
 func NewJoinCmd() *cobra.Command {
 	joinCmd := &cobra.Command{
 		Use:   "join NAME",
-		Short: "join a node to cluster",
+		Short: "join master or worker to cluster",
 		RunE:  joinCluster,
 	}
 

@@ -176,7 +176,7 @@ func TestPrepareInfrastructure(t *testing.T) {
 		t.Fatalf("test NodeInfrastructureSetup failed: %v\n", err)
 	}
 
-	if err := NodeInfrastructureDestroy(ccfg, ccfg.Nodes[0].Address, ccfg.Nodes[0].Type); err != nil {
+	if err := NodeInfrastructureDestroy(ccfg, ccfg.Nodes[0]); err != nil {
 		t.Fatalf("test NodeInfrastructureDestroy failed: %v\n", err)
 	}
 

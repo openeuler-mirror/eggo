@@ -24,22 +24,24 @@ import (
 )
 
 type eggoOptions struct {
-	name           string
-	templateConfig string
-	masters        []string
-	nodes          []string
-	etcds          []string
-	loadbalance    string
-	username       string
-	password       string
-	deployConfig   string
-	cleanupConfig  string
-	debug          bool
-	version        bool
-	joinType       string
-	joinHost       HostConfig
-	delName        string
-	delType        string
+	name             string
+	templateConfig   string
+	masters          []string
+	nodes            []string
+	etcds            []string
+	loadbalance      string
+	username         string
+	password         string
+	deployConfig     string
+	cleanupConfig    string
+	cleanupClusterID string
+	debug            bool
+	version          bool
+	joinType         string
+	joinClusterID    string
+	joinHost         HostConfig
+	delName          string
+	delClusterID     string
 }
 
 var opts eggoOptions
@@ -66,20 +68,22 @@ func setupDeployCmdOpts(deployCmd *cobra.Command) {
 
 func setupCleanupCmdOpts(cleanupCmd *cobra.Command) {
 	flags := cleanupCmd.Flags()
-	flags.StringVarP(&opts.cleanupConfig, "file", "f", defaultDeployConfigPath(), "location of cluster deploy config file, default $HOME/.eggo/deploy.yaml")
+	flags.StringVarP(&opts.cleanupConfig, "file", "f", "", "location of cluster deploy config file")
+	flags.StringVarP(&opts.cleanupClusterID, "id", "", "", "cluster id")
 }
 
 func setupJoinCmdOpts(joinCmd *cobra.Command) {
 	flags := joinCmd.Flags()
-	flags.StringVarP(&opts.joinType, "type", "t", "worker", "join type, can be \"master,worker,etcd\", deault worker")
-	flags.StringVarP(&opts.joinHost.Arch, "arch", "", "amd64", "host's architecture, default amd64")
+	flags.StringVarP(&opts.joinType, "type", "t", "worker", "join type, can be \"master,worker\", deault worker")
+	flags.StringVarP(&opts.joinHost.Arch, "arch", "a", "", "host's architecture")
 	flags.StringVarP(&opts.joinHost.Name, "name", "n", "", "host's name")
-	flags.IntVarP(&opts.joinHost.Port, "port", "p", 22, "host's ssh port, default 22")
+	flags.IntVarP(&opts.joinHost.Port, "port", "p", 0, "host's ssh port")
+	flags.StringVarP(&opts.joinClusterID, "id", "", "", "cluster id")
 }
 
 func setupDeleteCmdOpts(deleteCmd *cobra.Command) {
 	flags := deleteCmd.Flags()
-	flags.StringVarP(&opts.delType, "type", "t", "worker", "delete type, can be \"master,worker,etcd,all\", deault all")
+	flags.StringVarP(&opts.delClusterID, "id", "", "", "cluster id")
 }
 
 func setupTemplateCmdOpts(templateCmd *cobra.Command) {
