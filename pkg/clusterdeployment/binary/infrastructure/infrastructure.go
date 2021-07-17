@@ -263,6 +263,15 @@ func (it *DestroyInfraTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 
 	cleanupcluster.PostCleanup(r)
 
+	dstDir := it.packageSrc.GetPkgDstPath()
+	if !dependency.CheckPath(dstDir) {
+		logrus.Errorf("path %s not in White List and cannot remove", dstDir)
+		return nil
+	}
+	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"rm -rf %s\"", dstDir)); err != nil {
+		return fmt.Errorf("rm dependency failed: %v", err)
+	}
+
 	return nil
 }
 
@@ -344,6 +353,7 @@ func NodeInfrastructureDestroy(config *api.ClusterConfig, hostconfig *api.HostCo
 			roleInfra:  roleInfra,
 		})
 
+	task.SetIgnoreErrorFlag(itask)
 	if err := nodemanager.RunTaskOnNodes(itask, []string{hostconfig.Address}); err != nil {
 		return fmt.Errorf("destroy infrastructure Task failed: %v", err)
 	}

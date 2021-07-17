@@ -369,6 +369,7 @@ func (bc *BinaryCoredns) Cleanup(cluster *api.ClusterConfig) error {
 		},
 	)
 
+	task.SetIgnoreErrorFlag(sst)
 	err := nodemanager.RunTaskOnNodes(sst, masterIPs)
 	if err != nil {
 		logrus.Warnf("run cleanup coredns task failed: %v", err)

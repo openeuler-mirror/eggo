@@ -27,7 +27,6 @@ import (
 	"isula.org/eggo/pkg/clusterdeployment/binary/etcdcluster"
 	"isula.org/eggo/pkg/clusterdeployment/binary/infrastructure"
 	"isula.org/eggo/pkg/clusterdeployment/binary/loadbalance"
-	"isula.org/eggo/pkg/clusterdeployment/binary/network"
 	"isula.org/eggo/pkg/clusterdeployment/manager"
 	"isula.org/eggo/pkg/utils"
 	"isula.org/eggo/pkg/utils/kubectl"
@@ -153,28 +152,17 @@ func (bcp *BinaryClusterDeployment) taintAndLabelMasterNodes() error {
 	return nil
 }
 
-func (bcp *BinaryClusterDeployment) prepareNetwork() error {
+func (bcp *BinaryClusterDeployment) prepareCoredns() error {
 	// Setup coredns at here, like need addons
 	if err := coredns.CorednsSetup(bcp.config); err != nil {
 		logrus.Errorf("setup coredns failed: %v", err)
 		return err
 	}
 
-	// setup network
-	if err := network.SetupNetwork(bcp.config); err != nil {
-		return err
-	}
-
 	return nil
 }
 
-func (bcp *BinaryClusterDeployment) cleanupNetwork() error {
-	// cleanup network
-	if err := network.CleanupNetwork(bcp.config); err != nil {
-		logrus.Errorf("cleanup network failed: %v", err)
-		return err
-	}
-
+func (bcp *BinaryClusterDeployment) cleanupCoredns() error {
 	// cleanup coredns at here
 	if err := coredns.CorednsCleanup(bcp.config); err != nil {
 		logrus.Errorf("cleanup coredns failed: %v", err)
@@ -342,9 +330,9 @@ func (bcp *BinaryClusterDeployment) AddonsSetup() error {
 		return err
 	}
 
-	err = bcp.prepareNetwork()
+	err = bcp.prepareCoredns()
 	if err != nil {
-		logrus.Errorf("[addons] prepare network failed: %v", err)
+		logrus.Errorf("[addons] prepare coredns failed: %v", err)
 		return err
 	}
 
@@ -363,12 +351,10 @@ func (bcp *BinaryClusterDeployment) AddonsDestroy() error {
 	err := addons.CleanupAddons(bcp.config)
 	if err != nil {
 		logrus.Errorf("[addons] destroy addons failed: %v", err)
-		return err
 	}
-	err = bcp.cleanupNetwork()
+	err = bcp.cleanupCoredns()
 	if err != nil {
-		logrus.Errorf("[addons] cleanup network failed: %v", err)
-		return err
+		logrus.Errorf("[addons] cleanup coredns failed: %v", err)
 	}
 
 	logrus.Info("[addons] destroy addons success.")

@@ -8,28 +8,16 @@ import (
 	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/constants"
+	"isula.org/eggo/pkg/utils/dependency"
 	"isula.org/eggo/pkg/utils/nodemanager"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/task"
-	"isula.org/eggo/pkg/utils/template"
 )
 
-func runCmd(name string, r runner.Runner, cluster *api.ClusterConfig, tmpl string, datastore map[string]interface{}) error {
-	cmdStr, err := template.TemplateRender(tmpl, datastore)
-	if err != nil {
-		return err
-	}
-	output, err := r.RunShell(cmdStr, name)
-	if err != nil {
-		return err
-	}
-
-	logrus.Debugf("apply %s success\noutput: %s", name, output)
-	return nil
-}
-
 type SetupAddonsTask struct {
-	Cluster *api.ClusterConfig
+	yaml       []*api.PackageConfig
+	srcPath    string
+	kubeconfig string
 }
 
 func (ct *SetupAddonsTask) Name() string {
@@ -37,38 +25,47 @@ func (ct *SetupAddonsTask) Name() string {
 }
 
 func (ct *SetupAddonsTask) Run(r runner.Runner, hcf *api.HostConfig) error {
-	addonsTmpl := `
-#!/bin/bash
-export KUBECONFIG={{ .KubeConfig }}
-{{- range $i, $v := .Addons }}
-kubectl apply -f {{ $v }}
-if [ $? -ne 0 ]; then
-	echo "apply {{ $v }} failed"
-	exit 1
-fi
-{{- end }}
-exit 0
-`
-	datastore := make(map[string]interface{})
-	var addons []string
-	for _, a := range ct.Cluster.Addons {
-		addons = append(addons, filepath.Join(constants.DefaultK8SAddonsDir, a.Filename))
-	}
-	datastore["Addons"] = addons
-	datastore["KubeConfig"] = filepath.Join(ct.Cluster.GetConfigDir(), constants.KubeConfigFileNameAdmin)
+	logrus.Info("do apply addons...")
 
-	return runCmd("apply-addons", r, ct.Cluster, addonsTmpl, datastore)
+	yamlDep := dependency.NewDependencyYaml(ct.srcPath, ct.kubeconfig, ct.yaml)
+	if err := yamlDep.Install(r); err != nil {
+		return err
+	}
+
+	logrus.Info("apply addons success")
+	return nil
+}
+
+func getAddons(cluster *api.ClusterConfig) []*api.PackageConfig {
+	yaml := []*api.PackageConfig{}
+	for _, s := range cluster.RoleInfra[api.Master].Softwares {
+		if s.Type == "yaml" {
+			yaml = append(yaml, s)
+		}
+	}
+
+	return yaml
 }
 
 func setupAddons(cluster *api.ClusterConfig) error {
 	if cluster == nil {
 		return fmt.Errorf("invalid cluster config")
 	}
-	if cluster.Addons == nil || len(cluster.Addons) == 0 {
-		logrus.Debugf("no addons found")
+
+	yaml := getAddons(cluster)
+	if len(yaml) == 0 {
+		logrus.Warn("no addons load")
 		return nil
 	}
-	t := task.NewTaskInstance(&SetupAddonsTask{Cluster: cluster})
+
+	yamlPath := filepath.Join(cluster.PackageSrc.GetPkgDstPath(), constants.DefaultFilePath)
+	kubeconfig := filepath.Join(cluster.GetConfigDir(), constants.KubeConfigFileNameAdmin)
+
+	t := task.NewTaskInstance(&SetupAddonsTask{
+		yaml:       yaml,
+		srcPath:    yamlPath,
+		kubeconfig: kubeconfig,
+	})
 	var masters []string
 	for _, n := range cluster.Nodes {
 		if (n.Type & api.Master) != 0 {
@@ -84,12 +81,15 @@ func setupAddons(cluster *api.ClusterConfig) error {
 	if err != nil {
 		return err
 	}
+
 	logrus.Infof("[cluster] apply addons success")
 	return nil
 }
 
 type CleanupAddonsTask struct {
-	Cluster *api.ClusterConfig
+	yaml       []*api.PackageConfig
+	srcPath    string
+	kubeconfig string
 }
 
 func (ct *CleanupAddonsTask) Name() string {
@@ -97,38 +97,36 @@ func (ct *CleanupAddonsTask) Name() string {
 }
 
 func (ct *CleanupAddonsTask) Run(r runner.Runner, hcf *api.HostConfig) error {
-	addonsTmpl := `
-#!/bin/bash
-export KUBECONFIG={{ .KubeConfig }}
-{{- range $i, $v := .Addons }}
-kubectl delete --force=true -f {{ $v }}
-if [ $? -ne 0 ]; then
-	echo "apply {{ $v }} failed"
-	exit 1
-fi
-{{- end }}
-exit 0
-`
-	datastore := make(map[string]interface{})
-	var addons []string
-	for _, a := range ct.Cluster.Addons {
-		addons = append(addons, filepath.Join(constants.DefaultK8SAddonsDir, a.Filename))
-	}
-	datastore["Addons"] = addons
-	datastore["KubeConfig"] = filepath.Join(ct.Cluster.GetConfigDir(), constants.KubeConfigFileNameAdmin)
+	logrus.Info("do remove addons...")
 
-	return runCmd("delete-addons", r, ct.Cluster, addonsTmpl, datastore)
+	yamlDep := dependency.NewDependencyYaml(ct.srcPath, ct.kubeconfig, ct.yaml)
+	if err := yamlDep.Remove(r); err != nil {
+		return err
+	}
+
+	logrus.Info("remove addons success")
+	return nil
 }
 
 func cleanupAddons(cluster *api.ClusterConfig) error {
 	if cluster == nil {
 		return fmt.Errorf("invalid cluster config")
 	}
-	if cluster.Addons == nil || len(cluster.Addons) == 0 {
-		logrus.Debugf("no addons found")
+
+	yaml := getAddons(cluster)
+	if len(yaml) == 0 {
+		logrus.Warn("no addons load")
 		return nil
 	}
-	t := task.NewTaskInstance(&CleanupAddonsTask{Cluster: cluster})
+
+	yamlPath := filepath.Join(cluster.PackageSrc.GetPkgDstPath(), constants.DefaultFilePath)
+	kubeconfig := filepath.Join(cluster.GetConfigDir(), constants.KubeConfigFileNameAdmin)
+
+	t := task.NewTaskInstance(&CleanupAddonsTask{
+		yaml:       yaml,
+		srcPath:    yamlPath,
+		kubeconfig: kubeconfig,
+	})
 	var masters []string
 	for _, n := range cluster.Nodes {
 		if (n.Type & api.Master) != 0 {
@@ -136,11 +134,12 @@ func cleanupAddons(cluster *api.ClusterConfig) error {
 		}
 	}
 
+	task.SetIgnoreErrorFlag(t)
 	useMaster, err := nodemanager.RunTaskOnOneNode(t, masters)
 	if err != nil {
 		return err
 	}
-	err = nodemanager.WaitNodesFinish([]string{useMaster}, 5*time.Minute)
+	err = nodemanager.WaitNodesFinishWithProgress([]string{useMaster}, time.Minute)
 	if err != nil {
 		return err
 	}

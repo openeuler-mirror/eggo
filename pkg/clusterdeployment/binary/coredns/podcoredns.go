@@ -158,6 +158,7 @@ func (pc *PodCoredns) Cleanup(cluster *api.ClusterConfig) error {
 		}
 	}
 
+	task.SetIgnoreErrorFlag(t)
 	useMaster, err := nodemanager.RunTaskOnOneNode(t, masters)
 	if err != nil {
 		return err

@@ -71,12 +71,17 @@ func TestRemoveWorkers(t *testing.T) {
 			Arch:    "amd64",
 			Name:    "node0",
 			Address: "192.168.0.1",
-			Type:    0x07,
+			Type:    api.Master | api.Worker | api.ETCD,
 		},
 	}
 	conf := &api.ClusterConfig{
 		Certificate: api.CertificateConfig{SavePath: "/tmp/test"},
 		Nodes:       nodes,
+		RoleInfra: map[uint16]*api.RoleInfra{
+			api.Master: {},
+			api.Worker: {},
+			api.ETCD:   {},
+		},
 	}
 
 	task := &cleanupNodeTask{ccfg: conf}
@@ -91,12 +96,17 @@ func TestRemoveEtcds(t *testing.T) {
 			Arch:    "amd64",
 			Name:    "node0",
 			Address: "192.168.0.1",
-			Type:    0x07,
+			Type:    api.Master | api.Worker | api.ETCD,
 		},
 	}
 	conf := &api.ClusterConfig{
 		Certificate: api.CertificateConfig{SavePath: "/tmp/test"},
 		Nodes:       nodes,
+		RoleInfra: map[uint16]*api.RoleInfra{
+			api.Master: {},
+			api.Worker: {},
+			api.ETCD:   {},
+		},
 	}
 
 	task := &cleanupEtcdMemberTask{ccfg: conf}

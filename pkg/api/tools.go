@@ -76,3 +76,7 @@ func GetEtcdServers(ecc *EtcdClusterConfig) string {
 	ret := sb.String()
 	return ret[0 : len(ret)-1]
 }
+
+func IsCleanupSchedule(schedule Schedule) bool {
+	return schedule == SchedulePreCleanup || schedule == SchedulePostCleanup
+}

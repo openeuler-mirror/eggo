@@ -272,3 +272,42 @@ func (dy *dependencyYaml) Remove(r runner.Runner) error {
 
 	return nil
 }
+
+type dependencyShell struct {
+	srcPath string
+	shell   []*api.PackageConfig
+}
+
+func NewDependencyShell(srcPath string, shell []*api.PackageConfig) *dependencyShell {
+	return &dependencyShell{
+		srcPath: srcPath,
+		shell:   shell,
+	}
+}
+
+func (ds *dependencyShell) Install(r runner.Runner) error {
+	var sb strings.Builder
+
+	sb.WriteString("sudo -E /bin/sh -c \"")
+	for _, s := range ds.shell {
+		sb.WriteString(fmt.Sprintf("chmod +x %s/%s && ", ds.srcPath, s.Name))
+
+		timeout := s.TimeOut
+		if timeout == "" {
+			timeout = "30s"
+		}
+		sb.WriteString(fmt.Sprintf("timeout -s SIGKILL %s %s/%s > /dev/null ; ", timeout, ds.srcPath, s.Name))
+	}
+	sb.WriteString("\"")
+
+	if _, err := r.RunCommand(sb.String()); err != nil {
+		return fmt.Errorf("shell execute failed: %v", err)
+	}
+
+	return nil
+}
+
+func (ds *dependencyShell) Remove(r runner.Runner) error {
+	// nothing to do
+	return nil
+}

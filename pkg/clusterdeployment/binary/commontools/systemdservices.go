@@ -243,21 +243,21 @@ func SetupKubeletService(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.Host
 	configArgs := map[string]string{
 		"--network-plugin":            ccfg.WorkerConfig.KubeletConf.NetworkPlugin,
 		"--cni-bin-dir":               ccfg.WorkerConfig.KubeletConf.CniBinDir,
+		"--cni-conf-dir":              ccfg.WorkerConfig.KubeletConf.CniConfDir,
 		"--pod-infra-container-image": ccfg.WorkerConfig.KubeletConf.PauseImage,
 	}
-
 	if !runtime.IsDocker(ccfg.WorkerConfig.ContainerEngineConf.Runtime) {
 		configArgs["--container-runtime"] = "remote"
 		configArgs["--container-runtime-endpoint"] = ccfg.WorkerConfig.ContainerEngineConf.RuntimeEndpoint
-	}
-
-	for k, v := range ccfg.WorkerConfig.KubeletConf.ExtraArgs {
-		defaultArgs[k] = v
 	}
 	for k, v := range configArgs {
 		if v != "" {
 			defaultArgs[k] = v
 		}
+	}
+
+	for k, v := range ccfg.WorkerConfig.KubeletConf.ExtraArgs {
+		defaultArgs[k] = v
 	}
 
 	var args []string

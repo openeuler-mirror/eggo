@@ -109,7 +109,6 @@ type deployConfig struct {
 	RegistryMirrors    []string                    `yaml:"registry-mirrors"`
 	InsecureRegistries []string                    `yaml:"insecure-registries"`
 	ConfigExtraArgs    []*ConfigExtraArgs          `yaml:"config-extra-args"`
-	Addons             []*api.AddonConfig          `yaml:"addons"`
 	OpenPorts          map[string][]*api.OpenPorts `yaml:"open-ports"` // key: master, worker, etcd, loadbalance
 	InstallConfig      InstallConfig               `yaml:"install"`
 }
@@ -277,9 +276,11 @@ func appendSoftware(software, packageConfig, defaultPackage []*api.PackageConfig
 		splitSoftware := strings.Split(p.Name, ",")
 		for _, s := range splitSoftware {
 			result = append(result, &api.PackageConfig{
-				Name: s,
-				Type: p.Type,
-				Dst:  p.Dst,
+				Name:     s,
+				Type:     p.Type,
+				Dst:      p.Dst,
+				Schedule: p.Schedule,
+				TimeOut:  p.TimeOut,
 			})
 		}
 	}
@@ -722,8 +723,6 @@ func toClusterdeploymentConfig(conf *deployConfig) *api.ClusterConfig {
 	fillPackageConfig(ccfg, &conf.InstallConfig)
 	fillOpenPort(ccfg, conf.OpenPorts, conf.Service.DNS.CorednsType)
 
-	ccfg.Addons = append(ccfg.Addons, conf.Addons...)
-
 	return ccfg
 }
 
@@ -901,6 +900,12 @@ func createDeployConfigTemplate(file string) error {
 			Addition: map[string][]*api.PackageConfig{
 				"master": {
 					{
+						Name:     "prejoin.sh",
+						Type:     "shell",
+						Schedule: "prejoin",
+						TimeOut:  "30s",
+					},
+					{
 						Name: "calico.yaml",
 						Type: "yaml",
 					},
@@ -914,6 +919,11 @@ func createDeployConfigTemplate(file string) error {
 						Name: "docker.service",
 						Type: "file",
 						Dst:  "/usr/lib/systemd/system/",
+					},
+					{
+						Name:     "postjoin.sh",
+						Type:     "shell",
+						Schedule: "postjoin",
 					},
 				},
 			},

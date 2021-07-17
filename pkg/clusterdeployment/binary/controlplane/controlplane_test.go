@@ -84,6 +84,9 @@ func TestInit(t *testing.T) {
 				Type:     api.Worker,
 			},
 		},
+		RoleInfra: map[uint16]*api.RoleInfra{
+			api.Master: {},
+		},
 	}
 
 	r := &MockRunner{}
