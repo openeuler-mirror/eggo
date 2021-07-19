@@ -31,6 +31,7 @@ var (
 	WhiteList = []string{
 		"/opt/cni/bin", "/usr/libexec/cni", "/etc/cni/net.d",
 		"/etc/kubernetes",
+		"/root/.eggo",
 	}
 )
 
