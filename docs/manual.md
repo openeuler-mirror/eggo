@@ -36,9 +36,8 @@ $ tree
 .
 ├── bin
 ├── dir
-│   └── addons
-│       └── calico.yaml
 ├── file
+│   └── calico.yaml
 ├── image
 │   └── images.tar
 └── pkg
@@ -57,7 +56,7 @@ $ tree
     ├── libnetfilter_queue-1.0.5-1.oe1.aarch64.rpm
     └── socat-1.7.3.2-8.oe1.aarch64.rpm
 
-6 directories, 16 files
+5 directories, 16 files
 ```
 
 - 离线部署包的目录结构与集群配置config中的package的类型对应，package类型共有pkg/repo/bin/file/dir/image/yaml/shell八种

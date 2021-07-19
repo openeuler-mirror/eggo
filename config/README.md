@@ -25,15 +25,14 @@ config其他详细的配置请参见eggo操作手册
 ```
 $ tree /root/pacakges
 /root/pacakges
-├── dir
-│   └── addons
-│       └── calico.yaml
+├── file
+│   └── calico.yaml
 ├── image
 │   └── images.tar
 └── pkg
     └── coredns-1.7.0-1.0.oe1.aarch64.rpm
 
-4 directories, 3 files
+3 directories, 3 files
 ```
 
 其中images.tar为集群部署中使用到的镜像，包含
