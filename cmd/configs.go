@@ -49,68 +49,29 @@ var (
 	}
 )
 
-type ConfigExtraArgs struct {
-	Name      string            `yaml:"name"`
-	ExtraArgs map[string]string `yaml:"extra-args"`
+func ToEggoPackageConfig(pcs []*PackageConfig) []*api.PackageConfig {
+	res := make([]*api.PackageConfig, len(pcs))
+	for _, pc := range pcs {
+		res = append(res, &api.PackageConfig{
+			Name:     pc.Name,
+			Type:     pc.Type,
+			Dst:      pc.Dst,
+			Schedule: api.Schedule(pc.Schedule),
+			TimeOut:  pc.TimeOut,
+		})
+	}
+	return res
 }
 
-type InstallConfig struct {
-	PackageSrc       *api.PackageSrcConfig           `yaml:"package-source"`
-	KubernetesMaster []*api.PackageConfig            `yaml:"kubernetes-master"`
-	KubernetesWorker []*api.PackageConfig            `yaml:"kubernetes-worker"`
-	Network          []*api.PackageConfig            `yaml:"network"`
-	ETCD             []*api.PackageConfig            `yaml:"etcd"`
-	LoadBalance      []*api.PackageConfig            `yaml:"loadbalance"`
-	Container        []*api.PackageConfig            `yaml:"container"`
-	Image            []*api.PackageConfig            `yaml:"image"`
-	Addition         map[string][]*api.PackageConfig `yaml:"addition"` // key: master, worker, etcd, loadbalance
-}
-
-type HostConfig struct {
-	Name string `yaml:"name"`
-	Ip   string `yaml:"ip"`
-	Port int    `yaml:"port"`
-	Arch string `yaml:"arch"` // amd64, aarch64, default amd64
-}
-
-type LoadBalance struct {
-	Name     string `yaml:"name"`
-	Ip       string `yaml:"ip"`
-	Port     int    `yaml:"port"`
-	Arch     string `yaml:"arch"` // amd64, aarch64, default amd64
-	BindPort int    `yaml:"bind-port"`
-}
-
-type deployConfig struct {
-	ClusterID          string                      `yaml:"cluster-id"`
-	Username           string                      `yaml:"username"`
-	Password           string                      `yaml:"password"`
-	PrivateKeyPath     string                      `yaml:"private-key-path"`
-	Masters            []*HostConfig               `yaml:"masters"`
-	Workers            []*HostConfig               `yaml:"workers"`
-	Etcds              []*HostConfig               `yaml:"etcds"`
-	LoadBalance        LoadBalance                 `yaml:"loadbalance"`
-	ExternalCA         bool                        `yaml:"external-ca"`
-	ExternalCAPath     string                      `yaml:"external-ca-path"`
-	Service            api.ServiceClusterConfig    `yaml:"service"`
-	NetWork            api.NetworkConfig           `yaml:"network"`
-	ApiServerEndpoint  string                      `yaml:"apiserver-endpoint"`
-	ApiServerCertSans  api.Sans                    `yaml:"apiserver-cert-sans"`
-	ApiServerTimeout   string                      `yaml:"apiserver-timeout"`
-	EtcdExternal       bool                        `yaml:"etcd-external"`
-	EtcdToken          string                      `yaml:"etcd-token"`
-	DnsVip             string                      `yaml:"dns-vip"`
-	DnsDomain          string                      `yaml:"dns-domain"`
-	PauseImage         string                      `yaml:"pause-image"`
-	NetworkPlugin      string                      `yaml:"network-plugin"`
-	CniBinDir          string                      `yaml:"cni-bin-dir"`
-	Runtime            string                      `yaml:"runtime"`
-	RuntimeEndpoint    string                      `yaml:"runtime-endpoint"`
-	RegistryMirrors    []string                    `yaml:"registry-mirrors"`
-	InsecureRegistries []string                    `yaml:"insecure-registries"`
-	ConfigExtraArgs    []*ConfigExtraArgs          `yaml:"config-extra-args"`
-	OpenPorts          map[string][]*api.OpenPorts `yaml:"open-ports"` // key: master, worker, etcd, loadbalance
-	InstallConfig      InstallConfig               `yaml:"install"`
+func ToEggoOpenPort(ports []*OpenPorts) []*api.OpenPorts {
+	res := make([]*api.OpenPorts, len(ports))
+	for _, pc := range ports {
+		res = append(res, &api.OpenPorts{
+			Port:     pc.Port,
+			Protocol: pc.Protocol,
+		})
+	}
+	return res
 }
 
 func init() {
@@ -300,13 +261,13 @@ func fillPackageConfig(ccfg *api.ClusterConfig, icfg *InstallConfig) {
 		role uint16
 		dpc  []*api.PackageConfig
 	}{
-		{icfg.LoadBalance, api.LoadBalance, infra.LoadbalancePackages},
-		{icfg.Container, api.Worker, infra.ContainerPackages},
-		{icfg.Image, api.Worker, []*api.PackageConfig{}},
-		{icfg.Network, api.Worker, infra.NetworkPackages},
-		{icfg.ETCD, api.ETCD, infra.EtcdPackages},
-		{icfg.KubernetesMaster, api.Master, infra.MasterPackages},
-		{icfg.KubernetesWorker, api.Worker, infra.WorkerPackages},
+		{ToEggoPackageConfig(icfg.LoadBalance), api.LoadBalance, infra.LoadbalancePackages},
+		{ToEggoPackageConfig(icfg.Container), api.Worker, infra.ContainerPackages},
+		{ToEggoPackageConfig(icfg.Image), api.Worker, []*api.PackageConfig{}},
+		{ToEggoPackageConfig(icfg.Network), api.Worker, infra.NetworkPackages},
+		{ToEggoPackageConfig(icfg.ETCD), api.ETCD, infra.EtcdPackages},
+		{ToEggoPackageConfig(icfg.KubernetesMaster), api.Master, infra.MasterPackages},
+		{ToEggoPackageConfig(icfg.KubernetesWorker), api.Worker, infra.WorkerPackages},
 	}
 
 	for _, s := range software {
@@ -324,11 +285,11 @@ func fillPackageConfig(ccfg *api.ClusterConfig, icfg *InstallConfig) {
 			continue
 		}
 
-		ccfg.RoleInfra[role].Softwares = appendSoftware(ccfg.RoleInfra[role].Softwares, p, []*api.PackageConfig{})
+		ccfg.RoleInfra[role].Softwares = appendSoftware(ccfg.RoleInfra[role].Softwares, ToEggoPackageConfig(p), []*api.PackageConfig{})
 	}
 }
 
-func fillOpenPort(ccfg *api.ClusterConfig, openports map[string][]*api.OpenPorts, dnsType string) {
+func fillOpenPort(ccfg *api.ClusterConfig, openports map[string][]*OpenPorts, dnsType string) {
 	// key: master, worker, etcd, loadbalance
 	for t, p := range openports {
 		role, ok := toTypeInt[t]
@@ -337,7 +298,7 @@ func fillOpenPort(ccfg *api.ClusterConfig, openports map[string][]*api.OpenPorts
 			continue
 		}
 
-		ccfg.RoleInfra[role].OpenPorts = append(ccfg.RoleInfra[role].OpenPorts, p...)
+		ccfg.RoleInfra[role].OpenPorts = append(ccfg.RoleInfra[role].OpenPorts, ToEggoOpenPort(p)...)
 	}
 
 	if dnsType == "binary" || dnsType == "" {
@@ -782,21 +743,21 @@ func createDeployConfigTemplate(file string) error {
 		LoadBalance:    lb,
 		ExternalCA:     false,
 		ExternalCAPath: "/opt/externalca",
-		Service: api.ServiceClusterConfig{
+		Service: ServiceClusterConfig{
 			CIDR:    "10.32.0.0/16",
 			DNSAddr: "10.32.0.10",
 			Gateway: "10.32.0.1",
-			DNS: api.DnsConfig{
+			DNS: DnsConfig{
 				CorednsType: "binary",
 			},
 		},
-		NetWork: api.NetworkConfig{
+		NetWork: NetworkConfig{
 			PodCIDR:    "10.244.0.0/16",
 			Plugin:     "calico",
 			PluginArgs: make(map[string]string),
 		},
 		ApiServerEndpoint: fmt.Sprintf("%s:%d", lb.Ip, lb.BindPort),
-		ApiServerCertSans: api.Sans{},
+		ApiServerCertSans: Sans{},
 		ApiServerTimeout:  "120s",
 		EtcdExternal:      false,
 		EtcdToken:         "etcd-cluster",
@@ -807,45 +768,45 @@ func createDeployConfigTemplate(file string) error {
 		CniBinDir:         "/usr/libexec/cni,/opt/cni/bin",
 		Runtime:           "iSulad",
 		RuntimeEndpoint:   "unix:///var/run/isulad.sock",
-		OpenPorts: map[string][]*api.OpenPorts{
+		OpenPorts: map[string][]*OpenPorts{
 			"worker": {
-				&api.OpenPorts{
+				&OpenPorts{
 					Port:     111,
 					Protocol: "tcp",
 				},
-				&api.OpenPorts{
+				&OpenPorts{
 					Port:     179,
 					Protocol: "tcp",
 				},
 			},
 			"master": {
-				&api.OpenPorts{
+				&OpenPorts{
 					Port:     53,
 					Protocol: "tcp",
 				},
-				&api.OpenPorts{
+				&OpenPorts{
 					Port:     53,
 					Protocol: "udp",
 				},
-				&api.OpenPorts{
+				&OpenPorts{
 					Port:     9153,
 					Protocol: "tcp",
 				},
 			},
 		},
 		InstallConfig: InstallConfig{
-			PackageSrc: &api.PackageSrcConfig{
+			PackageSrc: &PackageSrcConfig{
 				Type:   "tar.gz",
 				ArmSrc: "/root/packages/pacakges-arm.tar.gz",
 				X86Src: "/root/packages/packages-x86.tar.gz",
 			},
-			KubernetesMaster: []*api.PackageConfig{
+			KubernetesMaster: []*PackageConfig{
 				{
 					Name: "kubernetes-client,kubernetes-master",
 					Type: "pkg",
 				},
 			},
-			KubernetesWorker: []*api.PackageConfig{
+			KubernetesWorker: []*PackageConfig{
 				{
 					Name: "docker-engine,kubernetes-client,kubernetes-node,kubernetes-kubelet",
 					Type: "pkg",
@@ -855,7 +816,7 @@ func createDeployConfigTemplate(file string) error {
 					Type: "pkg",
 				},
 			},
-			Container: []*api.PackageConfig{
+			Container: []*PackageConfig{
 				{
 					Name: "emacs-filesystem,gflags,gpm-libs,re2,rsync,vim-filesystem,vim-common,vim-enhanced,zlib-devel",
 					Type: "pkg",
@@ -869,19 +830,19 @@ func createDeployConfigTemplate(file string) error {
 					Type: "pkg",
 				},
 			},
-			Network: []*api.PackageConfig{
+			Network: []*PackageConfig{
 				{
 					Name: "containernetworking-plugins",
 					Type: "pkg",
 				},
 			},
-			ETCD: []*api.PackageConfig{
+			ETCD: []*PackageConfig{
 				{
 					Name: "etcd",
 					Type: "pkg",
 				},
 			},
-			LoadBalance: []*api.PackageConfig{
+			LoadBalance: []*PackageConfig{
 				{
 					Name: "gd,gperftools-libs,libunwind,libwebp,libxslt",
 					Type: "pkg",
@@ -891,13 +852,13 @@ func createDeployConfigTemplate(file string) error {
 					Type: "pkg",
 				},
 			},
-			Image: []*api.PackageConfig{
+			Image: []*PackageConfig{
 				{
 					Name: "pause.tar",
 					Type: "image",
 				},
 			},
-			Addition: map[string][]*api.PackageConfig{
+			Addition: map[string][]*PackageConfig{
 				"master": {
 					{
 						Name:     "prejoin.sh",
