@@ -37,7 +37,9 @@ import (
 )
 
 var (
-	pmd *packageMD5 = &packageMD5{}
+	pmd *packageMD5 = &packageMD5{
+		MD5s: make(map[string]string),
+	}
 )
 
 type SetupInfraTask struct {
@@ -166,14 +168,15 @@ func copyPackage(r runner.Runner, hcg *api.HostConfig, pcfg *api.PackageSrcConfi
 	}
 
 	// 1. calculate package MD5
-	if err := pmd.getMD5(src); err != nil {
+	md5, err := pmd.getMD5(src)
+	if err != nil {
 		return fmt.Errorf("get MD5 failed: %v", err)
 	}
 
 	// 2. package exist on remote host
 	file, dstDir := filepath.Base(src), pcfg.GetPkgDstPath()
 	dstPath := filepath.Join(dstDir, file)
-	if pmd.checkMD5(r, dstPath) {
+	if checkMD5(r, md5, dstPath) {
 		logrus.Warnf("package already exist on remote host")
 		return nil
 	}
@@ -187,7 +190,7 @@ func copyPackage(r runner.Runner, hcg *api.HostConfig, pcfg *api.PackageSrcConfi
 	}
 
 	// 4. check package MD5
-	if !pmd.checkMD5(r, dstPath) {
+	if !checkMD5(r, md5, dstPath) {
 		return fmt.Errorf("%s MD5 has changed after copy, maybe it is corrupted", file)
 	}
 
@@ -218,6 +221,17 @@ func setHostname(r runner.Runner, hcg *api.HostConfig) error {
 	}
 
 	return nil
+}
+
+func checkMD5(r runner.Runner, md5, path string) bool {
+	output, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"md5sum %s | awk '{print \\$1}'\"", path))
+	if err != nil {
+		logrus.Warnf("get %s MD5 failed: %v", path, err)
+		return false
+	}
+
+	logrus.Debugf("package MD5 value: local %s, remote: %s", md5, output)
+	return md5 == output
 }
 
 func NodeInfrastructureSetup(config *api.ClusterConfig, nodeID string, role uint16) error {
@@ -362,48 +376,33 @@ func NodeInfrastructureDestroy(config *api.ClusterConfig, hostconfig *api.HostCo
 }
 
 type packageMD5 struct {
-	MD5  string
+	MD5s map[string]string
 	Lock sync.RWMutex
 }
 
-func (pm *packageMD5) getMD5(path string) error {
+func (pm *packageMD5) getMD5(path string) (string, error) {
 	pm.Lock.RLock()
-	md5str := pm.MD5
-	pm.Lock.RUnlock()
+	defer func() {
+		pm.Lock.RUnlock()
+	}()
 
-	if md5str != "" {
-		return nil
+	md5str, ok := pm.MD5s[path]
+	if ok {
+		return md5str, nil
 	}
 
 	f, err := os.Open(path)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer f.Close()
 
 	h := md5.New()
 	if _, err := io.Copy(h, f); err != nil {
-		return err
+		return "", err
 	}
+	md5str = fmt.Sprintf("%x", h.Sum(nil))
+	pm.MD5s[path] = md5str
 
-	pm.Lock.Lock()
-	pm.MD5 = fmt.Sprintf("%x", h.Sum(nil))
-	pm.Lock.Unlock()
-
-	return nil
-}
-
-func (pm *packageMD5) checkMD5(r runner.Runner, path string) bool {
-	pm.Lock.RLock()
-	md5str := pm.MD5
-	pm.Lock.RUnlock()
-
-	output, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"md5sum %s | awk '{print \\$1}'\"", path))
-	if err != nil {
-		logrus.Warnf("get %s MD5 failed: %v", path, err)
-		return false
-	}
-
-	logrus.Debugf("package MD5 value: local %s, remote: %s", md5str, output)
-	return md5str == output
+	return md5str, nil
 }
