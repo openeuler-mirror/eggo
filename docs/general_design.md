@@ -26,7 +26,7 @@ Eggo支持三种部署方式：
 
 ### 部署组件
 
-EggoDeploy组件交互关系图
+Eggo组件交互关系图
 
 ![detailed_design_1](./imgs/detailed_design_1.png)
 
