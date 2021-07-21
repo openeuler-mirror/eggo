@@ -4,26 +4,22 @@
 
 ```mermaid
 flowchart LR
-	A[command client] --> tasksList
-	subgraph tasksList
-	BA[infrastructure task]
-	BA --> BB[first control plane task]
-	BB --> BC[worker or other control node task]
-	BC -->|current| BD(worker1)
-	BC -->|current| BE(worker...)
-	BC -->|current| BF(workerN)
+	A(client) --> AA[[eggo]]
+	subgraph steps
+        BA[infrastructure]
+        BA --> BB[etcd]
+        BB --> BC[control plane]
+        BC --> BD[join]
 	end
-	tasksList --> C[[EggoDeploy module]]
-	subgraph manager-cluster
-	DA[infrastructure controller]
-	DB[control-plane controller]
-	DC[bootstrap controller]
-	end
-	manager-cluster --> C
-	gitops --> E(operator)
-	E --> manager-cluster
-	F[cluster api] --> manager-cluster
-	
+	AA --> steps
+	steps --> CA[binary implement]
+	steps --> CB[pod implement]
+	D(gitops) --> EA[CRD-1]
+	F(cluster api) --> EB[CRD-2]
+	EA & EB --> H[job]
+	H --> AA
+	classDef interfacestyle fill:#b1f,stroke:#f66,stroke-width:1px,color:#fff,stroke-dasharray:5 5
+	class A,D,F interfacestyle
 ```
 
 Eggo支持三种部署方式：
@@ -36,7 +32,7 @@ Eggo支持三种部署方式：
 
 ```mermaid
 graph TD
-	A[(configs)] --> B{{EggoDeploy}}
+	A[(configs)] --> B{{Eggo}}
 	B --> C(intreface)
 	C --> D[pod方式]
 	C --> E[二进制方式]
@@ -67,12 +63,12 @@ graph TD
 
 ### 部署组件
 
-EggoDeploy组件交互关系图
+Eggo组件交互关系图
 
 ```mermaid
 sequenceDiagram
 	participant A as client
-	participant B as EggoDeploy
+	participant B as Eggo
 	participant C as kubeadm
 	participant D as binaryadm
 	A ->>+ B: call (infra/etcd/control/bootstrap..)
@@ -91,9 +87,8 @@ sequenceDiagram
 
 ```mermaid
 graph TD
-	A[preflight check] --> B[download dependences]
+	A[preflight check] --> B[copy dependences]
 	B --> C[install dependences]
-	C --> D[config environment]
 ```
 
 #### etcd集群流程
@@ -110,13 +105,13 @@ graph TD
 
 ```mermaid
 graph TD
-	O[preflight check] --> A[download dependces]
-	A --> B[install dependces]
-	B --> C[generate certs]
-	C --> D[generate kubeconfigs]
-	D --> E[upload certs and kubeconfigs]
-	E --> F[run services of K8S]
-	F --> G[apply addons]
+	O[preflight check] --> A[create encryption]
+	A --> B[generate ca]
+	B --> C[generate kubeconfigs]
+	C --> D[save above files]
+	D --> E[copy ca to master]
+	E --> F[run services of master k8s]
+	F --> G[apply admin role]
 ```
 
 #### bootstrap流程
@@ -166,13 +161,15 @@ sequenceDiagram
 		par [push task to nodeA]
 		A ->> B: push task
 		B ->> D: use connection run command
-		D -->> B: return
-		B -->> A: add label to task
+		D -->>+ B: return
+		Note Left of B: update status of nodeA
+		B -->>- A: add label to task
 		and [push task to nodeB]
 		A ->> C: push task
 		C ->> E: use connection run command
-		E -->> C: return
-		C -->> A: add label to task
+		E -->>+ C: return
+		Note Left of C: update status of nodeB
+		C -->>- A: add label to task
 		end
 		A -->> A: wait task on nodes success
 	end
