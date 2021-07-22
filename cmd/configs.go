@@ -119,9 +119,7 @@ func fillEtcdsIfNotExist(cc *deployConfig) {
 		return
 	}
 
-	for _, h := range cc.Masters {
-		cc.Etcds = append(cc.Etcds, h)
-	}
+	cc.Etcds = append(cc.Etcds, cc.Masters...)
 }
 
 func loadDeployConfig(file string) (*deployConfig, error) {
@@ -234,6 +232,9 @@ func appendSoftware(software, packageConfig, defaultPackage []*api.PackageConfig
 
 	result := software
 	for _, p := range packages {
+		if p == nil {
+			continue
+		}
 		splitSoftware := strings.Split(p.Name, ",")
 		for _, s := range splitSoftware {
 			result = append(result, &api.PackageConfig{

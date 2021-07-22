@@ -149,7 +149,7 @@ func (dr *dockerRuntime) PrepareRuntimeJson(r runner.Runner, WorkerConfig *api.W
 
 	var sb strings.Builder
 	jsonBase64 := base64.StdEncoding.EncodeToString([]byte(json))
-	sb.WriteString(fmt.Sprintf("sudo -E /bin/sh -c \"echo %s | base64 -d > %s\"", jsonBase64, "/etc/docker/daemon.json"))
+	sb.WriteString(fmt.Sprintf("sudo -E /bin/sh -c \"mkdir -p /etc/docker && echo %s | base64 -d > %s\"", jsonBase64, "/etc/docker/daemon.json"))
 	_, err = r.RunCommand(sb.String())
 	if err != nil {
 		return err
