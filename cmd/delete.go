@@ -18,26 +18,57 @@ package main
 import (
 	"fmt"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment"
-	"isula.org/eggo/pkg/utils"
 )
 
-func getDelType(hostconfig *api.HostConfig) string {
-	var delType string
-	if utils.IsType(hostconfig.Type, api.Master) {
-		delType = "master"
-	}
-	if utils.IsType(hostconfig.Type, api.Worker) {
-		if delType != "" {
-			delType += ","
+func splitDeletedConfigs(hosts []*HostConfig, delNames []string) ([]*HostConfig, []*HostConfig) {
+	var diff []*HostConfig
+	var deleted []*HostConfig
+	for _, h := range hosts {
+		found := false
+		for _, delName := range delNames {
+			if delName == h.Name || delName == h.Ip {
+				found = true
+				break
+			}
 		}
-		delType += "worker"
+
+		if found {
+			diff = append(diff, h)
+		} else {
+			deleted = append(deleted, h)
+		}
 	}
-	return delType
+
+	return diff, deleted
+}
+
+func getDeletedAndDiffConfigs(conf *deployConfig, delNames []string) (*deployConfig, []*api.HostConfig, error) {
+	if len(conf.Masters) == 0 {
+		return nil, nil, fmt.Errorf("invalid cluster config, no master found")
+	}
+
+	deletedConfig := *conf
+	deletedConfig.Masters, deletedConfig.Workers, deletedConfig.Etcds = nil, nil, nil
+	diffConfig := *conf
+	diffConfig.Masters, diffConfig.Workers, diffConfig.Etcds, diffConfig.LoadBalance = nil, nil, nil, LoadBalance{}
+	diffConfig.Masters, deletedConfig.Masters = splitDeletedConfigs(conf.Masters, delNames)
+	diffConfig.Etcds, deletedConfig.Etcds = splitDeletedConfigs(conf.Etcds, delNames)
+	diffConfig.Workers, deletedConfig.Workers = splitDeletedConfigs(conf.Workers, delNames)
+
+	if len(deletedConfig.Masters) == 0 || conf.Masters[0].Ip != deletedConfig.Masters[0].Ip {
+		return nil, nil, fmt.Errorf("forbidden to delete first master")
+	}
+
+	clusterConfig := toClusterdeploymentConfig(&diffConfig)
+	if len(clusterConfig.Nodes) == 0 {
+		return nil, nil, fmt.Errorf("no valid ip or name found")
+	}
+
+	return &deletedConfig, clusterConfig.Nodes, nil
 }
 
 func deleteCluster(cmd *cobra.Command, args []string) error {
@@ -45,17 +76,13 @@ func deleteCluster(cmd *cobra.Command, args []string) error {
 		initLog()
 	}
 
-	// TODO: support delete multi-nodes at one time
-	if len(args) != 1 {
-		return fmt.Errorf("delete command need exactly one argument")
+	if len(args) == 0 {
+		return fmt.Errorf("delete command need at least one argument")
 	}
 
 	if opts.delClusterID == "" {
 		return fmt.Errorf("please specify cluster id")
 	}
-
-	// support delete master and worker at one time only currently
-	opts.delName = args[0]
 
 	conf, err := loadDeployConfig(savedDeployConfigPath(opts.delClusterID))
 	if err != nil {
@@ -63,32 +90,16 @@ func deleteCluster(cmd *cobra.Command, args []string) error {
 	}
 	// TODO: make sure config valid
 
-	clusterConfig := toClusterdeploymentConfig(conf)
-	h := getHostConfigByName(clusterConfig.Nodes, opts.delName)
-	if h == nil {
-		return fmt.Errorf("cannot found host by %v in %v", opts.delName, opts.delClusterID)
+	deletedConfig, diffHostconfigs, err := getDeletedAndDiffConfigs(conf, args)
+	if err != nil {
+		return fmt.Errorf("get deleted and diff config failed: %v", err)
 	}
 
-	delType := getDelType(h)
-	if delType == "" {
-		logrus.Errorf("no master or worker found by %v in %v, ignore delete", opts.delName, opts.delClusterID)
-		return nil
-	}
-
-	_, diffHostconfig, err := joinConfig(conf, delType, &HostConfig{Ip: h.Address})
-	if diffHostconfig == nil || err != nil {
-		return fmt.Errorf("get diff config failed: %v", err)
-	}
-
-	if err = clusterdeployment.DeleteNode(toClusterdeploymentConfig(conf), diffHostconfig); err != nil {
+	if err = clusterdeployment.DeleteNodes(toClusterdeploymentConfig(conf), diffHostconfigs); err != nil {
 		return err
 	}
 
-	if err = deleteConfig(conf, delType, opts.delName); err != nil {
-		return fmt.Errorf("delete config from userconfig failed")
-	}
-
-	if err = saveDeployConfig(conf, savedDeployConfigPath(opts.delClusterID)); err != nil {
+	if err = saveDeployConfig(deletedConfig, savedDeployConfigPath(opts.delClusterID)); err != nil {
 		return err
 	}
 
@@ -97,8 +108,8 @@ func deleteCluster(cmd *cobra.Command, args []string) error {
 
 func NewDeleteCmd() *cobra.Command {
 	deleteCmd := &cobra.Command{
-		Use:   "delete NAME",
-		Short: "delete the master and worker from cluster",
+		Use:   "delete NAME [NAME...]",
+		Short: "delete nodes from cluster",
 		RunE:  deleteCluster,
 	}
 

@@ -76,6 +76,7 @@ func umountKubeletSubDirs(r runner.Runner, kubeletDir string) error {
 func getWorkerPathes(r runner.Runner, ccfg *api.ClusterConfig) []string {
 	pathes := []string{
 		filepath.Join(ccfg.GetConfigDir(), "kubelet"),
+		filepath.Join(ccfg.GetConfigDir(), "kubelet.conf"),
 		filepath.Join(ccfg.GetConfigDir(), "kubelet-bootstrap.kubeconfig"),
 		filepath.Join(ccfg.GetConfigDir(), "kubelet_config.yaml"),
 		filepath.Join(ccfg.GetConfigDir(), "kubelet.kubeconfig"),
