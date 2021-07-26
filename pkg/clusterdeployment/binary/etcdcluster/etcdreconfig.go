@@ -29,8 +29,10 @@ import (
 )
 
 type EtcdEtcdReconfigTask struct {
-	ccfg         *api.ClusterConfig
-	reconfigType string
+	ccfg           *api.ClusterConfig
+	reconfigType   string
+	reconfigHost   *api.HostConfig
+	initialCluster string
 }
 
 func (t *EtcdEtcdReconfigTask) Name() string {
@@ -46,73 +48,106 @@ func getEtcdIDByName(etcds []*etcdMember, name string) string {
 	return ""
 }
 
+func getInitalCluster(output string) (string, error) {
+	lines := strings.Split(output, "\n")
+
+	for _, line := range lines {
+		if strings.HasPrefix(line, "ETCD_INITIAL_CLUSTER=") {
+			result := strings.TrimSuffix(strings.TrimPrefix(line, "ETCD_INITIAL_CLUSTER="), "\r")
+			if result == "" {
+				return "", fmt.Errorf("found null initial cluster from output failed: %v", output)
+			}
+			return result, nil
+		}
+	}
+
+	return "", fmt.Errorf("error found initial cluster from output: %v", output)
+}
+
 func (t *EtcdEtcdReconfigTask) Run(r runner.Runner, hostConfig *api.HostConfig) error {
 	if hostConfig == nil {
 		return fmt.Errorf("empty host config")
 	}
 
-	etcds := getEtcdMembers(t.ccfg.GetCertDir(), r)
-	if etcds == nil {
-		return fmt.Errorf("get etcds failed")
-	}
+	if t.reconfigType == "remove" {
+		etcds := getEtcdMembers(t.ccfg.GetCertDir(), r)
+		if etcds == nil {
+			return fmt.Errorf("get etcds failed")
+		}
 
-	id := getEtcdIDByName(etcds, hostConfig.Name)
-	if id == "" {
-		return fmt.Errorf("get etcd id to remove failed")
-	}
+		id := getEtcdIDByName(etcds, t.reconfigHost.Name)
+		if id == "" {
+			// no need to delete if the etcd not exist
+			return nil
+		}
 
-	if t.reconfigType == "delete" {
 		if err := removeEtcd(r, t.ccfg.GetCertDir(), id); err != nil {
 			return err
 		}
 	}
 	if t.reconfigType == "add" {
-		// TODO
+		output, err := addEtcd(r, t.ccfg.GetCertDir(), t.reconfigHost.Name, t.reconfigHost.Address)
+		if err != nil {
+			return err
+		}
+
+		var initialCluster string
+		initialCluster, err = getInitalCluster(output)
+		if err != nil {
+			return err
+		}
+
+		t.initialCluster = initialCluster
 	}
 
 	return nil
 }
 
-func etcdReconfig(conf *api.ClusterConfig, hostconfig *api.HostConfig, reconfigType string) error {
+func etcdReconfig(conf *api.ClusterConfig, hostconfig *api.HostConfig, reconfigType string) (string, error) {
 	if len(conf.EtcdCluster.Nodes) == 0 {
-		return fmt.Errorf("invalid null etcd node")
+		return "", fmt.Errorf("invalid null etcd node")
 	}
 
 	// only one etcd member found, no need to notify etcd cluster to delete
-	if len(conf.EtcdCluster.Nodes) == 1 && reconfigType == "delete" {
-		return nil
+	if len(conf.EtcdCluster.Nodes) == 1 && reconfigType == "remove" {
+		return "", nil
 	}
 
-	taskEtcdReconfig := task.NewTaskInstance(
-		&EtcdEtcdReconfigTask{
-			ccfg:         conf,
-			reconfigType: reconfigType,
-		},
-	)
+	t := &EtcdEtcdReconfigTask{
+		ccfg:         conf,
+		reconfigType: reconfigType,
+		reconfigHost: hostconfig,
+	}
+	taskEtcdReconfig := task.NewTaskInstance(t)
 
-	nodes := []string{hostconfig.Address}
+	nodes := []string{conf.EtcdCluster.Nodes[0].Address}
 	if err := nodemanager.RunTaskOnNodes(taskEtcdReconfig, nodes); err != nil {
-		return fmt.Errorf("run task on nodes failed: %v", err)
+		return "", fmt.Errorf("run task on nodes failed: %v", err)
 	}
 
-	return nil
+	if err := nodemanager.WaitNodesFinish(nodes, time.Minute); err != nil {
+		return "", fmt.Errorf("wait for etcd reconfig task finish failed: %v", err)
+	}
+
+	return t.initialCluster, nil
 }
 
 func ExecRemoveMemberTask(conf *api.ClusterConfig, hostconfig *api.HostConfig) error {
 	if !conf.EtcdCluster.External {
-		return etcdReconfig(conf, hostconfig, "remove")
+		_, ret := etcdReconfig(conf, hostconfig, "remove")
+		return ret
 	} else {
 		logrus.Info("external etcd, ignore remove etcds")
 		return nil
 	}
 }
 
-func ExecAddMemberTask(conf *api.ClusterConfig, hostconfig *api.HostConfig) error {
+func ExecAddMemberTask(conf *api.ClusterConfig, hostconfig *api.HostConfig) (string, error) {
 	if !conf.EtcdCluster.External {
 		return etcdReconfig(conf, hostconfig, "add")
 	} else {
 		logrus.Info("external etcd, ignore add etcds")
-		return nil
+		return "", nil
 	}
 }
 
@@ -173,11 +208,31 @@ func getEtcdCertsOpts(certsPath string) string {
 func removeEtcd(r runner.Runner, certDir string, id string) error {
 	cmd := fmt.Sprintf("ETCDCTL_API=3 etcdctl %v member remove %v",
 		getEtcdCertsOpts(certDir), id)
+	logrus.Debugf("remove etcd command: %v", cmd)
 	if output, err := r.RunCommand(utils.AddSudo(cmd)); err != nil {
 		logrus.Errorf("remove etcd %v failed: %v\noutput: %v", id, err, output)
 		return err
 	}
 	return nil
+}
+
+func addEtcd(r runner.Runner, certDir string, name string, ip string) (string, error) {
+	cmd := fmt.Sprintf("ETCDCTL_API=3 etcdctl %v member add %v --peer-urls=https://%v:2380",
+		getEtcdCertsOpts(certDir), name, ip)
+	logrus.Debugf("add etcd command: %v", cmd)
+
+	var err error
+	var output string
+	retry := 10
+	for retry != 0 {
+		if output, err = r.RunCommand(utils.AddSudo(cmd)); err == nil {
+			return output, nil
+		}
+		retry--
+		time.Sleep(3 * time.Second)
+	}
+	logrus.Errorf("add etcd %v failed: %v\noutput: %v", name, err, output)
+	return "", err
 }
 
 func (t *removeEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfig) error {
@@ -207,7 +262,7 @@ func execRemoveEtcdsTask(conf *api.ClusterConfig, node string) error {
 		return err
 	}
 
-	if err := nodemanager.WaitNodesFinish([]string{node}, time.Minute*5); err != nil {
+	if err := nodemanager.WaitNodesFinish([]string{node}, time.Minute*2); err != nil {
 		logrus.Warnf("wait remove etcds task finish failed: %v", err)
 		return err
 	}

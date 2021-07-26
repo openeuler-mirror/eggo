@@ -18,6 +18,7 @@ package clusterdeployment
 import (
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -254,6 +255,14 @@ func doJoinNode(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, hostcon
 		return err
 	}
 
+	// join etcd to cluster
+	if utils.IsType(hostconfig.Type, api.ETCD) {
+		if err := handler.EtcdNodeSetup(hostconfig); err != nil {
+			logrus.Errorf("add etcd %s failed: %v", hostconfig.Name, err)
+			return err
+		}
+	}
+
 	// join node to cluster
 	if err := handler.ClusterNodeJoin(hostconfig); err != nil {
 		return err
@@ -272,7 +281,7 @@ func doJoinNode(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, hostcon
 	return nil
 }
 
-func JoinNode(cc *api.ClusterConfig, hostconfig *api.HostConfig) error {
+func JoinNodes(cc *api.ClusterConfig, hostconfigs []*api.HostConfig) error {
 	if cc == nil {
 		return fmt.Errorf("[cluster] cluster config is required")
 	}
@@ -289,15 +298,43 @@ func JoinNode(cc *api.ClusterConfig, hostconfig *api.HostConfig) error {
 	}
 	defer handler.Finish()
 
-	if err := doJoinNode(handler, cc, hostconfig); err != nil {
-		logrus.Errorf("join node failed: %v", err)
-		if err1 := doDeleteNode(handler, cc, hostconfig); err1 != nil {
-			logrus.Errorf("try cleanup node failed when join node failed: %v", err1)
+	var withEtcd []*api.HostConfig
+	var withoutEtcd []*api.HostConfig
+	for _, h := range hostconfigs {
+		if utils.IsType(h.Type, api.ETCD) {
+			withEtcd = append(withEtcd, h)
+		} else {
+			withoutEtcd = append(withoutEtcd, h)
 		}
 	}
 
-	logrus.Infof("[cluster] join '%s' to cluster successed", cc.Name)
-	return nil
+	// join nodes with etcd
+	for _, h := range withEtcd {
+		if err := doJoinNode(handler, cc, h); err != nil {
+			logrus.Errorf("join node with etcd failed: %v", err)
+			return err
+		}
+		logrus.Infof("[cluster] join '%s' with etcd to cluster successed", cc.Name)
+	}
+
+	// join nodes without etcd
+	var result error
+	var wg sync.WaitGroup
+	wg.Add(len(withoutEtcd))
+	for _, h := range withoutEtcd {
+		go func(hostconfig *api.HostConfig) {
+			defer wg.Done()
+			if err := doJoinNode(handler, cc, hostconfig); err != nil {
+				// TODO: support part success
+				result = err
+				logrus.Infof("[cluster] join '%s' to cluster failed: %v", cc.Name, err)
+				return
+			}
+			logrus.Infof("[cluster] join '%s' to cluster successed", cc.Name)
+		}(h)
+	}
+	wg.Wait()
+	return result
 }
 
 func doDeleteNode(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, h *api.HostConfig) error {
@@ -318,7 +355,8 @@ func doDeleteNode(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, h *ap
 
 	if utils.IsType(h.Type, api.ETCD) {
 		if err := handler.EtcdNodeDestroy(h); err != nil {
-			return fmt.Errorf("delete etcd of node %s failed: %v", h.Name, err)
+			logrus.Errorf("delete etcd of node %s failed: %v", h.Name, err)
+			return err
 		}
 	}
 
@@ -337,7 +375,7 @@ func doDeleteNode(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, h *ap
 	return nil
 }
 
-func DeleteNode(cc *api.ClusterConfig, hostconfig *api.HostConfig) error {
+func DeleteNodes(cc *api.ClusterConfig, hostconfigs []*api.HostConfig) error {
 	if cc == nil {
 		return fmt.Errorf("[cluster] cluster config is required")
 	}
@@ -354,12 +392,41 @@ func DeleteNode(cc *api.ClusterConfig, hostconfig *api.HostConfig) error {
 	}
 	defer handler.Finish()
 
-	if err := doDeleteNode(handler, cc, hostconfig); err != nil {
-		return err
+	var nodes []*api.HostConfig
+	var etcds []*api.HostConfig
+	for _, h := range hostconfigs {
+		if utils.IsType(h.Type, api.ETCD) {
+			etcds = append(etcds, h)
+		} else {
+			nodes = append(nodes, h)
+		}
 	}
 
-	logrus.Infof("[cluster] delete node '%s' from cluster successed", cc.Name)
-	return nil
+	// delete masters and workers
+	var wg sync.WaitGroup
+	wg.Add(len(nodes))
+	for _, h := range nodes {
+		go func(hostconfig *api.HostConfig) {
+			defer wg.Done()
+			if err := doDeleteNode(handler, cc, hostconfig); err != nil {
+				logrus.Errorf("[cluster] delete '%s' from cluster failed", hostconfig.Name)
+				return
+			}
+			logrus.Infof("[cluster] delete '%s' from cluster successed", hostconfig.Name)
+		}(h)
+	}
+	wg.Wait()
+
+	// delete node with etcds
+	for _, h := range etcds {
+		if err := doDeleteNode(handler, cc, h); err != nil {
+			logrus.Errorf("[cluster] delete '%s' with etcd from cluster failed", h.Name)
+			return err
+		}
+		logrus.Infof("[cluster] delete '%s' with etcd from cluster successed", h.Name)
+	}
+
+	return err
 }
 
 func doRemoveCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig) {

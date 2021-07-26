@@ -239,14 +239,19 @@ func (bcp *BinaryClusterDeployment) EtcdClusterDestroy() error {
 }
 
 func (bcp *BinaryClusterDeployment) EtcdNodeSetup(machine *api.HostConfig) error {
-	// TODO: add implement
+	logrus.Info("do etcd node setup...")
+	if err := etcdcluster.AddMember(bcp.config, machine); err != nil {
+		return fmt.Errorf("etcd add member %v failed: %v", machine.Name, err)
+	}
+
+	logrus.Info("do etcd node setup done")
 	return nil
 }
 
 func (bcp *BinaryClusterDeployment) EtcdNodeDestroy(machine *api.HostConfig) error {
 	logrus.Info("do etcd node destroy...")
 	if err := cleanupcluster.CleanupEtcdMember(bcp.config, machine); err != nil {
-		return fmt.Errorf("cleanup etcd member %v failed", machine.Name)
+		return fmt.Errorf("cleanup etcd member %v failed: %v", machine.Name, err)
 	}
 
 	logrus.Info("do etcd node destroy done")
