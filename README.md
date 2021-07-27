@@ -11,7 +11,7 @@ Eggo项目旨在解决大规模生产环境K8S集群自动化部署问题、部�
 
 ```bash
 # 使能go mod
-$ go env -w GO111MODULE=on
+$ export GO111MODULE=on
 # 设置goproxy为国内代理，也可以设置为其他公司的代理
 $ go env -w GOPROXY=https://goproxy.cn,direct
 # 下载依赖库

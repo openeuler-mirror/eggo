@@ -10,7 +10,7 @@ Eggo is a tool built to provide standard multi-ways for creating Kubernetes clus
 
 ```bash
 # enable go mod
-$ go env -w GO111MODULE=on
+$ export GO111MODULE=on
 # set goproxy
 $ go env -w GOPROXY=https://goproxy.cn,direct
 # download dependences
