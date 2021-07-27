@@ -232,6 +232,16 @@ type EtcdAPI interface {
 
 type ClusterManagerAPI interface {
 	// TODO: should add other dependence cluster configurations
+	PreCreateClusterHooks() error
+	PostCreateClusterHooks() error
+	PreDeleteClusterHooks()
+	PostDeleteClusterHooks()
+
+	PreNodeJoinHooks(node *HostConfig) error
+	PostNodeJoinHooks(node *HostConfig) error
+	PreNodeCleanupHooks(node *HostConfig)
+	PostNodeCleanupHooks(node *HostConfig)
+
 	ClusterControlPlaneInit(node *HostConfig) error
 	ClusterNodeJoin(node *HostConfig) error
 	ClusterNodeCleanup(node *HostConfig, delType uint16) error

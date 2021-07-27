@@ -25,7 +25,6 @@ import (
 	_ "isula.org/eggo/pkg/clusterdeployment/binary"
 	"isula.org/eggo/pkg/clusterdeployment/manager"
 	"isula.org/eggo/pkg/utils"
-	"isula.org/eggo/pkg/utils/dependency"
 	"isula.org/eggo/pkg/utils/nodemanager"
 )
 
@@ -61,9 +60,8 @@ func doCreateCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig) er
 		}
 	}
 
-	// Step2: Hook SchedulePreJoin
-	role := []uint16{api.LoadBalance, api.ETCD, api.Master, api.Worker}
-	if err := dependency.HookSchedule(cc, cc.Nodes, role, api.SchedulePreJoin); err != nil {
+	// Step2: run precreate cluster hooks
+	if err := handler.PreCreateClusterHooks(); err != nil {
 		return err
 	}
 
@@ -94,20 +92,21 @@ func doCreateCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig) er
 			return err
 		}
 	}
-	//Step7: setup addons for cluster
 	// wait all nodes ready
 	if err := nodemanager.WaitNodesFinishWithProgress(joinNodeIDs, time.Minute*5); err != nil {
 		return err
 	}
 
+	//Step7: setup addons for cluster
 	if err := handler.AddonsSetup(); err != nil {
 		return err
 	}
 
-	// Step8: Hook SchedulePostJoin
-	if err := dependency.HookSchedule(cc, cc.Nodes, role, api.SchedulePostJoin); err != nil {
+	// Step8: run postcreate cluster hooks
+	if err := handler.PostCreateClusterHooks(); err != nil {
 		return err
 	}
+
 	allNodes := utils.GetAllIPs(cc.Nodes)
 	if err := nodemanager.WaitNodesFinishWithProgress(allNodes, time.Minute*5); err != nil {
 		return err
@@ -151,9 +150,8 @@ func doJoinNode(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, hostcon
 		return err
 	}
 
-	// Hook SchedulePreJoin
-	role := []uint16{api.Master, api.Worker, api.ETCD}
-	if err := dependency.HookSchedule(cc, []*api.HostConfig{hostconfig}, role, api.SchedulePreJoin); err != nil {
+	// Pre node join Hooks
+	if err := handler.PreNodeJoinHooks(hostconfig); err != nil {
 		return err
 	}
 
@@ -167,8 +165,8 @@ func doJoinNode(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, hostcon
 		return err
 	}
 
-	// Hook SchedulePostJoin
-	if err := dependency.HookSchedule(cc, []*api.HostConfig{hostconfig}, role, api.SchedulePostJoin); err != nil {
+	// Post node join Hooks
+	if err := handler.PostNodeJoinHooks(hostconfig); err != nil {
 		return err
 	}
 
@@ -223,11 +221,8 @@ func JoinNode(cc *api.ClusterConfig, hostconfig *api.HostConfig) error {
 }
 
 func doDeleteNode(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, h *api.HostConfig) error {
-	// Hook SchedulePreCleanup
-	role := []uint16{api.Worker, api.Master, api.ETCD}
-	if err := dependency.HookSchedule(cc, []*api.HostConfig{h}, role, api.SchedulePreCleanup); err != nil {
-		return err
-	}
+	// Pre node delete Hooks
+	handler.PreNodeCleanupHooks(h)
 
 	if utils.IsType(h.Type, api.Worker) {
 		if err := handler.ClusterNodeCleanup(h, api.Worker); err != nil {
@@ -247,10 +242,8 @@ func doDeleteNode(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, h *ap
 		}
 	}
 
-	// Hook SchedulePostCleanup
-	if err := dependency.HookSchedule(cc, []*api.HostConfig{h}, role, api.SchedulePostCleanup); err != nil {
-		return err
-	}
+	// Post node delete Hooks
+	handler.PostNodeCleanupHooks(h)
 
 	if err := handler.MachineInfraDestroy(h); err != nil {
 		logrus.Warnf("cleanup infrastructure for node: %s failed: %v", h.Name, err)
@@ -290,11 +283,8 @@ func DeleteNode(cc *api.ClusterConfig, hostconfig *api.HostConfig) error {
 }
 
 func doRemoveCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig) {
-	// Step1: Hook SchedulePreCleanup
-	role := []uint16{api.Worker, api.Master, api.ETCD, api.LoadBalance}
-	if err := dependency.HookSchedule(cc, cc.Nodes, role, api.SchedulePreCleanup); err != nil {
-		logrus.Errorf("Hook SchedulePreCleanup failed: %v", err)
-	}
+	// Step1: Pre delete cluster Hooks
+	handler.PreDeleteClusterHooks()
 
 	// Step2: cleanup addons
 	err := handler.AddonsDestroy()
@@ -344,10 +334,8 @@ func doRemoveCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig) {
 		logrus.Warnf("[cluster] cleanup etcd cluster failed: %v", err)
 	}
 
-	// Step7: Hook SchedulePostCleanup
-	if err := dependency.HookSchedule(cc, cc.Nodes, role, api.SchedulePostCleanup); err != nil {
-		logrus.Errorf("Hook SchedulePostCleanup failed: %v", err)
-	}
+	// Step7: Post delete cluster Hooks
+	handler.PostDeleteClusterHooks()
 
 	// Step8: cleanup infrastructure
 	for _, n := range cc.Nodes {

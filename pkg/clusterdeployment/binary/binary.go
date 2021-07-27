@@ -22,6 +22,7 @@ import (
 	"isula.org/eggo/pkg/clusterdeployment/binary/addons"
 	"isula.org/eggo/pkg/clusterdeployment/binary/bootstrap"
 	"isula.org/eggo/pkg/clusterdeployment/binary/cleanupcluster"
+	"isula.org/eggo/pkg/clusterdeployment/binary/commontools"
 	"isula.org/eggo/pkg/clusterdeployment/binary/controlplane"
 	"isula.org/eggo/pkg/clusterdeployment/binary/coredns"
 	"isula.org/eggo/pkg/clusterdeployment/binary/etcdcluster"
@@ -29,9 +30,11 @@ import (
 	"isula.org/eggo/pkg/clusterdeployment/binary/loadbalance"
 	"isula.org/eggo/pkg/clusterdeployment/manager"
 	"isula.org/eggo/pkg/utils"
+	"isula.org/eggo/pkg/utils/dependency"
 	"isula.org/eggo/pkg/utils/kubectl"
 	"isula.org/eggo/pkg/utils/nodemanager"
 	"isula.org/eggo/pkg/utils/runner"
+	"isula.org/eggo/pkg/utils/task"
 
 	"github.com/sirupsen/logrus"
 )
@@ -414,4 +417,150 @@ func (bcp *BinaryClusterDeployment) Finish() {
 	}
 	bcp.connections = make(map[string]runner.Runner)
 	logrus.Info("do finish binary deployment success")
+}
+
+func (bcp *BinaryClusterDeployment) PreCreateClusterHooks() error {
+	role := []uint16{api.LoadBalance, api.ETCD, api.Master, api.Worker}
+	if err := dependency.HookSchedule(bcp.config, bcp.config.Nodes, role, api.SchedulePreJoin); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (bcp *BinaryClusterDeployment) PostCreateClusterHooks() error {
+	role := []uint16{api.LoadBalance, api.ETCD, api.Master, api.Worker}
+	if err := dependency.HookSchedule(bcp.config, bcp.config.Nodes, role, api.SchedulePostJoin); err != nil {
+		return err
+	}
+
+	if err := checkK8sServices(bcp.config.Nodes); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (bcp *BinaryClusterDeployment) PreDeleteClusterHooks() {
+	role := []uint16{api.Worker, api.Master, api.ETCD, api.LoadBalance}
+	if err := dependency.HookSchedule(bcp.config, bcp.config.Nodes, role, api.SchedulePreCleanup); err != nil {
+		logrus.Warnf("Ignore: Delete cluster PreHook failed: %v", err)
+	}
+}
+
+func (bcp *BinaryClusterDeployment) PostDeleteClusterHooks() {
+	role := []uint16{api.Worker, api.Master, api.ETCD, api.LoadBalance}
+	if err := dependency.HookSchedule(bcp.config, bcp.config.Nodes, role, api.SchedulePostCleanup); err != nil {
+		logrus.Warnf("Ignore: Delete cluster PostHook failed: %v", err)
+	}
+}
+
+func (bcp *BinaryClusterDeployment) PreNodeJoinHooks(node *api.HostConfig) error {
+	role := []uint16{api.Master, api.Worker, api.ETCD}
+	if err := dependency.HookSchedule(bcp.config, []*api.HostConfig{node}, role, api.SchedulePreJoin); err != nil {
+		return err
+	}
+	return nil
+}
+
+func checkWorkerServices(workers []string) error {
+	if len(workers) == 0 {
+		return nil
+	}
+	shell := `#!/bin/bash
+systemctl status kubelet | tail -20
+[[ $? -ne 0 ]] && exit 1
+systemctl status kube-proxy | tail -20
+[[ $? -ne 0 ]] && exit 1
+exit 0
+`
+	checker := task.NewTaskInstance(
+		&commontools.RunShellTask{
+			ShellName: "checkWorker",
+			Shell:     shell,
+		},
+	)
+
+	return nodemanager.RunTaskOnNodes(checker, workers)
+}
+
+func checkMasterServices(masters []string) error {
+	if len(masters) == 0 {
+		return nil
+	}
+	shell := `#!/bin/bash
+systemctl status kube-apiserver | tail -20
+[[ $? -ne 0 ]] && exit 1
+systemctl status kube-controller-manager | tail -20
+[[ $? -ne 0 ]] && exit 1
+systemctl status kube-scheduler | tail -20
+[[ $? -ne 0 ]] && exit 1
+exit 0
+`
+	checker := task.NewTaskInstance(
+		&commontools.RunShellTask{
+			ShellName: "checkMaster",
+			Shell:     shell,
+		},
+	)
+
+	return nodemanager.RunTaskOnNodes(checker, masters)
+}
+
+func checkK8sServices(nodes []*api.HostConfig) error {
+	var wokers, masters []string
+
+	for _, n := range nodes {
+		if utils.IsType(n.Type, api.Master) {
+			masters = append(masters, n.Address)
+		}
+		if utils.IsType(n.Type, api.Worker) {
+			wokers = append(wokers, n.Address)
+		}
+	}
+	if err := checkWorkerServices(wokers); err != nil {
+		return err
+	}
+	return checkMasterServices(masters)
+}
+
+func (bcp *BinaryClusterDeployment) PostNodeJoinHooks(node *api.HostConfig) error {
+	role := []uint16{api.Master, api.Worker, api.ETCD}
+	if err := dependency.HookSchedule(bcp.config, []*api.HostConfig{node}, role, api.SchedulePostJoin); err != nil {
+		return err
+	}
+
+	// taint and label for master node
+	roles := node.Type
+	for _, n := range bcp.config.Nodes {
+		if n.Name == node.Name {
+			roles |= n.Type
+			break
+		}
+	}
+
+	if utils.IsType(roles, (api.Master & api.Worker)) {
+		if err := taintAndLabelNode(bcp.config.Name, node.Name); err != nil {
+			return err
+		}
+	}
+
+	// check node status
+	if err := checkK8sServices([]*api.HostConfig{node}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (bcp *BinaryClusterDeployment) PreNodeCleanupHooks(node *api.HostConfig) {
+	role := []uint16{api.Worker, api.Master, api.ETCD}
+	if err := dependency.HookSchedule(bcp.config, []*api.HostConfig{node}, role, api.SchedulePreCleanup); err != nil {
+		logrus.Warnf("Ignore: Delete Node PreHook failed: %v", err)
+	}
+}
+
+func (bcp *BinaryClusterDeployment) PostNodeCleanupHooks(node *api.HostConfig) {
+	role := []uint16{api.Worker, api.Master, api.ETCD}
+	if err := dependency.HookSchedule(bcp.config, []*api.HostConfig{node}, role, api.SchedulePostCleanup); err != nil {
+		logrus.Warnf("Ignore: Delete Node PostHook failed: %v", err)
+	}
 }
