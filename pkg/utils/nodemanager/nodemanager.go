@@ -92,8 +92,8 @@ func doRetryPushTask(t task.Task, retryNodes []*Node) error {
 }
 
 func RunTaskOnNodes(t task.Task, nodes []string) error {
-	manager.lock.RLock()
-	defer manager.lock.RUnlock()
+	manager.lock.Lock()
+	defer manager.lock.Unlock()
 	var retryNodes []*Node
 	for _, id := range nodes {
 		if n, ok := manager.nodes[id]; ok {
@@ -112,8 +112,8 @@ func RunTaskOnNodes(t task.Task, nodes []string) error {
 
 func RunTaskOnAll(t task.Task) error {
 	var retryNodes []*Node
-	manager.lock.RLock()
-	defer manager.lock.RUnlock()
+	manager.lock.Lock()
+	defer manager.lock.Unlock()
 	for id, n := range manager.nodes {
 		if n.PushTask(t) {
 			continue
@@ -126,8 +126,8 @@ func RunTaskOnAll(t task.Task) error {
 }
 
 func RunTasksOnNode(tasks []task.Task, node string) error {
-	manager.lock.RLock()
-	defer manager.lock.RUnlock()
+	manager.lock.Lock()
+	defer manager.lock.Unlock()
 
 	for _, t := range tasks {
 		if n, ok := manager.nodes[node]; ok {
@@ -152,9 +152,6 @@ func RunTasksOnNode(tasks []task.Task, node string) error {
 }
 
 func RunTasksOnNodes(tasks []task.Task, nodes []string) error {
-	manager.lock.RLock()
-	defer manager.lock.RUnlock()
-
 	for _, n := range nodes {
 		if err := RunTasksOnNode(tasks, n); err != nil {
 			logrus.Errorf("run tasks on node %s failed: %v", n, err)
@@ -166,8 +163,8 @@ func RunTasksOnNodes(tasks []task.Task, nodes []string) error {
 }
 
 func RunTaskOnOneNode(t task.Task, nodes []string) (string, error) {
-	manager.lock.RLock()
-	defer manager.lock.RUnlock()
+	manager.lock.Lock()
+	defer manager.lock.Unlock()
 
 	for _, id := range nodes {
 		n, ok := manager.nodes[id]

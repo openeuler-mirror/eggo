@@ -51,7 +51,7 @@ func GetEggoDir() string {
 }
 
 func IsType(curType uint16, expectedType uint16) bool {
-	return curType&expectedType != 0
+	return (curType & expectedType) == expectedType
 }
 
 func AddSudo(cmd string) string {
