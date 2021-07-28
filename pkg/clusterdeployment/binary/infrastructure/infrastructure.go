@@ -72,8 +72,8 @@ func (it *SetupInfraTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 		return err
 	}
 
-	if err := setHostname(r, hcg); err != nil {
-		logrus.Errorf("set hostname failed: %v", err)
+	if err := addHostNameIP(r, hcg); err != nil {
+		logrus.Errorf("add host name ip failed: %v", err)
 		return err
 	}
 
@@ -209,15 +209,69 @@ func copyPackage(r runner.Runner, hcg *api.HostConfig, pcfg *api.PackageSrcConfi
 	return nil
 }
 
-func setHostname(r runner.Runner, hcg *api.HostConfig) error {
-	if hcg.Name == "" {
-		logrus.Warnf("no name for %s", hcg.Address)
+func addHostNameIP(r runner.Runner, hcg *api.HostConfig) error {
+	shell := `
+#!/bin/bash
+cat /etc/hosts | grep "{{ .Address }}" | grep "{{ .Name }}"
+if [ $? -eq 0 ]; then
+	exit 0
+fi
+
+echo "{{ .Address }} {{ .Name }}" >> /etc/hosts
+exit 0
+`
+
+	if hcg.Name == "" || hcg.Address == "" {
+		logrus.Warnf("no name or address")
 		return nil
 	}
 
-	_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"hostnamectl set-hostname %s\"", hcg.Name))
+	datastore := make(map[string]interface{})
+	datastore["Address"] = hcg.Address
+	datastore["Name"] = hcg.Name
+
+	cmdStr, err := template.TemplateRender(shell, datastore)
 	if err != nil {
-		return fmt.Errorf("set Hostname %s for %s failed: %v", hcg.Name, hcg.Address, err)
+		return err
+	}
+
+	_, err = r.RunShell(cmdStr, "addHostNameIP")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func removeHostNameIP(r runner.Runner, hcg *api.HostConfig) error {
+	shell := `
+#!/bin/bash
+cat /etc/hosts | grep "{{ .Address }}" | grep "{{ .Name }}"
+if [ $? -ne 0 ]; then
+	exit 0
+fi
+
+sed -i '/{{ .Address }} {{ .Name }}/d' /etc/hosts
+exit 0
+`
+
+	if hcg.Name == "" || hcg.Address == "" {
+		logrus.Warnf("no name or address")
+		return nil
+	}
+
+	datastore := make(map[string]interface{})
+	datastore["Address"] = hcg.Address
+	datastore["Name"] = hcg.Name
+
+	cmdStr, err := template.TemplateRender(shell, datastore)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.RunShell(cmdStr, "removeHostNameIP")
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -272,6 +326,10 @@ func (it *DestroyInfraTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 	}
 
 	dependency.RemoveDependency(r, it.roleInfra, hcg, it.packageSrc.GetPkgDstPath())
+
+	if err := removeHostNameIP(r, hcg); err != nil {
+		logrus.Errorf("remove host name ip failed: %v", err)
+	}
 
 	removeFirewallPort(r, it.roleInfra.OpenPorts)
 
@@ -381,9 +439,9 @@ type packageMD5 struct {
 }
 
 func (pm *packageMD5) getMD5(path string) (string, error) {
-	pm.Lock.RLock()
+	pm.Lock.Lock()
 	defer func() {
-		pm.Lock.RUnlock()
+		pm.Lock.Unlock()
 	}()
 
 	md5str, ok := pm.MD5s[path]
