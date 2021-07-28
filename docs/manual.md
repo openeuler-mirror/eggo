@@ -106,6 +106,7 @@ $ eggo -d deploy -f deploy.yaml
 
 ```
 $ eggo -d join --id k8s-cluster --type master,worker --arch arm64 --port 22 192.168.0.5
+```
 
 * -d参数表示打印调试信息
 * --id集群的id
@@ -155,12 +156,12 @@ cluster-id: k8s-cluster           // 集群名称
 username: root                    // 需要部署k8s集群的机器的ssh登录用户名，所有机器都需要使用同一个用户名
 password: 123456                  // 需要部署k8s集群的机器的ssh登录密码，所有机器都需要使用同一个密码
 masters:                          // 配置master节点的列表，建议每个master节点同时作为node节点，否则master节点可以无法直接访问pod
-- name: test0                     // 该节点的名称，会设置该名称为该节点的hostname并设置为k8s集群看到的该节点的名称
+- name: test0                     // 该节点的名称，为k8s集群看到的该节点的名称
   ip: 192.168.0.1                 // 该节点的ip地址
   port: 22                        // ssh登录的端口
   arch: arm64                     // 机器架构，x86_64的填amd64
 workers:                          // 配置worker节点的列表
-- name: test0                     // 该节点的名称，会设置该名称为该节点的hostname并设置为k8s集群看到的该节点的名称
+- name: test0                     // 该节点的名称，为k8s集群看到的该节点的名称
   ip: 192.168.0.2                 // 该节点的ip地址
   port: 22                        // ssh登录的端口
   arch: arm64                     // 机器架构，x86_64的填amd64
@@ -169,12 +170,12 @@ workers:                          // 配置worker节点的列表
   port: 22
   arch: arm64
 etcds:                            // 配置etcd节点的列表，如果该项为空，则将会为每个master节点部署一个etcd，否则只会部署配置的etcd节点
-- name: etcd-0                    // 该节点的名称，会设置该名称为该节点的hostname并设置为k8s集群看到的该节点的名称
+- name: etcd-0                    // 该节点的名称，为k8s集群看到的该节点的名称
   ip: 192.168.0.4                 // 该节点的ip地址
   port: 22                        // ssh登录的端口
   arch: amd64                     // 机器架构，x86_64的填amd64
 loadbalance:                      // 配置loadbalance节点
-  name: k8s-loadbalance           // 该节点的名称，会设置该名称为该节点的hostname并设置为k8s集群看到的该节点的名称
+  name: k8s-loadbalance           // 该节点的名称，为k8s集群看到的该节点的名称
   ip: 192.168.0.5                 // 该节点的ip地址
   port: 22                        // ssh登录的端口
   arch: amd64                     // 机器架构，x86_64的填amd64
