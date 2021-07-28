@@ -175,20 +175,6 @@ func doJoinNode(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, hostcon
 		return err
 	}
 
-	roles := hostconfig.Type
-	for _, node := range cc.Nodes {
-		if node.Name == hostconfig.Name {
-			roles |= node.Type
-			break
-		}
-	}
-
-	if utils.IsType(roles, api.Master) && utils.IsType(roles, api.Worker) {
-		if err := handler.TaintAndLabelNode(hostconfig.Name); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
