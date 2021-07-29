@@ -117,7 +117,7 @@ func (n *Node) updateNodeStatus(message string, status int) {
 
 func (n *Node) PushTask(t task.Task) bool {
 	// only run ignore error tasks to cleanup node
-	if n.status.HasError() && task.IsIgnoreError(t) {
+	if n.status.HasError() && !task.IsIgnoreError(t) {
 		logrus.Debugf("node finished with error: %v", n.status.Message)
 		return false
 	}

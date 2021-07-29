@@ -54,6 +54,10 @@ func IsType(curType uint16, expectedType uint16) bool {
 	return (curType & expectedType) == expectedType
 }
 
+func ClearType(curType uint16, clearType uint16) uint16 {
+	return (curType & ^clearType)
+}
+
 func AddSudo(cmd string) string {
 	return "sudo -E /bin/sh -c \"" + cmd + "\""
 }

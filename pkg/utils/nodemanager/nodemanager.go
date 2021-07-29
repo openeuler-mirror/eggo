@@ -37,6 +37,28 @@ var manager = &NodeManager{
 	nodes: make(map[string]*Node, 2),
 }
 
+// return: key is node IP; value true is failed, false is success
+func CheckNodesStatus(checkNodes []string) ([]*api.HostConfig, []string) {
+	var failures []*api.HostConfig
+	var success []string
+	manager.lock.RLock()
+	defer manager.lock.RUnlock()
+	for _, cn := range checkNodes {
+		n, ok := manager.nodes[cn]
+		if !ok {
+			failures = append(failures, n.host)
+			continue
+		}
+		if n.GetStatus().HasError() {
+			failures = append(failures, n.host)
+		} else {
+			success = append(success, cn)
+		}
+	}
+
+	return failures, success
+}
+
 func RegisterNode(hcf *api.HostConfig, r runner.Runner) error {
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
@@ -227,7 +249,10 @@ outfor:
 			}
 			logrus.Infof("Tasks progress: %s", sb.String())
 			unfinishedNodes = nextUnfinished
-			time.Sleep(time.Second)
+
+			// sleep time depend on count of wait nodes
+			st := len(unfinishedNodes) + 1
+			time.Sleep(time.Second * time.Duration(st))
 		}
 	}
 

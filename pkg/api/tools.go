@@ -7,6 +7,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/constants"
+	"k8s.io/apimachinery/pkg/util/json"
 )
 
 var (
@@ -79,4 +80,44 @@ func GetEtcdServers(ecc *EtcdClusterConfig) string {
 
 func IsCleanupSchedule(schedule Schedule) bool {
 	return schedule == SchedulePreCleanup || schedule == SchedulePostCleanup
+}
+
+func (hc HostConfig) DeepCopy() (*HostConfig, error) {
+	b, err := json.Marshal(hc)
+	if err != nil {
+		return nil, err
+	}
+	var result HostConfig
+	err = json.Unmarshal(b, &result)
+	return &result, err
+}
+
+func (cs *ClusterStatus) Show() string {
+	var sb strings.Builder
+	var fb strings.Builder
+
+	sb.WriteString("-------------------------------\n")
+	sb.WriteString("message: ")
+	sb.WriteString(cs.Message)
+	sb.WriteString("\nsummary: \n")
+	if cs.Working {
+		sb.WriteString(cs.ControlPlane)
+		sb.WriteString("\t\tsuccess")
+		sb.WriteString("\n")
+	}
+	for ip, ok := range cs.StatusOfNodes {
+		if ok {
+			sb.WriteString(ip)
+			sb.WriteString("\t\tsuccess")
+			sb.WriteString("\n")
+		} else {
+			fb.WriteString(ip)
+			fb.WriteString("\t\tfailure")
+			fb.WriteString("\n")
+		}
+	}
+	sb.WriteString(fb.String())
+	sb.WriteString("-------------------------------\n")
+
+	return sb.String()
 }

@@ -24,8 +24,64 @@ import (
 	"isula.org/eggo/pkg/clusterdeployment"
 )
 
-func deploy(ccfg *api.ClusterConfig) error {
-	return clusterdeployment.CreateCluster(ccfg)
+func deploy(conf *deployConfig) error {
+	if err := saveDeployConfig(conf, savedDeployConfigPath(conf.ClusterID)); err != nil {
+		return fmt.Errorf("save deploy config failed: %v", err)
+	}
+
+	ccfg := toClusterdeploymentConfig(conf)
+
+	cstatus, err := clusterdeployment.CreateCluster(ccfg)
+	if err != nil {
+		return err
+	}
+
+	if cstatus.FailureCnt > 0 {
+		// if partial success, just update config of cluster, remove failed nodes
+		var tmp []*HostConfig
+		for _, n := range conf.Masters {
+			if success, ok := cstatus.StatusOfNodes[n.Ip]; ok && !success {
+				continue
+			}
+			tmp = append(tmp, n)
+		}
+		conf.Masters = tmp
+
+		tmp = nil
+		for _, n := range conf.Workers {
+			if success, ok := cstatus.StatusOfNodes[n.Ip]; ok && !success {
+				continue
+			}
+			tmp = append(tmp, n)
+		}
+		conf.Workers = tmp
+
+		tmp = nil
+		for _, n := range conf.Etcds {
+			if success, ok := cstatus.StatusOfNodes[n.Ip]; ok && !success {
+				continue
+			}
+			tmp = append(tmp, n)
+		}
+		conf.Etcds = tmp
+
+		err = saveDeployConfig(conf, savedDeployConfigPath(conf.ClusterID))
+		if err != nil {
+			fmt.Printf("")
+			clusterdeployment.RemoveCluster(ccfg)
+			return fmt.Errorf("update config of cluster failed: %v", err)
+		}
+		fmt.Printf("update config of cluster: %s", conf.ClusterID)
+	}
+
+	fmt.Print(cstatus.Show())
+
+	if cstatus.Working {
+		fmt.Printf("To start using cluster: %s, you need following as a regular user:\n\n", ccfg.Name)
+		fmt.Printf("\texport KUBECONFIG=%s/admin.conf\n\n", api.GetClusterHomePath(ccfg.Name))
+	}
+
+	return err
 }
 
 func deployCluster(cmd *cobra.Command, args []string) error {
@@ -40,11 +96,7 @@ func deployCluster(cmd *cobra.Command, args []string) error {
 
 	// TODO: make sure config valid
 
-	if err := saveDeployConfig(conf, savedDeployConfigPath(conf.ClusterID)); err != nil {
-		return fmt.Errorf("save deploy config failed: %v", err)
-	}
-
-	if err := deploy(toClusterdeploymentConfig(conf)); err != nil {
+	if err := deploy(conf); err != nil {
 		return err
 	}
 

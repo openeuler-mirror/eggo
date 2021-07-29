@@ -533,7 +533,8 @@ func (bcp *BinaryClusterDeployment) PostNodeJoinHooks(node *api.HostConfig) erro
 		}
 	}
 
-	if utils.IsType(roles, (api.Master & api.Worker)) {
+	// check whether the node is worker and master
+	if utils.IsType(roles, (api.Master | api.Worker)) {
 		if err := taintAndLabelNode(bcp.config.Name, node.Name); err != nil {
 			return err
 		}

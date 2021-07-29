@@ -28,121 +28,215 @@ import (
 	"isula.org/eggo/pkg/utils/nodemanager"
 )
 
-func doCreateCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig) error {
-	var loadbalancer *api.HostConfig
-	var controlPlane *api.HostConfig
-	var joinNodes []*api.HostConfig
-	var joinNodeIDs []string
+func splitNodes(nodes []*api.HostConfig) (*api.HostConfig, []*api.HostConfig, []*api.HostConfig, []string) {
+	var lb *api.HostConfig
+	var masters []*api.HostConfig
+	var workers []*api.HostConfig
 	var etcdNodes []string
-	// Step1: setup infrastructure for all nodes in the cluster
-	for _, n := range cc.Nodes {
-		if err := handler.MachineInfraSetup(n); err != nil {
-			return err
-		}
+
+	for _, n := range nodes {
 		if utils.IsType(n.Type, api.LoadBalance) {
-			loadbalancer = n
+			lb = n
 		}
 		if utils.IsType(n.Type, api.ETCD) {
 			etcdNodes = append(etcdNodes, n.Address)
 		}
-		if utils.IsType(n.Type, api.Worker) {
-			joinNodes = append(joinNodes, n)
-			joinNodeIDs = append(joinNodeIDs, n.Address)
-		}
 
 		if utils.IsType(n.Type, api.Master) {
-			if controlPlane == nil {
-				controlPlane = n
-			} else {
-				joinNodes = append(joinNodes, n)
-				joinNodeIDs = append(joinNodeIDs, n.Address)
-			}
+			masters = append(masters, n)
+			// node with master and worker, just put into masters
+			continue
+		}
+
+		if utils.IsType(n.Type, api.Worker) {
+			workers = append(workers, n)
+		}
+	}
+
+	return lb, masters, workers, etcdNodes
+}
+
+func doJoinNodeOfCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, masters, workers []*api.HostConfig) ([]string, []*api.HostConfig, error) {
+	var joinedNodeIDs []string
+	var failedNodes []*api.HostConfig
+	for _, node := range workers {
+		if err := handler.ClusterNodeJoin(node); err != nil {
+			failedNodes = append(failedNodes, node)
+			continue
+		}
+		joinedNodeIDs = append(joinedNodeIDs, node.Address)
+	}
+	for _, node := range masters {
+		if err := handler.ClusterNodeJoin(node); err != nil {
+			failedNodes = append(failedNodes, node)
+			continue
+		}
+		joinedNodeIDs = append(joinedNodeIDs, node.Address)
+	}
+	// wait all nodes ready
+	if err := nodemanager.WaitNodesFinishWithProgress(joinedNodeIDs, time.Minute*5); err != nil {
+		tFailedNodes, successNodes := nodemanager.CheckNodesStatus(joinedNodeIDs)
+		// update joined and failed nodes
+		failedNodes = append(failedNodes, tFailedNodes...)
+		joinedNodeIDs = successNodes
+		if len(successNodes) == 0 {
+			return joinedNodeIDs, nil, err
+		}
+		logrus.Warnf("wait some node to complete join failed: %v", err)
+	}
+
+	return joinedNodeIDs, failedNodes, nil
+}
+
+func doCreateCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, cstatus *api.ClusterStatus) ([]*api.HostConfig, error) {
+	loadbalancer, masters, workers, etcdNodes := splitNodes(cc.Nodes)
+
+	if len(masters) == 0 {
+		return nil, fmt.Errorf("no master found")
+	}
+	controlPlaneNode, err := masters[0].DeepCopy()
+	if err != nil {
+		return nil, err
+	}
+	cstatus.ControlPlane = controlPlaneNode.Address
+	masters = masters[1:]
+
+	// Step1: setup infrastructure for all nodes in the cluster
+	for _, n := range cc.Nodes {
+		if err = handler.MachineInfraSetup(n); err != nil {
+			return nil, err
 		}
 	}
 
 	// Step2: run precreate cluster hooks
-	if err := handler.PreCreateClusterHooks(); err != nil {
-		return err
+	if err = handler.PreCreateClusterHooks(); err != nil {
+		return nil, err
 	}
 
 	// Step3: setup etcd cluster
 	// wait infrastructure task success on nodes of etcd cluster
-	if err := nodemanager.WaitNodesFinishWithProgress(etcdNodes, time.Minute*5); err != nil {
-		return err
+	if err = nodemanager.WaitNodesFinishWithProgress(etcdNodes, time.Minute*5); err != nil {
+		return nil, err
 	}
-	if err := handler.EtcdClusterSetup(); err != nil {
-		return err
+	if err = handler.EtcdClusterSetup(); err != nil {
+		return nil, err
 	}
+
 	// Step4: setup loadbalance for cluster
-	if err := handler.LoadBalancerSetup(loadbalancer); err != nil {
-		return err
+	if err = handler.LoadBalancerSetup(loadbalancer); err != nil {
+		return nil, err
 	}
+
 	// Step5: setup control plane for cluster
-	if err := handler.ClusterControlPlaneInit(controlPlane); err != nil {
-		return err
+	if err = handler.ClusterControlPlaneInit(controlPlaneNode); err != nil {
+		return nil, err
 	}
 	// wait controlplane setup task success
-	if err := nodemanager.WaitNodesFinish([]string{controlPlane.Address}, time.Minute*5); err != nil {
-		return err
+	if err = nodemanager.WaitNodesFinish([]string{controlPlaneNode.Address}, time.Minute*5); err != nil {
+		return nil, err
+	}
+	if utils.IsType(controlPlaneNode.Type, api.Worker) {
+		controlPlaneNode.Type = utils.ClearType(controlPlaneNode.Type, api.Master)
+		if err = handler.ClusterNodeJoin(controlPlaneNode); err != nil {
+			return nil, err
+		}
 	}
 
 	//Step6: setup left nodes for cluster
-	for _, node := range joinNodes {
-		if err := handler.ClusterNodeJoin(node); err != nil {
-			return err
-		}
-	}
-	// wait all nodes ready
-	if err := nodemanager.WaitNodesFinishWithProgress(joinNodeIDs, time.Minute*5); err != nil {
-		return err
+	joinedNodeIDs, failedNodes, err := doJoinNodeOfCluster(handler, cc, masters, workers)
+	if err != nil {
+		return nil, err
 	}
 
 	//Step7: setup addons for cluster
-	if err := handler.AddonsSetup(); err != nil {
-		return err
+	if err = handler.AddonsSetup(); err != nil {
+		return nil, err
 	}
 
 	// Step8: run postcreate cluster hooks
-	if err := handler.PostCreateClusterHooks(); err != nil {
-		return err
+	if err = handler.PostCreateClusterHooks(); err != nil {
+		return nil, err
 	}
 
-	allNodes := utils.GetAllIPs(cc.Nodes)
-	if err := nodemanager.WaitNodesFinishWithProgress(allNodes, time.Minute*5); err != nil {
-		return err
+	if err = nodemanager.WaitNodesFinishWithProgress(append(joinedNodeIDs, controlPlaneNode.Address), time.Minute*5); err != nil {
+		return nil, err
 	}
 
-	return nil
+	for _, sid := range joinedNodeIDs {
+		cstatus.StatusOfNodes[sid] = true
+		cstatus.SuccessCnt += 1
+	}
+	cstatus.Working = true
+
+	return failedNodes, nil
 }
 
-func CreateCluster(cc *api.ClusterConfig) error {
+func rollbackFailedNoeds(handler api.ClusterDeploymentAPI, nodes []*api.HostConfig) {
+	if nodes == nil {
+		return
+	}
+	var rollIDs []string
+	for _, n := range nodes {
+		// do best to cleanup, if error, just ignore
+		handler.ClusterNodeCleanup(n, n.Type)
+		handler.MachineInfraDestroy(n)
+		rollIDs = append(rollIDs, n.Address)
+	}
+
+	if err := nodemanager.WaitNodesFinishWithProgress(rollIDs, time.Minute*5); err != nil {
+		logrus.Warnf("rollback failed: %v", err)
+	}
+}
+
+func CreateCluster(cc *api.ClusterConfig) (api.ClusterStatus, error) {
+	cstatus := api.ClusterStatus{
+		StatusOfNodes: make(map[string]bool),
+	}
 	if cc == nil {
-		return fmt.Errorf("[cluster] cluster config is required")
+		return cstatus, fmt.Errorf("[cluster] cluster config is required")
 	}
 
 	creator, err := manager.GetClusterDeploymentDriver(cc.DeployDriver)
 	if err != nil {
 		logrus.Errorf("[cluster] get cluster deployment driver: %s failed: %v", cc.DeployDriver, err)
-		return err
+		return cstatus, err
 	}
 	handler, err := creator(cc)
 	if err != nil {
 		logrus.Errorf("[cluster] create cluster deployment instance with driver: %s, failed: %v", cc.DeployDriver, err)
-		return err
+		return cstatus, err
 	}
 	defer handler.Finish()
 
 	// prepare eggo config directory
 	if err := os.MkdirAll(api.GetClusterHomePath(cc.Name), 0750); err != nil {
-		return err
+		return cstatus, err
 	}
 
-	if err := doCreateCluster(handler, cc); err != nil {
-		return err
+	failedNodes, err := doCreateCluster(handler, cc, &cstatus)
+	if err != nil {
+		logrus.Warnf("rollback cluster: %s", cc.Name)
+		doRemoveCluster(handler, cc)
+		cstatus.Message = err.Error()
+		return cstatus, err
+	}
+	// rollback failed nodes
+	rollbackFailedNoeds(handler, failedNodes)
+	// update status of cluster
+	if failedNodes != nil {
+		var failureIDs []string
+		for _, fid := range failedNodes {
+			failureIDs = append(failureIDs, fid.Address)
+			cstatus.StatusOfNodes[fid.Address] = false
+			cstatus.FailureCnt += 1
+		}
+		logrus.Warnf("[cluster] failed nodes: %v", failureIDs)
+		cstatus.Message = "partial success of create cluster"
+		return cstatus, nil
 	}
 
-	logrus.Infof("[cluster] create cluster '%s' successed", cc.Name)
-	return nil
+	cstatus.Message = "create cluster success"
+	return cstatus, nil
 }
 
 func doJoinNode(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, hostconfig *api.HostConfig) error {
