@@ -150,7 +150,7 @@ func (pc *PodCoredns) Cleanup(cluster *api.ClusterConfig) error {
 	if cluster == nil {
 		return fmt.Errorf("invalid cluster config")
 	}
-	t := task.NewTaskInstance(&PodCorednsCleanupTask{Cluster: cluster})
+	t := task.NewTaskIgnoreErrInstance(&PodCorednsCleanupTask{Cluster: cluster})
 	var masters []string
 	for _, n := range cluster.Nodes {
 		if (n.Type & api.Master) != 0 {
@@ -158,7 +158,6 @@ func (pc *PodCoredns) Cleanup(cluster *api.ClusterConfig) error {
 		}
 	}
 
-	task.SetIgnoreErrorFlag(t)
 	useMaster, err := nodemanager.RunTaskOnOneNode(t, masters)
 	if err != nil {
 		return err

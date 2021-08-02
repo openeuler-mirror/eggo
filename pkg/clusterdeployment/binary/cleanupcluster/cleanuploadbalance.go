@@ -56,13 +56,12 @@ func (t *cleanupLoadBalanceTask) Run(r runner.Runner, hostConfig *api.HostConfig
 }
 
 func CleanupLoadBalance(conf *api.ClusterConfig, lb *api.HostConfig) error {
-	taskCleanupLoadBalance := task.NewTaskInstance(
+	taskCleanupLoadBalance := task.NewTaskIgnoreErrInstance(
 		&cleanupLoadBalanceTask{
 			ccfg: conf,
 		},
 	)
 
-	task.SetIgnoreErrorFlag(taskCleanupLoadBalance)
 	if err := nodemanager.RunTaskOnNodes(taskCleanupLoadBalance, []string{lb.Address}); err != nil {
 		return fmt.Errorf("run task for cleanup loadbalance failed: %v", err)
 	}

@@ -362,14 +362,13 @@ func (bc *BinaryCoredns) Cleanup(cluster *api.ClusterConfig) error {
 		logrus.Warn("no master host found, can not cleanup coredns service")
 		return nil
 	}
-	sst := task.NewTaskInstance(
+	sst := task.NewTaskIgnoreErrInstance(
 		&BinaryCorednsCleanupTask{
 			Cluster:   cluster,
 			cleanYaml: true,
 		},
 	)
 
-	task.SetIgnoreErrorFlag(sst)
 	err := nodemanager.RunTaskOnNodes(sst, masterIPs)
 	if err != nil {
 		logrus.Warnf("run cleanup coredns task failed: %v", err)

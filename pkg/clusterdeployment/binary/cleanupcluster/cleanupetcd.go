@@ -84,13 +84,12 @@ func CleanupEtcdMember(conf *api.ClusterConfig, hostconfig *api.HostConfig) erro
 	}
 
 	// cleanup remains
-	taskCleanupEtcdMember := task.NewTaskInstance(
+	taskCleanupEtcdMember := task.NewTaskIgnoreErrInstance(
 		&cleanupEtcdMemberTask{
 			ccfg: conf,
 		},
 	)
 
-	task.SetIgnoreErrorFlag(taskCleanupEtcdMember)
 	if err := nodemanager.RunTaskOnNodes(taskCleanupEtcdMember, []string{hostconfig.Address}); err != nil {
 		return fmt.Errorf("run task for cleanup etcd member failed: %v", err)
 	}
@@ -114,14 +113,13 @@ func CleanupAllEtcds(conf *api.ClusterConfig) error {
 	}
 
 	// cleanup remains
-	taskCleanupAllEtcds := task.NewTaskInstance(
+	taskCleanupAllEtcds := task.NewTaskIgnoreErrInstance(
 		&cleanupEtcdMemberTask{
 			ccfg: conf,
 		},
 	)
 
 	nodes := utils.GetAllIPs(conf.EtcdCluster.Nodes)
-	task.SetIgnoreErrorFlag(taskCleanupAllEtcds)
 	if err := nodemanager.RunTaskOnNodes(taskCleanupAllEtcds, nodes); err != nil {
 		return fmt.Errorf("run task for cleanup all etcds failed: %v", err)
 	}

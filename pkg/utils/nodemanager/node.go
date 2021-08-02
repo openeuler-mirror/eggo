@@ -17,6 +17,7 @@ package nodemanager
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -54,6 +55,12 @@ func (ns NodeStatus) ShowCounts() string {
 	return fmt.Sprintf("{ total: %d, success: %d, fail: %d, ignore: %d }", ns.TaskTotalCnt, ns.TaskSuccessCnt, ns.TaskFailCnt, ns.TaskIgnoreCnt)
 }
 
+type taskSummary struct {
+	name    string
+	useTime time.Duration
+	status  string
+}
+
 type Node struct {
 	host *api.HostConfig
 	r    runner.Runner
@@ -62,6 +69,32 @@ type Node struct {
 	queue  chan task.Task
 	lock   sync.RWMutex
 	status NodeStatus
+
+	tasksHistory []taskSummary
+}
+
+func (n *Node) addHistory(t task.Task, err error, useTime time.Duration) {
+	ts := taskSummary{name: t.Name(), useTime: useTime}
+	if err == nil {
+		ts.status = "success"
+	} else {
+		if task.IsIgnoreError(t) {
+			ts.status = fmt.Sprintf("ignore err: %v", err)
+		} else {
+			ts.status = err.Error()
+		}
+	}
+	n.tasksHistory = append(n.tasksHistory, ts)
+}
+
+func (n *Node) ShowTaskList() string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("\n##################tasks on node: %s#################\n", n.host.Name))
+	for _, n := range n.tasksHistory {
+		sb.WriteString(fmt.Sprintf("name: %s, elapsed time: %s, message: %s\n", n.name, n.useTime.String(), n.status))
+	}
+	sb.WriteString("#########################################\n")
+	return sb.String()
 }
 
 func (n *Node) GetStatus() NodeStatus {
@@ -135,7 +168,42 @@ func (n *Node) PushTask(t task.Task) bool {
 func (n *Node) Finish() {
 	n.stop <- true
 	n.r.Close()
-	logrus.Infof("node: %s is finished", n.host.Address)
+	logrus.Infof(n.ShowTaskList())
+}
+
+func doRunTask(n *Node, t task.Task) {
+	start := time.Now()
+	echan := make(chan error)
+	go func(ec chan error) {
+		select {
+		// TODO: maybe we need get timeout from task
+		case <-time.After(time.Second * 300):
+			ec <- fmt.Errorf("timeout to run task")
+		case ec <- t.Run(n.r, n.host):
+		}
+	}(echan)
+
+	err := <-echan
+	finish := time.Now()
+
+	if err != nil {
+		label := fmt.Sprintf("%s: run task: %s on node: %s fail: %v", task.FAILED, t.Name(), n.host.Address, err)
+		t.AddLabel(n.host.Address, label)
+		if task.IsIgnoreError(t) {
+			logrus.Warnf("ignore: %s", label)
+			n.updateNodeStatus("", IgnoreStatus)
+		} else {
+			logrus.Errorf("%s", label)
+			// set task status on node after task
+			n.updateNodeStatus(label, ErrorStatus)
+		}
+	} else {
+		t.AddLabel(n.host.Address, task.SUCCESS)
+		// set task status on node after task
+		n.updateNodeStatus("", FinishStatus)
+		logrus.Infof("run task: %s success on %s\n", t.Name(), n.host.Address)
+	}
+	n.addHistory(t, err, finish.UTC().Sub(start))
 }
 
 func NewNode(hcf *api.HostConfig, r runner.Runner) (*Node, error) {
@@ -153,25 +221,7 @@ func NewNode(hcf *api.HostConfig, r runner.Runner) (*Node, error) {
 			case <-n.stop:
 				return
 			case t := <-n.queue:
-				// set task status on node before run task
-				err := t.Run(n.r, n.host)
-				if err != nil {
-					label := fmt.Sprintf("%s: run task: %s on node: %s fail: %v", task.FAILED, t.Name(), n.host.Address, err)
-					t.AddLabel(n.host.Address, label)
-					if task.IsIgnoreError(t) {
-						logrus.Warnf("ignore: %s", label)
-						n.updateNodeStatus("", IgnoreStatus)
-					} else {
-						logrus.Errorf("%s", label)
-						// set task status on node after task
-						n.updateNodeStatus(label, ErrorStatus)
-					}
-				} else {
-					t.AddLabel(n.host.Address, task.SUCCESS)
-					// set task status on node after task
-					n.updateNodeStatus("", FinishStatus)
-					logrus.Infof("run task: %s success on %s\n", t.Name(), n.host.Address)
-				}
+				doRunTask(n, t)
 			}
 		}
 	}(n)
