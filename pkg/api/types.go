@@ -215,7 +215,14 @@ type ClusterConfig struct {
 }
 
 type ClusterStatus struct {
+	Message       string          `json:"message"`
+	ControlPlane  string          `json:"controlplane"`
+	Working       bool            `json:"working"`
+	StatusOfNodes map[string]bool `json:"statusOfNodes"`
+	SuccessCnt    uint32          `json:"successCnt"`
+	FailureCnt    uint32          `json:"failureCnt"`
 }
+
 type InfrastructureAPI interface {
 	// TODO: should add other dependence cluster configurations
 	MachineInfraSetup(machine *HostConfig) error
@@ -249,7 +256,6 @@ type ClusterManagerAPI interface {
 	ClusterStatus() (*ClusterStatus, error)
 	AddonsSetup() error
 	AddonsDestroy() error
-	TaintAndLabelNode(name string) error
 }
 
 type LoadBalancerAPI interface {

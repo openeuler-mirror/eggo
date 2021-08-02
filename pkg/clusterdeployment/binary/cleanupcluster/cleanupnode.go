@@ -232,7 +232,6 @@ func execRemoveWorkerTask(conf *api.ClusterConfig, hostconfig *api.HostConfig) e
 
 	task.SetIgnoreErrorFlag(taskRemoveWorker)
 	if err := nodemanager.RunTaskOnNodes(taskRemoveWorker, []string{master}); err != nil {
-		logrus.Errorf("run task for remove worker failed: %v", err)
 		return err
 	}
 
@@ -246,8 +245,7 @@ func CleanupNode(conf *api.ClusterConfig, hostconfig *api.HostConfig, delType ui
 
 	if utils.IsType(delType, api.Worker) {
 		if err := execRemoveWorkerTask(conf, hostconfig); err != nil {
-			logrus.Errorf("remove workers failed: %v", err)
-			return err
+			logrus.Warnf("ignore: remove workers failed: %v", err)
 		}
 	}
 

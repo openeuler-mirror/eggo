@@ -139,10 +139,6 @@ func taintAndLabelNode(clusterID string, name string) error {
 	return nil
 }
 
-func (bcp *BinaryClusterDeployment) TaintAndLabelNode(name string) error {
-	return taintAndLabelNode(bcp.config.Name, name)
-}
-
 func (bcp *BinaryClusterDeployment) taintAndLabelMasterNodes() error {
 	for _, node := range bcp.config.Nodes {
 		if (node.Type&api.Master != 0) && (node.Type&api.Worker != 0) {
@@ -537,7 +533,8 @@ func (bcp *BinaryClusterDeployment) PostNodeJoinHooks(node *api.HostConfig) erro
 		}
 	}
 
-	if utils.IsType(roles, (api.Master & api.Worker)) {
+	// check whether the node is worker and master
+	if utils.IsType(roles, (api.Master | api.Worker)) {
 		if err := taintAndLabelNode(bcp.config.Name, node.Name); err != nil {
 			return err
 		}
