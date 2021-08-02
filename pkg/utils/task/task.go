@@ -53,6 +53,16 @@ func NewTaskInstance(t TaskRun) *TaskInstance {
 	}
 }
 
+func NewTaskIgnoreErrInstance(t TaskRun) *TaskInstance {
+	ti := &TaskInstance{
+		data:    make(map[string]string),
+		TaskRun: t,
+	}
+
+	ti.AddLabel(IgnoreErr, "true")
+	return ti
+}
+
 func (t *TaskInstance) AddLabel(key, label string) {
 	t.l.Lock()
 	defer t.l.Unlock()

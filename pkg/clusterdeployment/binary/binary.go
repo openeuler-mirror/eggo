@@ -102,12 +102,11 @@ func (bcp *BinaryClusterDeployment) registerNodes() error {
 	defer func() {
 		if err != nil {
 			bcp.Finish()
-			nodemanager.UnRegisterAllNodes()
 		}
 	}()
 
 	for _, cfg := range bcp.config.Nodes {
-		err := bcp.registerNode(cfg)
+		err = bcp.registerNode(cfg)
 		if err != nil {
 			return err
 		}
@@ -408,9 +407,7 @@ func (bcp *BinaryClusterDeployment) Finish() {
 	logrus.Info("do finish binary deployment...")
 	bcp.connLock.Lock()
 	defer bcp.connLock.Unlock()
-	for _, c := range bcp.connections {
-		c.Close()
-	}
+	nodemanager.UnRegisterAllNodes()
 	bcp.connections = make(map[string]runner.Runner)
 	logrus.Info("do finish binary deployment success")
 }

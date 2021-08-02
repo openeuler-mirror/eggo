@@ -196,13 +196,12 @@ func (t *removeEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfig) error
 }
 
 func execRemoveEtcdsTask(conf *api.ClusterConfig, node string) error {
-	taskRemoveEtcds := task.NewTaskInstance(
+	taskRemoveEtcds := task.NewTaskIgnoreErrInstance(
 		&removeEtcdsTask{
 			ccfg: conf,
 		},
 	)
 
-	task.SetIgnoreErrorFlag(taskRemoveEtcds)
 	if err := nodemanager.RunTaskOnNodes(taskRemoveEtcds, []string{node}); err != nil {
 		logrus.Errorf("run task for remove etcds failed: %v", err)
 		return err

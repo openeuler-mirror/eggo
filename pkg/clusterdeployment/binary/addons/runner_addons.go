@@ -122,7 +122,7 @@ func cleanupAddons(cluster *api.ClusterConfig) error {
 	yamlPath := filepath.Join(cluster.PackageSrc.GetPkgDstPath(), constants.DefaultFilePath)
 	kubeconfig := filepath.Join(cluster.GetConfigDir(), constants.KubeConfigFileNameAdmin)
 
-	t := task.NewTaskInstance(&CleanupAddonsTask{
+	t := task.NewTaskIgnoreErrInstance(&CleanupAddonsTask{
 		yaml:       yaml,
 		srcPath:    yamlPath,
 		kubeconfig: kubeconfig,
@@ -134,7 +134,6 @@ func cleanupAddons(cluster *api.ClusterConfig) error {
 		}
 	}
 
-	task.SetIgnoreErrorFlag(t)
 	useMaster, err := nodemanager.RunTaskOnOneNode(t, masters)
 	if err != nil {
 		return err

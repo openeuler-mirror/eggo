@@ -419,13 +419,12 @@ func NodeInfrastructureDestroy(config *api.ClusterConfig, hostconfig *api.HostCo
 		return fmt.Errorf("do not register %d roleinfra", hostconfig.Type)
 	}
 
-	itask := task.NewTaskInstance(
+	itask := task.NewTaskIgnoreErrInstance(
 		&DestroyInfraTask{
 			packageSrc: &config.PackageSrc,
 			roleInfra:  roleInfra,
 		})
 
-	task.SetIgnoreErrorFlag(itask)
 	if err := nodemanager.RunTaskOnNodes(itask, []string{hostconfig.Address}); err != nil {
 		return fmt.Errorf("destroy infrastructure Task failed: %v", err)
 	}

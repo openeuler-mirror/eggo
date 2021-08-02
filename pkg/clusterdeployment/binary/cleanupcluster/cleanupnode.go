@@ -218,7 +218,7 @@ func (t *removeWorkerTask) Run(r runner.Runner, hostConfig *api.HostConfig) erro
 }
 
 func execRemoveWorkerTask(conf *api.ClusterConfig, hostconfig *api.HostConfig) error {
-	taskRemoveWorker := task.NewTaskInstance(
+	taskRemoveWorker := task.NewTaskIgnoreErrInstance(
 		&removeWorkerTask{
 			ccfg:       conf,
 			workerName: hostconfig.Name,
@@ -230,7 +230,6 @@ func execRemoveWorkerTask(conf *api.ClusterConfig, hostconfig *api.HostConfig) e
 		return fmt.Errorf("failed to get first master")
 	}
 
-	task.SetIgnoreErrorFlag(taskRemoveWorker)
 	if err := nodemanager.RunTaskOnNodes(taskRemoveWorker, []string{master}); err != nil {
 		return err
 	}
@@ -249,14 +248,13 @@ func CleanupNode(conf *api.ClusterConfig, hostconfig *api.HostConfig, delType ui
 		}
 	}
 
-	taskCleanupNode := task.NewTaskInstance(
+	taskCleanupNode := task.NewTaskIgnoreErrInstance(
 		&cleanupNodeTask{
 			ccfg:    conf,
 			delType: delType,
 		},
 	)
 
-	task.SetIgnoreErrorFlag(taskCleanupNode)
 	if err := nodemanager.RunTaskOnNodes(taskCleanupNode, []string{hostconfig.Address}); err != nil {
 		return fmt.Errorf("run task for cleanup cluster failed: %v", err)
 	}
