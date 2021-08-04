@@ -1,0 +1,20 @@
+# permissions for end users to view machinebindings.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: machinebinding-viewer-role
+rules:
+- apiGroups:
+  - eggo.isula.org
+  resources:
+  - machinebindings
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - eggo.isula.org
+  resources:
+  - machinebindings/status
+  verbs:
+  - get

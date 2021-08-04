@@ -1,0 +1,7 @@
+apiVersion: eggo.isula.org/v1
+kind: MachineBinding
+metadata:
+  name: machinebinding-sample
+spec:
+  # Add fields here
+  foo: bar

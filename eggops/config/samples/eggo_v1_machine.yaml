@@ -1,0 +1,7 @@
+apiVersion: eggo.isula.org/v1
+kind: Machine
+metadata:
+  name: machine-sample
+spec:
+  # Add fields here
+  foo: bar

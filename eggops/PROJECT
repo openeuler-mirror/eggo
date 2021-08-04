@@ -1,0 +1,33 @@
+domain: isula.org
+layout:
+- go.kubebuilder.io/v3
+projectName: eggops
+repo: isula.org/eggo/eggops
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: isula.org
+  group: eggo
+  kind: Machine
+  path: isula.org/eggo/eggops/api/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: isula.org
+  group: eggo
+  kind: Cluster
+  path: isula.org/eggo/eggops/api/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: isula.org
+  group: eggo
+  kind: MachineBinding
+  path: isula.org/eggo/eggops/api/v1
+  version: v1
+version: "3"
