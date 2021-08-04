@@ -39,6 +39,7 @@ type eggoOptions struct {
 	version          bool
 	joinType         string
 	joinClusterID    string
+	joinYaml         string
 	joinHost         HostConfig
 	delName          string
 	delClusterID     string
@@ -74,11 +75,12 @@ func setupCleanupCmdOpts(cleanupCmd *cobra.Command) {
 
 func setupJoinCmdOpts(joinCmd *cobra.Command) {
 	flags := joinCmd.Flags()
-	flags.StringVarP(&opts.joinType, "type", "t", "worker", "join type, can be \"master,worker\", deault worker")
+	flags.StringVarP(&opts.joinType, "type", "t", "", "join type, can be \"master,worker\", deault worker")
 	flags.StringVarP(&opts.joinHost.Arch, "arch", "a", "", "host's architecture")
 	flags.StringVarP(&opts.joinHost.Name, "name", "n", "", "host's name")
 	flags.IntVarP(&opts.joinHost.Port, "port", "p", 0, "host's ssh port")
 	flags.StringVarP(&opts.joinClusterID, "id", "", "", "cluster id")
+	flags.StringVarP(&opts.joinYaml, "file", "f", "", "yaml file contain nodes infomation")
 }
 
 func setupDeleteCmdOpts(deleteCmd *cobra.Command) {

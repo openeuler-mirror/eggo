@@ -20,7 +20,6 @@ import (
 	"path/filepath"
 
 	"isula.org/eggo/pkg/api"
-	"isula.org/eggo/pkg/utils"
 	"isula.org/eggo/pkg/utils/certs"
 	"isula.org/eggo/pkg/utils/runner"
 )
@@ -57,17 +56,12 @@ func genEtcdHealthcheckClientCerts(savePath string, hostname string, cg certs.Ce
 	}, savePath, "healthcheck-client")
 }
 
-func genApiserverEtcdClientCerts(savePath string, hostnameList []string, ipList []string, cg certs.CertGenerator,
-	ccfg *api.ClusterConfig) error {
+func genApiserverEtcdClientCerts(savePath string, cg certs.CertGenerator, ccfg *api.ClusterConfig) error {
 	return cg.CreateCertAndKey(filepath.Join(savePath, "etcd", "ca.crt"), filepath.Join(savePath, "etcd", "ca.key"),
 		&certs.CertConfig{
 			CommonName:    "kube-apiserver-etcd-client",
 			Organizations: []string{"system:masters"},
-			AltNames: certs.AltNames{
-				IPs:      append(ipList, "127.0.0.1"),
-				DNSNames: append(hostnameList, "localhost"),
-			},
-			Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			Usages:        []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		}, savePath, "apiserver-etcd-client")
 }
 
@@ -108,17 +102,8 @@ func generateCaAndApiserverEtcdCerts(r runner.Runner, ccfg *api.ClusterConfig) e
 		return err
 	}
 
-	var hostnameList []string
-	var ipList []string
-	for _, node := range ccfg.Nodes {
-		if utils.IsType(node.Type, api.Master) {
-			hostnameList = append(hostnameList, node.Name)
-			ipList = append(ipList, node.Address)
-		}
-	}
-
 	// generate apiserver-etcd-client certificates
-	if err := genApiserverEtcdClientCerts(savePath, hostnameList, ipList, cg, ccfg); err != nil {
+	if err := genApiserverEtcdClientCerts(savePath, cg, ccfg); err != nil {
 		return err
 	}
 

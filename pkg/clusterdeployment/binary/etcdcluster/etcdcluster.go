@@ -43,7 +43,8 @@ type copyInfo struct {
 }
 
 type EtcdDeployEtcdsTask struct {
-	ccfg *api.ClusterConfig
+	ccfg           *api.ClusterConfig
+	initialCluster string
 }
 
 func (t *EtcdDeployEtcdsTask) Name() string {
@@ -99,7 +100,8 @@ func (t *EtcdDeployEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfig) e
 	}
 
 	// prepare config
-	if err := prepareEtcdConfigs(t.ccfg, r, hostConfig, EtcdConfFile, EtcdServiceFile); err != nil {
+	if err := prepareEtcdConfigs(t.ccfg, r, hostConfig, t.initialCluster, EtcdConfFile,
+		EtcdServiceFile); err != nil {
 		return err
 	}
 
@@ -146,11 +148,17 @@ func (t *EtcdPostDeployEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfi
 		return fmt.Errorf("empty host config")
 	}
 
-	if err := healthcheck(r, getDstEtcdCertsDir(t.ccfg), hostConfig.Address); err != nil {
-		return err
+	var err error
+	retry := 10
+	for retry != 0 {
+		if err = healthcheck(r, getDstEtcdCertsDir(t.ccfg), hostConfig.Address); err == nil {
+			return nil
+		}
+		retry--
+		time.Sleep(3 * time.Second)
 	}
 
-	return nil
+	return fmt.Errorf("etcd %v healthcheck failed: %v", hostConfig.Name, err)
 }
 
 func prepareEtcdDir(r runner.Runner) error {
@@ -165,7 +173,7 @@ func prepareEtcdDir(r runner.Runner) error {
 	return nil
 }
 
-func prepareEtcdConfigs(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *api.HostConfig,
+func prepareEtcdConfigs(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *api.HostConfig, initialCluster string,
 	confPath string, servicePath string) error {
 	var peerAddresses string
 	dataDir := ccfg.EtcdCluster.DataDir
@@ -177,12 +185,17 @@ func prepareEtcdConfigs(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *ap
 	if len(nodes) == 0 {
 		return fmt.Errorf("no etcd node found in config")
 	}
-
-	for i, node := range nodes {
-		if i != 0 {
-			peerAddresses += ","
+	state := "new"
+	if initialCluster != "" {
+		state = "existing"
+		peerAddresses = initialCluster
+	} else {
+		for i, node := range nodes {
+			if i != 0 {
+				peerAddresses += ","
+			}
+			peerAddresses += node.Name + "=https://" + node.Address + ":2380"
 		}
-		peerAddresses += node.Name + "=https://" + node.Address + ":2380"
 	}
 
 	conf := &etcdEnvConfig{
@@ -190,7 +203,7 @@ func prepareEtcdConfigs(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *ap
 		Ip:            hostConfig.Address,
 		Token:         ccfg.EtcdCluster.Token,
 		Hostname:      hostConfig.Name,
-		State:         "new",
+		State:         state,
 		PeerAddresses: peerAddresses,
 		DataDir:       dataDir,
 		CertsDir:      ccfg.GetCertDir(),

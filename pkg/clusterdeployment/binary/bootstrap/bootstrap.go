@@ -308,7 +308,8 @@ func JoinMaster(config *api.ClusterConfig, master *api.HostConfig) error {
 	joinMasterTasks := []task.Task{
 		task.NewTaskInstance(
 			&commontools.CopyCaCertificatesTask{
-				Cluster: config,
+				Cluster:  config,
+				JoinType: master.Type,
 			},
 		),
 		task.NewTaskInstance(
@@ -340,7 +341,8 @@ func JoinWorker(config *api.ClusterConfig, controlPlane *api.HostConfig, worker 
 	joinWorkerTasks := []task.Task{
 		task.NewTaskInstance(
 			&commontools.CopyCaCertificatesTask{
-				Cluster: config,
+				Cluster:  config,
+				JoinType: worker.Type,
 			},
 		),
 		task.NewTaskInstance(

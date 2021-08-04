@@ -73,7 +73,7 @@ func TestDeployEtcd(t *testing.T) {
 		Arch:    "aarch64",
 		Name:    "node0",
 		Address: "192.168.0.1",
-	}, filepath.Join(dstTempDir, "etcd.conf"), filepath.Join(dstTempDir, "etcd.service")); err != nil {
+	}, "", filepath.Join(dstTempDir, "etcd.conf"), filepath.Join(dstTempDir, "etcd.service")); err != nil {
 		t.Fatalf("prepare etcd configs failed: %v", err)
 	}
 

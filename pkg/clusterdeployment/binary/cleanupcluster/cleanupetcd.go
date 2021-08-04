@@ -80,7 +80,7 @@ func CleanupEtcdMember(conf *api.ClusterConfig, hostconfig *api.HostConfig) erro
 
 	// delete etcd member
 	if err := etcdcluster.ExecRemoveMemberTask(conf, hostconfig); err != nil {
-		return fmt.Errorf("remove etcd member %v failed", hostconfig.Name)
+		return fmt.Errorf("remove etcd member %v failed: %v", hostconfig.Name, err)
 	}
 
 	// cleanup remains
@@ -94,7 +94,7 @@ func CleanupEtcdMember(conf *api.ClusterConfig, hostconfig *api.HostConfig) erro
 		return fmt.Errorf("run task for cleanup etcd member failed: %v", err)
 	}
 
-	if err := nodemanager.WaitNodesFinish([]string{hostconfig.Address}, time.Minute*5); err != nil {
+	if err := nodemanager.WaitNodesFinish([]string{hostconfig.Address}, time.Minute); err != nil {
 		return fmt.Errorf("wait for cleanup etcd member task finish failed: %v", err)
 	}
 
@@ -109,7 +109,7 @@ func CleanupAllEtcds(conf *api.ClusterConfig) error {
 	}
 
 	if err := etcdcluster.ExecRemoveEtcdsTask(conf); err != nil {
-		return fmt.Errorf("remove etcds failed")
+		logrus.Errorf("remove etcds failed: %v", err)
 	}
 
 	// cleanup remains

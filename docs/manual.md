@@ -104,15 +104,48 @@ $ eggo -d deploy -f deploy.yaml
 
 ### 3. 将master或者worker加入到k8s集群
 
+join单个节点：
+
 ```
 $ eggo -d join --id k8s-cluster --type master,worker --arch arm64 --port 22 192.168.0.5
 ```
 
 * -d参数表示打印调试信息
 * --id集群的id
-* --type可以为master或者worker，默认为worker，也可以同时作为master和worker加入，值为master,worker
+* --type可以为master或者worker，默认为worker，也可以同时作为master和worker加入，值为master,worker，如果添加的类型里有master，则会同时部署etcd到该节点。
 * --arch机器架构，支持amd64或者arm64，不填则使用原有配置，无配置则用默认值amd64
 * --port使用ssh登录的端口号，不填则使用原有配置，无配置则用默认值22
+
+
+
+join多个节点时需要将join的信息放到yaml配置里：
+
+```
+$ eggo -d join --id k8s-cluster --file join.yaml
+```
+
+* --file 指定yaml文件，yaml文件格式如下
+
+  ```
+  masters:                          // 配置master节点的列表，建议每个master节点同时作为node节点，否则master节点可以无法直接访问pod
+  - name: test0                     // 该节点的名称，为k8s集群看到的该节点的名称
+    ip: 192.168.0.2                 // 该节点的ip地址
+    port: 22                        // ssh登录的端口
+    arch: arm64                     // 机器架构，x86_64的填amd64
+  - name: test1
+    ip: 192.168.0.3
+    port: 22
+    arch: arm64
+  workers:                          // 配置worker节点的列表
+  - name: test0                     // 该节点的名称，为k8s集群看到的该节点的名称
+    ip: 192.168.0.4                 // 该节点的ip地址
+    port: 22                        // ssh登录的端口
+    arch: arm64                     // 机器架构，x86_64的填amd64
+  - name: test2
+    ip: 192.168.0.5
+    port: 22
+    arch: arm64
+  ```
 
 
 
@@ -134,16 +167,16 @@ $ eggo -d cleanup --id k8s-cluster -f deploy.yaml
 
 
 
-####  2. 也可以只拆除master和worker
+####  2. 也可以只拆除指定节点
 
 ```
-$ eggo -d delete --id k8s-cluster --type master,worker 192.168.0.5
+$ eggo -d delete --id k8s-cluster 192.168.0.5 192.168.0.6
 ```
 
 * -d参数表示打印调试信息
 * --id集群的id
 * --type可以为master或者worker，默认worker
-* 192.168.0.5 需要删除的机器的IP地址或者名称
+* 192.168.0.5 需要删除的机器的IP地址列表或者名称列表，注意第1个master节点不能删除
 
 
 
