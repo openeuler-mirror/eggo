@@ -20,6 +20,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -39,12 +40,32 @@ func initLog() {
 	})
 }
 
+func preCheck() {
+	proxies := []string{"http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"}
+	var sb strings.Builder
+	sb.WriteString("Warning:\n")
+	flag := false
+	for _, p := range proxies {
+		if v := os.Getenv(p); v != "" {
+			flag = true
+			sb.WriteString(fmt.Sprintf("\tproxy is setted: %s=%s\n", p, v))
+		}
+	}
+	if flag {
+		sb.WriteString("Maybe cause to failure!!!\n")
+		fmt.Println(sb.String())
+	}
+}
+
 func NewEggoCmd() *cobra.Command {
 	eggoCmd := &cobra.Command{
 		Short:         "eggo is a tool built to provide standard multi-ways for creating Kubernetes clusters",
 		Use:           "eggo",
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			preCheck()
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.version {
 				showVersion()

@@ -112,11 +112,15 @@ var (
 	// coredns
 	CorednsPorts = []*api.OpenPorts{
 		{
-			Port:     111,
+			Port:     53,
 			Protocol: "tcp",
 		},
 		{
-			Port:     179,
+			Port:     53,
+			Protocol: "udp",
+		},
+		{
+			Port:     9153,
 			Protocol: "tcp",
 		},
 	}

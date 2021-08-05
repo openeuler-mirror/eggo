@@ -243,11 +243,8 @@ runtime: docker                             // 使用哪种容器运行时，目
 registry-mirrors: []                        // 下载容器镜像时使用的镜像仓库的mirror站点地址
 insecure-registries: []                     // 下载容器镜像时运行使用http协议下载镜像的镜像仓库地址
 config-extra-args: []                       // 各个组件(kube-apiserver/etcd等)服务启动配置的额外参数
-addons:                                     // 配置第三方插件
-- type: file                                // 插件类型，目前只支持file类型
-  filename: xxx.yaml                        // 插件名称，注意需要将对应插件放到tar.gz包中的addons目录下
 open-ports:                                 // 配置需要额外打开的端口，k8s自身所需端口不需要进行配置，额外的插件的端口需要进行额外配置
-  node:                                     // 指定在那种类型的节点上打开端口，可以是master/node/etcd/loadbalance
+  worker:                                   // 指定在那种类型的节点上打开端口，可以是master/worker/etcd/loadbalance
   - port: 111                               // 端口地址
     protocol: tcp                           // 端口类型，tcp/udp
   - port: 179
