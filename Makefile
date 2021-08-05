@@ -14,7 +14,7 @@ local:
 	@echo "build eggo use vendor done!"
 test:
 	@echo "Unit tests starting..."
-	@go test -race -cover -count=1 -timeout=300s  ./...
+	@go test $(shell go list ./... | grep -v /eggops) -race -cover -count=1 -timeout=300s
 	@echo "Units test done!"
 
 images: image-eggo
