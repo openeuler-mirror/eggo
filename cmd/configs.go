@@ -50,7 +50,7 @@ var (
 )
 
 func ToEggoPackageConfig(pcs []*PackageConfig) []*api.PackageConfig {
-	res := make([]*api.PackageConfig, len(pcs))
+	var res []*api.PackageConfig
 	for _, pc := range pcs {
 		res = append(res, &api.PackageConfig{
 			Name:     pc.Name,
@@ -64,7 +64,7 @@ func ToEggoPackageConfig(pcs []*PackageConfig) []*api.PackageConfig {
 }
 
 func ToEggoOpenPort(ports []*OpenPorts) []*api.OpenPorts {
-	res := make([]*api.OpenPorts, len(ports))
+	var res []*api.OpenPorts
 	for _, pc := range ports {
 		res = append(res, &api.OpenPorts{
 			Port:     pc.Port,
@@ -232,9 +232,6 @@ func appendSoftware(software, packageConfig, defaultPackage []*api.PackageConfig
 
 	result := software
 	for _, p := range packages {
-		if p == nil {
-			continue
-		}
 		splitSoftware := strings.Split(p.Name, ",")
 		for _, s := range splitSoftware {
 			result = append(result, &api.PackageConfig{
