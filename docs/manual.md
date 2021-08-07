@@ -104,15 +104,48 @@ $ eggo -d deploy -f deploy.yaml
 
 ### 3. 将master或者worker加入到k8s集群
 
+join单个节点：
+
 ```
 $ eggo -d join --id k8s-cluster --type master,worker --arch arm64 --port 22 192.168.0.5
 ```
 
 * -d参数表示打印调试信息
 * --id集群的id
-* --type可以为master或者worker，默认为worker，也可以同时作为master和worker加入，值为master,worker
+* --type可以为master或者worker，默认为worker，也可以同时作为master和worker加入，值为master,worker，如果添加的类型里有master，则会同时部署etcd到该节点。
 * --arch机器架构，支持amd64或者arm64，不填则使用原有配置，无配置则用默认值amd64
 * --port使用ssh登录的端口号，不填则使用原有配置，无配置则用默认值22
+
+
+
+join多个节点时需要将join的信息放到yaml配置里：
+
+```
+$ eggo -d join --id k8s-cluster --file join.yaml
+```
+
+* --file 指定yaml文件，yaml文件格式如下
+
+  ```
+  masters:                          // 配置master节点的列表，建议每个master节点同时作为node节点，否则master节点可以无法直接访问pod
+  - name: test0                     // 该节点的名称，为k8s集群看到的该节点的名称
+    ip: 192.168.0.2                 // 该节点的ip地址
+    port: 22                        // ssh登录的端口
+    arch: arm64                     // 机器架构，x86_64的填amd64
+  - name: test1
+    ip: 192.168.0.3
+    port: 22
+    arch: arm64
+  workers:                          // 配置worker节点的列表
+  - name: test0                     // 该节点的名称，为k8s集群看到的该节点的名称
+    ip: 192.168.0.4                 // 该节点的ip地址
+    port: 22                        // ssh登录的端口
+    arch: arm64                     // 机器架构，x86_64的填amd64
+  - name: test2
+    ip: 192.168.0.5
+    port: 22
+    arch: arm64
+  ```
 
 
 
@@ -134,16 +167,16 @@ $ eggo -d cleanup --id k8s-cluster -f deploy.yaml
 
 
 
-####  2. 也可以只拆除master和worker
+####  2. 也可以只拆除指定节点
 
 ```
-$ eggo -d delete --id k8s-cluster --type master,worker 192.168.0.5
+$ eggo -d delete --id k8s-cluster 192.168.0.5 192.168.0.6
 ```
 
 * -d参数表示打印调试信息
 * --id集群的id
 * --type可以为master或者worker，默认worker
-* 192.168.0.5 需要删除的机器的IP地址或者名称
+* 192.168.0.5 需要删除的机器的IP地址列表或者名称列表，注意第1个master节点不能删除
 
 
 
@@ -210,11 +243,8 @@ runtime: docker                             // 使用哪种容器运行时，目
 registry-mirrors: []                        // 下载容器镜像时使用的镜像仓库的mirror站点地址
 insecure-registries: []                     // 下载容器镜像时运行使用http协议下载镜像的镜像仓库地址
 config-extra-args: []                       // 各个组件(kube-apiserver/etcd等)服务启动配置的额外参数
-addons:                                     // 配置第三方插件
-- type: file                                // 插件类型，目前只支持file类型
-  filename: xxx.yaml                        // 插件名称，注意需要将对应插件放到tar.gz包中的addons目录下
 open-ports:                                 // 配置需要额外打开的端口，k8s自身所需端口不需要进行配置，额外的插件的端口需要进行额外配置
-  node:                                     // 指定在那种类型的节点上打开端口，可以是master/node/etcd/loadbalance
+  worker:                                   // 指定在那种类型的节点上打开端口，可以是master/worker/etcd/loadbalance
   - port: 111                               // 端口地址
     protocol: tcp                           // 端口类型，tcp/udp
   - port: 179

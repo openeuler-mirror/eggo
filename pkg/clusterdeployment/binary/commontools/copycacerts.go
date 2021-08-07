@@ -19,9 +19,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/utils/runner"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -46,7 +46,8 @@ var (
 )
 
 type CopyCaCertificatesTask struct {
-	Cluster *api.ClusterConfig
+	Cluster  *api.ClusterConfig
+	JoinType uint16
 }
 
 func (ct *CopyCaCertificatesTask) Name() string {
@@ -88,12 +89,14 @@ func getRequireCerts(hostType uint16) []string {
 }
 
 func (ct *CopyCaCertificatesTask) Run(r runner.Runner, hcf *api.HostConfig) error {
-	requireCerts := getRequireCerts(hcf.Type)
+	hostType := hcf.Type | ct.JoinType
+
+	requireCerts := getRequireCerts(hostType)
 	if !checkCaExists(ct.Cluster.Name, requireCerts) {
 		return fmt.Errorf("[certs] cannot find ca certificates")
 	}
 	cmd := fmt.Sprintf("sudo -E /bin/sh -c \"mkdir -p %s\"", ct.Cluster.Certificate.SavePath)
-	if (hcf.Type&api.ETCD) != 0 || (hcf.Type&api.Master) != 0 {
+	if (hostType&api.ETCD) != 0 || (hostType&api.Master) != 0 {
 		cmd = fmt.Sprintf("sudo -E /bin/sh -c \"mkdir -p %s/etcd\"", ct.Cluster.Certificate.SavePath)
 	}
 

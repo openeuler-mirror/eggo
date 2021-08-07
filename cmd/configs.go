@@ -50,7 +50,7 @@ var (
 )
 
 func ToEggoPackageConfig(pcs []*PackageConfig) []*api.PackageConfig {
-	res := make([]*api.PackageConfig, len(pcs))
+	var res []*api.PackageConfig
 	for _, pc := range pcs {
 		res = append(res, &api.PackageConfig{
 			Name:     pc.Name,
@@ -64,7 +64,7 @@ func ToEggoPackageConfig(pcs []*PackageConfig) []*api.PackageConfig {
 }
 
 func ToEggoOpenPort(ports []*OpenPorts) []*api.OpenPorts {
-	res := make([]*api.OpenPorts, len(ports))
+	var res []*api.OpenPorts
 	for _, pc := range ports {
 		res = append(res, &api.OpenPorts{
 			Port:     pc.Port,
@@ -232,9 +232,6 @@ func appendSoftware(software, packageConfig, defaultPackage []*api.PackageConfig
 
 	result := software
 	for _, p := range packages {
-		if p == nil {
-			continue
-		}
 		splitSoftware := strings.Split(p.Name, ",")
 		for _, s := range splitSoftware {
 			result = append(result, &api.PackageConfig{
@@ -324,40 +321,6 @@ func appendNodeNoDup(hostconfigs []*HostConfig, hostconfig *HostConfig) []*HostC
 	return append(hostconfigs, hostconfig)
 }
 
-func deleteNodebyDelName(hostconfigs []*HostConfig, delName string) ([]*HostConfig, error) {
-	for i, h := range hostconfigs {
-		if h.Ip == delName || h.Name == delName {
-			result := append(hostconfigs[:i], hostconfigs[i+1:]...)
-			if len(result) == 0 {
-				return nil, nil
-			}
-			return result, nil
-		}
-	}
-	return nil, fmt.Errorf("delete node from config failed: %v not found", delName)
-}
-
-func deleteConfig(userConfig *deployConfig, delType string, delName string) error {
-	var err error
-	types := strings.Split(delType, ",")
-	for _, nodeType := range types {
-		if nodeType == MasterRole {
-			userConfig.Masters, err = deleteNodebyDelName(userConfig.Masters, delName)
-		}
-		if nodeType == WorkerRole {
-			userConfig.Workers, err = deleteNodebyDelName(userConfig.Workers, delName)
-		}
-		if nodeType == ETCDRole {
-			userConfig.Etcds, err = deleteNodebyDelName(userConfig.Etcds, delName)
-		}
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func getHostConfigByIp(nodes []*HostConfig, ip string) *HostConfig {
 	for _, node := range nodes {
 		if node.Ip == ip {
@@ -387,105 +350,43 @@ func checkJoinParam(joinHost *HostConfig, host *HostConfig) error {
 	return nil
 }
 
-func getHostConfigByName(hostconfigs []*api.HostConfig, name string) *api.HostConfig {
-	for _, h := range hostconfigs {
-		if h.Name == name || h.Address == name {
-			return h
-		}
-	}
-	return nil
+func getAllHostConfigs(conf *deployConfig) []*HostConfig {
+	allHostConfigs := append(conf.Masters, conf.Workers...)
+	allHostConfigs = append(allHostConfigs, conf.Etcds...)
+	allHostConfigs = append(allHostConfigs, &HostConfig{
+		Name: conf.LoadBalance.Name,
+		Ip:   conf.LoadBalance.Ip,
+		Port: conf.LoadBalance.Port,
+		Arch: conf.LoadBalance.Arch,
+	})
+
+	return allHostConfigs
 }
 
-func joinConfig(userConfig *deployConfig, joinType string, joinHost *HostConfig) (*deployConfig, *api.HostConfig, error) {
-	mergedConf := *userConfig
-	masters := userConfig.Masters
-	userConfig.Masters = nil
-	workers := userConfig.Workers
-	userConfig.Workers = nil
-	etcds := userConfig.Etcds
-	userConfig.Etcds = nil
-	loadbalance := userConfig.LoadBalance
-	userConfig.LoadBalance = LoadBalance{}
-	defer func() {
-		userConfig.Masters = masters
-		userConfig.Workers = workers
-		userConfig.Etcds = etcds
-		userConfig.LoadBalance = loadbalance
-	}()
+func createHostConfig(host *HostConfig, joinHost *HostConfig, defaultName string) *HostConfig {
+	var hostconfig HostConfig
 
-	host := getHostConfigByIp(masters, joinHost.Ip)
-	if host == nil {
-		host = getHostConfigByIp(workers, joinHost.Ip)
-	}
-	if err := checkJoinParam(joinHost, host); err != nil {
-		return nil, nil, err
-	}
-
-	types := strings.Split(joinType, ",")
-	for _, nodeType := range types {
-		if nodeType != MasterRole && nodeType != WorkerRole {
-			return nil, nil, fmt.Errorf("invalid join type %v, only support master and worker currently", nodeType)
+	if host != nil {
+		hostconfig.Name = host.Name
+		hostconfig.Arch = host.Arch
+		hostconfig.Port = host.Port
+	} else {
+		hostconfig.Name = defaultName
+		if joinHost.Name != "" {
+			hostconfig.Name = joinHost.Name
 		}
-
-		var hostconfig HostConfig
-		var index int
-
-		if nodeType == MasterRole {
-			index = len(masters)
+		hostconfig.Arch = "amd64"
+		if joinHost.Arch != "" {
+			hostconfig.Arch = joinHost.Arch
 		}
-		if nodeType == WorkerRole {
-			index = len(workers)
-		}
-
-		if host != nil {
-			hostconfig.Name = host.Name
-			hostconfig.Arch = host.Arch
-			hostconfig.Port = host.Port
-		} else {
-			if joinHost.Name != "" {
-				hostconfig.Name = joinHost.Name
-			} else {
-				hostconfig.Name = defaultHostName(userConfig.ClusterID, nodeType, index)
-			}
-			if joinHost.Arch != "" {
-				hostconfig.Arch = joinHost.Arch
-			} else {
-				hostconfig.Arch = "amd64"
-			}
-			if joinHost.Port != 0 {
-				hostconfig.Port = joinHost.Port
-			} else {
-				hostconfig.Port = 22
-			}
-		}
-		hostconfig.Ip = joinHost.Ip
-
-		if nodeType == MasterRole {
-			userConfig.Masters = []*HostConfig{&hostconfig}
-			mergedConf.Masters = appendNodeNoDup(masters, &hostconfig)
-		}
-		if nodeType == WorkerRole {
-			userConfig.Workers = []*HostConfig{&hostconfig}
-			mergedConf.Workers = appendNodeNoDup(workers, &hostconfig)
-		}
-
-		host = &hostconfig
-	}
-
-	var joinHostConfig *api.HostConfig
-	config := toClusterdeploymentConfig(userConfig)
-	for _, h := range config.Nodes {
-		if h.Address == joinHost.Ip {
-			joinHostConfig = h
-			break
+		hostconfig.Port = 22
+		if joinHost.Port != 0 {
+			hostconfig.Port = joinHost.Port
 		}
 	}
-	if joinHostConfig == nil {
-		// This should never happen
-		return nil, nil, fmt.Errorf("can not found join host config")
-	}
+	hostconfig.Ip = joinHost.Ip
 
-	return &mergedConf, joinHostConfig, nil
+	return &hostconfig
 }
 
 func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
