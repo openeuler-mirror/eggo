@@ -546,6 +546,27 @@ func fillAPIEndPoint(APIEndpoint *api.APIEndpoint, conf *deployConfig) {
 	APIEndpoint.BindPort = int32(iport)
 }
 
+func fillExtrArgs(ccfg *api.ClusterConfig, eargs []*ConfigExtraArgs) {
+	for _, ea := range eargs {
+		switch ea.Name {
+		case "etcd":
+			api.WithEtcdExtrArgs(ea.ExtraArgs)(ccfg)
+		case "kube-apiserver":
+			api.WithAPIServerExtrArgs(ea.ExtraArgs)(ccfg)
+		case "kube-controller-manager":
+			api.WithControllerManagerExtrArgs(ea.ExtraArgs)(ccfg)
+		case "kube-scheduler":
+			api.WithSchedulerExtrArgs(ea.ExtraArgs)(ccfg)
+		case "kube-proxy":
+			api.WithKubeProxyExtrArgs(ea.ExtraArgs)(ccfg)
+		case "kubelet":
+			api.WithKubeletExtrArgs(ea.ExtraArgs)(ccfg)
+		default:
+			logrus.Warnf("unknow extra args key: %s", ea.Name)
+		}
+	}
+}
+
 func toClusterdeploymentConfig(conf *deployConfig) *api.ClusterConfig {
 	ccfg := getDefaultClusterdeploymentConfig()
 
@@ -585,6 +606,8 @@ func toClusterdeploymentConfig(conf *deployConfig) *api.ClusterConfig {
 	fillAPIEndPoint(&ccfg.APIEndpoint, conf)
 	fillPackageConfig(ccfg, &conf.InstallConfig)
 	fillOpenPort(ccfg, conf.OpenPorts, conf.Service.DNS.CorednsType)
+
+	fillExtrArgs(ccfg, conf.ConfigExtraArgs)
 
 	return ccfg
 }
