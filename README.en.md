@@ -1,7 +1,11 @@
 # eggo
 
 ### Description
-Eggo is a tool built to provide standard multi-ways for creating Kubernetes clusters.
+The Eggo project was designed to automate deployment of K8S clusters in mass production environments, track deployment processes, and provide a high degree of flexibility. By combining GitOps management and deployment configuration tracking, cluster deployment is implemented in cloud native mode, enabling cluster management.
+
+- Support for multiple deployments: binary and KUbeadm (to be implemented);
+- Supports multi-architecture deployment: a cluster supports nodes of multiple architectures;
+- Supports offline and online deployment;
 
 ### Software Architecture
 [Software architecture description](./docs/design.md)
