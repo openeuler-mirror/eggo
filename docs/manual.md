@@ -83,7 +83,7 @@ $ eggo template -f template.yaml
 另外，可以使用命令行修改机器列表等基本信息。
 
 ```
-$ eggo template -f template.yaml -n k8s-cluster -u username -p password --masters 192.168.0.1 --masters 192.168.0.2 --nodes 192.168.0.3 --etcds 192.168.0.4 --loadbalancer 192.168.0.5
+$ eggo template -f template.yaml -n k8s-cluster -u username -p password --masters 192.168.0.1 --masters 192.168.0.2 --workers 192.168.0.3 --etcds 192.168.0.4 --loadbalancer 192.168.0.5
 ```
 
 具体的deploy.yaml的配置见最后的"配置文件说明"章节
@@ -101,6 +101,8 @@ $ eggo -d deploy -f deploy.yaml
 - -f参数指定部署时使用的配置文件，不指定的话会从默认文件~/.eggo/deploy.yaml加载配置进行集群安装部署。
 
   说明：集群部署结束后可以执行命令`echo $?`来判断是否部署成功，输出为0则为部署成功。如果部署失败，则`echo $?`为非0,并且终端也会打印错误信息。
+
+**注意: 如果部署被强制中断，或者异常终止，建议使用清理命令`eggo cleanup -f deploy.yaml`，保证无残留信息。**
 
 ### 3. 将master或者worker加入到k8s集群
 
@@ -127,7 +129,7 @@ $ eggo -d join --id k8s-cluster --file join.yaml
 * --file 指定yaml文件，yaml文件格式如下
 
   ```
-  masters:                          // 配置master节点的列表，建议每个master节点同时作为node节点，否则master节点可以无法直接访问pod
+  masters:                          // 配置master节点的列表，建议每个master节点同时作为worker节点，否则master节点可以无法直接访问pod
   - name: test0                     // 该节点的名称，为k8s集群看到的该节点的名称
     ip: 192.168.0.2                 // 该节点的ip地址
     port: 22                        // ssh登录的端口
@@ -188,7 +190,7 @@ $ eggo -d delete --id k8s-cluster 192.168.0.5 192.168.0.6
 cluster-id: k8s-cluster           // 集群名称
 username: root                    // 需要部署k8s集群的机器的ssh登录用户名，所有机器都需要使用同一个用户名
 password: 123456                  // 需要部署k8s集群的机器的ssh登录密码，所有机器都需要使用同一个密码
-masters:                          // 配置master节点的列表，建议每个master节点同时作为node节点，否则master节点可以无法直接访问pod
+masters:                          // 配置master节点的列表，建议每个master节点同时作为worker节点，否则master节点可以无法直接访问pod
 - name: test0                     // 该节点的名称，为k8s集群看到的该节点的名称
   ip: 192.168.0.1                 // 该节点的ip地址
   port: 22                        // ssh登录的端口
@@ -242,7 +244,10 @@ cni-bin-dir: /usr/libexec/cni,/opt/cni/bin  // 网络插件地址，使用","分
 runtime: docker                             // 使用哪种容器运行时，目前支持docker和iSulad
 registry-mirrors: []                        // 下载容器镜像时使用的镜像仓库的mirror站点地址
 insecure-registries: []                     // 下载容器镜像时运行使用http协议下载镜像的镜像仓库地址
-config-extra-args: []                       // 各个组件(kube-apiserver/etcd等)服务启动配置的额外参数
+config-extra-args:                          // 各个组件(kube-apiserver/etcd等)服务启动配置的额外参数
+  - name: kubelet                           // name支持："etcd","kube-apiserver","kube-controller-manager","kube-scheduler","kube-proxy","kubelet"
+    extra-args:
+      "--cgroup-driver": systemd            // 注意key对应的组件的参数，需要带上"-"或者"--"
 open-ports:                                 // 配置需要额外打开的端口，k8s自身所需端口不需要进行配置，额外的插件的端口需要进行额外配置
   worker:                                   // 指定在那种类型的节点上打开端口，可以是master/worker/etcd/loadbalance
   - port: 111                               // 端口地址

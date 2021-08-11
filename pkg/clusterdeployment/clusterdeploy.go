@@ -216,8 +216,12 @@ func CreateCluster(cc *api.ClusterConfig) (api.ClusterStatus, error) {
 
 	failedNodes, err := doCreateCluster(handler, cc, &cstatus)
 	if err != nil {
-		logrus.Warnf("rollback cluster: %s", cc.Name)
 		doRemoveCluster(handler, cc)
+		if terr := os.RemoveAll(api.GetClusterHomePath(cc.Name)); terr != nil {
+			logrus.Warnf("[cluster] cleanup eggo config directory failed: %v", terr)
+		}
+
+		logrus.Warnf("rollbacked cluster: %s", cc.Name)
 		cstatus.Message = err.Error()
 		return cstatus, err
 	}
