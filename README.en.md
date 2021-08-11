@@ -5,6 +5,7 @@ The Eggo project was designed to automate deployment of K8S clusters in mass pro
 
 - Support for multiple deployments: binary and KUbeadm (to be implemented);
 - Supports multi-architecture deployment: a cluster supports nodes of multiple architectures;
+- Supports offline and online deployment;
 
 ### Software Architecture
 [Software architecture description](./docs/design.md)

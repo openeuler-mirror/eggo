@@ -121,3 +121,47 @@ func (cs *ClusterStatus) Show() string {
 
 	return sb.String()
 }
+
+type ClusterConfigOption func(conf *ClusterConfig) *ClusterConfig
+
+func WithEtcdExtrArgs(eargs map[string]string) ClusterConfigOption {
+	return func(conf *ClusterConfig) *ClusterConfig {
+		conf.EtcdCluster.ExtraArgs = eargs
+		return conf
+	}
+}
+
+func WithAPIServerExtrArgs(eargs map[string]string) ClusterConfigOption {
+	return func(conf *ClusterConfig) *ClusterConfig {
+		conf.ControlPlane.ApiConf.ExtraArgs = eargs
+		return conf
+	}
+}
+
+func WithControllerManagerExtrArgs(eargs map[string]string) ClusterConfigOption {
+	return func(conf *ClusterConfig) *ClusterConfig {
+		conf.ControlPlane.ManagerConf.ExtraArgs = eargs
+		return conf
+	}
+}
+
+func WithSchedulerExtrArgs(eargs map[string]string) ClusterConfigOption {
+	return func(conf *ClusterConfig) *ClusterConfig {
+		conf.ControlPlane.SchedulerConf.ExtraArgs = eargs
+		return conf
+	}
+}
+
+func WithKubeletExtrArgs(eargs map[string]string) ClusterConfigOption {
+	return func(conf *ClusterConfig) *ClusterConfig {
+		conf.WorkerConfig.KubeletConf.ExtraArgs = eargs
+		return conf
+	}
+}
+
+func WithKubeProxyExtrArgs(eargs map[string]string) ClusterConfigOption {
+	return func(conf *ClusterConfig) *ClusterConfig {
+		conf.WorkerConfig.ProxyConf.ExtraArgs = eargs
+		return conf
+	}
+}
