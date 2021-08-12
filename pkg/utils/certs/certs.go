@@ -21,9 +21,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/template"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -50,7 +50,7 @@ type CertGenerator interface {
 	CreateServiceAccount(savePath string) error
 	CreateCA(config *CertConfig, savePath string, name string) error
 	CreateCertAndKey(caCertPath, caKeyPath string, config *CertConfig, savePath string, name string) error
-	CreateKubeConfig(savePath, filename string, caCertPath, credName, certPath, keyPath string, enpoint string) error
+	CreateKubeConfig(savePath, filename string, caCertPath, clusterName, credName, certPath, keyPath string, enpoint string) error
 	CleanAll(savePath string) error
 }
 
@@ -197,13 +197,13 @@ func (o *OpensshBinCertGenerator) CreateCertAndKey(caCertPath, caKeyPath string,
 	return nil
 }
 
-func (o *OpensshBinCertGenerator) CreateKubeConfig(savePath, filename string, caCertPath, credName, certPath, keyPath string, enpoint string) error {
+func (o *OpensshBinCertGenerator) CreateKubeConfig(savePath, filename string, caCertPath, clusterName, credName, certPath, keyPath string, enpoint string) error {
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	sb.WriteString(fmt.Sprintf("cd %s", savePath))
-	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s kubectl config set-cluster default-cluster --server=%s --certificate-authority %s --embed-certs", filename, enpoint, caCertPath))
+	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s kubectl config set-cluster %s --server=%s --certificate-authority %s --embed-certs", filename, clusterName, enpoint, caCertPath))
 	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s kubectl config set-credentials %s --client-key %s --client-certificate %s --embed-certs", filename, credName, keyPath, certPath))
-	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s kubectl config set-context default-system --cluster default-cluster --user %s", filename, credName))
+	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s kubectl config set-context default-system --cluster %s --user %s", filename, clusterName, credName))
 	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s kubectl config use-context default-system", filename))
 	sb.WriteString("\"")
 	_, err := o.r.RunCommand(sb.String())

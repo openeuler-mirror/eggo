@@ -63,7 +63,7 @@ func TestNewLocalCertGenerator(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create cert and key for admin failed: %v", err)
 	}
-	err = cg.CreateKubeConfig(savePath, constants.KubeConfigFileNameAdmin, caCertPath, "default-admin",
+	err = cg.CreateKubeConfig(savePath, constants.KubeConfigFileNameAdmin, caCertPath, "default-cluster", "default-admin",
 		filepath.Join(savePath, "admin.crt"), filepath.Join(savePath, "admin.key"), "https://127.0.0.1:6443")
 	if err != nil {
 		t.Fatalf("create kubeconfig for admin failed: %v", err)
