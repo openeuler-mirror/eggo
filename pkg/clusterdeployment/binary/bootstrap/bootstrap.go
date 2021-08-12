@@ -173,7 +173,7 @@ func genKubeletBootstrapAndConfig(r runner.Runner, ccfg *api.ClusterConfig, toke
 func genKubeletBootstrap(r runner.Runner, ccfg *api.ClusterConfig, token, apiEndpoint string) error {
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"cd /etc/kubernetes/ && ")
-	sb.WriteString("kubectl config set-cluster kubernetes" +
+	sb.WriteString("kubectl config set-cluster " + ccfg.Name +
 		" --certificate-authority=/etc/kubernetes/pki/ca.crt" +
 		" --embed-certs=true" +
 		" --server=" + apiEndpoint +
@@ -184,7 +184,7 @@ func genKubeletBootstrap(r runner.Runner, ccfg *api.ClusterConfig, token, apiEnd
 		" --kubeconfig=kubelet-bootstrap.kubeconfig")
 	sb.WriteString(" && ")
 	sb.WriteString("kubectl config set-context default" +
-		" --cluster=kubernetes" +
+		" --cluster=" + ccfg.Name +
 		" --user=kubelet-bootstrap" +
 		" --kubeconfig=kubelet-bootstrap.kubeconfig")
 	sb.WriteString(" && ")
@@ -288,7 +288,7 @@ mode: "iptables"
 	rootPath := ccfg.GetConfigDir()
 	certPath := ccfg.GetCertDir()
 	configGen := certs.NewOpensshBinCertGenerator(r)
-	err := configGen.CreateKubeConfig(rootPath, KubeConfigFileNameKubeProxy, filepath.Join(certPath, "ca.crt"), "default-kube-proxy",
+	err := configGen.CreateKubeConfig(rootPath, KubeConfigFileNameKubeProxy, filepath.Join(certPath, "ca.crt"), ccfg.Name, "default-kube-proxy",
 		filepath.Join(certPath, "kube-proxy.crt"), filepath.Join(certPath, "kube-proxy.key"), apiEndpoint)
 	if err != nil {
 		logrus.Errorf("generate proxy kube config failed: %v", err)
