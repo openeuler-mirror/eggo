@@ -12,9 +12,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"isula.org/eggo/pkg/utils/runner"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"isula.org/eggo/pkg/utils/runner"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
@@ -177,10 +177,10 @@ func (l *LocalCertGenerator) CreateCertAndKey(caCertPath, caKeyPath string, conf
 	return nil
 }
 
-func (l *LocalCertGenerator) CreateKubeConfig(savePath, filename string, caCertPath, credName, certPath, keyPath string, endpoint string) error {
+func (l *LocalCertGenerator) CreateKubeConfig(savePath, filename string, caCertPath, clusterName, credName, certPath, keyPath string, endpoint string) error {
 	writeFile := filepath.Join(savePath, filename)
 	cfg := &CreateKubeConfig{
-		clusterName:    "default-cluster",
+		clusterName:    clusterName,
 		server:         endpoint,
 		caPath:         caCertPath,
 		credName:       credName,
