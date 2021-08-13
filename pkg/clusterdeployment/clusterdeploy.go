@@ -57,9 +57,9 @@ func splitNodes(nodes []*api.HostConfig) (*api.HostConfig, []*api.HostConfig, []
 	return lb, masters, workers, etcdNodes
 }
 
-func doJoinNodeOfCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, masters, workers []*api.HostConfig) ([]string, []*api.HostConfig, error) {
+func doJoinNodeOfCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, masters, workers []*api.HostConfig) ([]string, []*api.HostConfig, []*api.HostConfig) {
 	var joinedNodeIDs []string
-	var failedNodes []*api.HostConfig
+	var joinedNodes, failedNodes []*api.HostConfig
 	for _, node := range workers {
 		if err := handler.ClusterNodeJoin(node); err != nil {
 			failedNodes = append(failedNodes, node)
@@ -80,13 +80,23 @@ func doJoinNodeOfCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig
 		// update joined and failed nodes
 		failedNodes = append(failedNodes, tFailedNodes...)
 		joinedNodeIDs = successNodes
-		if len(successNodes) == 0 {
-			return joinedNodeIDs, nil, err
-		}
+		// allow all join nodes failed
 		logrus.Warnf("wait some node to complete join failed: %v", err)
 	}
+	flags := make(map[string]bool)
+	for _, jid := range joinedNodeIDs {
+		flags[jid] = true
+	}
+	for _, node := range workers {
+		for _, jid := range joinedNodeIDs {
+			if jid == node.Address {
+				joinedNodes = append(joinedNodes, node)
+				break
+			}
+		}
+	}
 
-	return joinedNodeIDs, failedNodes, nil
+	return joinedNodeIDs, joinedNodes, failedNodes
 }
 
 func doCreateCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, cstatus *api.ClusterStatus) ([]*api.HostConfig, error) {
@@ -144,9 +154,9 @@ func doCreateCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, cs
 	}
 
 	//Step6: setup left nodes for cluster
-	joinedNodeIDs, failedNodes, err := doJoinNodeOfCluster(handler, cc, masters, workers)
-	if err != nil {
-		return nil, err
+	joinedNodeIDs, joinedNodes, failedNodes := doJoinNodeOfCluster(handler, cc, masters, workers)
+	if len(joinedNodeIDs) == 0 {
+		logrus.Warnln("all join nodes failed")
 	}
 
 	//Step7: setup addons for cluster
@@ -155,7 +165,7 @@ func doCreateCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, cs
 	}
 
 	// Step8: run postcreate cluster hooks
-	if err = handler.PostCreateClusterHooks(); err != nil {
+	if err = handler.PostCreateClusterHooks(joinedNodes); err != nil {
 		return nil, err
 	}
 

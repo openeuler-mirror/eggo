@@ -61,6 +61,15 @@ $ eggo cleanup -f test.yaml
 
 详细的用法见 https://gitee.com/openeuler/eggo/blob/master/docs/manual.md
 
+### 发布版本
+
+```
+# Step 1: 升级VERSION文件版本号，并且合入修改
+$ vi VERSION
+# Step 2: 通过脚本获取release信息
+$ ./hack/releasenote.sh
+```
+
 ### 感谢
 
 本项目受[Kubekey](https://github.com/kubesphere/kubekey)的启发，感谢Kubekey的伟大工作。

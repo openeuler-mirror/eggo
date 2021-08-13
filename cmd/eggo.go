@@ -21,6 +21,7 @@ import (
 	"path"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -53,7 +54,9 @@ func preCheck() {
 	}
 	if flag {
 		sb.WriteString("Maybe cause to failure!!!\n")
+		sb.WriteString("Shutdown current operator!!!\n")
 		fmt.Println(sb.String())
+		time.Sleep(time.Second * 10)
 	}
 }
 
