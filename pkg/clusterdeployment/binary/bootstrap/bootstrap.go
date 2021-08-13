@@ -34,6 +34,7 @@ import (
 	"isula.org/eggo/pkg/utils/nodemanager"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/task"
+	"isula.org/eggo/pkg/utils/template"
 )
 
 const (
@@ -121,9 +122,31 @@ func check(r runner.Runner, ccfg *api.ClusterConfig) error {
 		return fmt.Errorf("invalid endpoint")
 	}
 
-	_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"ls %s\"", filepath.Join(ccfg.Certificate.SavePath, "ca.crt")))
+	checkTmpl := `
+#!/bin/bash
+if [ ! -f {{ .CAFile }} ]; then
+	echo "{{ .CAFile }} not found" 1>&2
+	exit 1
+fi
+
+if [ ! -f /etc/resolv.conf ]; then
+	echo "/etc/resolv.conf not found, will cause kubelet start failed" 1>&2
+	exit 1
+fi
+
+exit 0
+`
+	datastore := make(map[string]interface{})
+	datastore["CAFile"] = filepath.Join(ccfg.Certificate.SavePath, "ca.crt")
+
+	cmdStr, err := template.TemplateRender(checkTmpl, datastore)
 	if err != nil {
-		logrus.Errorf("check ca cert failed: %v\n", err)
+		return err
+	}
+
+	_, err = r.RunShell(cmdStr, "bootstrap-check")
+	if err != nil {
+		logrus.Errorf("bootstrap-check failed: %v\n", err)
 		return err
 	}
 

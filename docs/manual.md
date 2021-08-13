@@ -384,3 +384,13 @@ containers:
       - name: CALICO_IPV4POOL_CIDR
          value: "10.244.0.0/16"
 ```
+
+### resolv.conf缺失导致kubelet启动失败
+
+#### 现象
+
+kubelet启动不了，详细报错可以参考[issue](https://gitee.com/openeuler/eggo/issues/I457S5?from=project-issue)。
+
+#### 解决方法
+
+创建/etc/resolv.conf文件，并且设置合理的配置。

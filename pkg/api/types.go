@@ -240,7 +240,7 @@ type EtcdAPI interface {
 type ClusterManagerAPI interface {
 	// TODO: should add other dependence cluster configurations
 	PreCreateClusterHooks() error
-	PostCreateClusterHooks() error
+	PostCreateClusterHooks(nodes []*HostConfig) error
 	PreDeleteClusterHooks()
 	PostDeleteClusterHooks()
 

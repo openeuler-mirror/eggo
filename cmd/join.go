@@ -168,7 +168,7 @@ func getFailedInfos(failedConfigs []*api.HostConfig) map[string]uint16 {
 	return failedInfos
 }
 
-func dropFailedConfigs(conf *deployConfig, failedConfigs []*api.HostConfig) {
+func dropFailedConfigs(conf *DeployConfig, failedConfigs []*api.HostConfig) {
 	var masters []*HostConfig
 
 	failedInfos := getFailedInfos(failedConfigs)

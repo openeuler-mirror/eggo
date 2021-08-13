@@ -425,13 +425,13 @@ func (bcp *BinaryClusterDeployment) PreCreateClusterHooks() error {
 	return nil
 }
 
-func (bcp *BinaryClusterDeployment) PostCreateClusterHooks() error {
+func (bcp *BinaryClusterDeployment) PostCreateClusterHooks(nodes []*api.HostConfig) error {
 	role := []uint16{api.LoadBalance, api.ETCD, api.Master, api.Worker}
-	if err := dependency.HookSchedule(bcp.config, bcp.config.Nodes, role, api.SchedulePostJoin); err != nil {
+	if err := dependency.HookSchedule(bcp.config, nodes, role, api.SchedulePostJoin); err != nil {
 		return err
 	}
 
-	if err := checkK8sServices(bcp.config.Nodes); err != nil {
+	if err := checkK8sServices(nodes); err != nil {
 		return err
 	}
 	return nil

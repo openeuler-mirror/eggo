@@ -51,7 +51,7 @@ func runKubectlWithYaml(r runner.Runner, operator string, yamlFile string, clust
 export KUBECONFIG={{ .KubeConfig }}
 kubectl {{ .Operator }} -f {{ .Yaml }}
 if [ $? -ne 0 ]; then
-	echo "{{ .Operator }} {{ .Yaml }} failed"
+	echo "{{ .Operator }} {{ .Yaml }} failed" 1>&2
 	exit 1
 fi
 exit 0

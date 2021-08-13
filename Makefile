@@ -28,7 +28,7 @@ image-eggo: eggo
 install:
 	@echo "install eggo..."
 	@install -d /usr/local/bin
-	@install -m 0755 bin/eggo /usr/local/bin
+	@install -m 0750 bin/eggo /usr/local/bin
 	@echo "install eggo done"
 
 .PHONY: clean
