@@ -197,7 +197,7 @@ func copyPackage(r runner.Runner, hcg *api.HostConfig, pcfg *api.PackageSrcConfi
 	// 5. uncompress package
 	// TODO: support other compress method
 	switch pcfg.Type {
-	case "tar.gz":
+	case "tar.gz", "":
 		_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"cd %s && tar -zxvf %s\"", dstDir, file))
 		if err != nil {
 			return fmt.Errorf("uncompress %s failed for %s: %v", src, hcg.Address, err)

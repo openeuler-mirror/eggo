@@ -13,7 +13,7 @@
  * Description: eggo command implement
  ******************************************************************************/
 
-package main
+package cmd
 
 import (
 	"fmt"
@@ -86,11 +86,4 @@ func NewEggoCmd() *cobra.Command {
 	eggoCmd.AddCommand(NewDeleteCmd())
 
 	return eggoCmd
-}
-
-func main() {
-	if err := NewEggoCmd().Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
 }

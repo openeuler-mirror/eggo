@@ -13,7 +13,7 @@
  * Description: eggo join command implement
  ******************************************************************************/
 
-package main
+package cmd
 
 import (
 	"fmt"
@@ -53,7 +53,7 @@ func checkConflict(joinYaml string, host *HostConfig, joinType string, clusterID
 	return nil
 }
 
-func parseJoinInput(joinYaml string, host *HostConfig, joinType string, clusterID string) (*deployConfig, error) {
+func parseJoinInput(joinYaml string, host *HostConfig, joinType string, clusterID string) (*DeployConfig, error) {
 	if err := checkConflict(joinYaml, host, joinType, clusterID); err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func parseJoinInput(joinYaml string, host *HostConfig, joinType string, clusterI
 	}
 
 	var err error
-	conf := &deployConfig{}
+	conf := &DeployConfig{}
 	if joinYaml != "" {
 		conf, err = loadDeployConfig(joinYaml)
 		if err != nil {
@@ -95,7 +95,7 @@ func parseJoinInput(joinYaml string, host *HostConfig, joinType string, clusterI
 	return conf, nil
 }
 
-func getMergedAndDiffConfigs(conf *deployConfig, joinConf *deployConfig) (*deployConfig, []*api.HostConfig, error) {
+func getMergedAndDiffConfigs(conf *DeployConfig, joinConf *DeployConfig) (*DeployConfig, []*api.HostConfig, error) {
 	allHostConfigs := getAllHostConfigs(conf)
 
 	mergedConfig := *conf

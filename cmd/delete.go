@@ -13,7 +13,7 @@
  * Description: eggo delete command implement
  ******************************************************************************/
 
-package main
+package cmd
 
 import (
 	"fmt"
@@ -46,7 +46,7 @@ func splitDeletedConfigs(hosts []*HostConfig, delNames []string) ([]*HostConfig,
 	return diff, deleted
 }
 
-func getDeletedAndDiffConfigs(conf *deployConfig, delNames []string) (*deployConfig, []*api.HostConfig, error) {
+func getDeletedAndDiffConfigs(conf *DeployConfig, delNames []string) (*DeployConfig, []*api.HostConfig, error) {
 	if len(conf.Masters) == 0 {
 		return nil, nil, fmt.Errorf("invalid cluster config, no master found")
 	}
