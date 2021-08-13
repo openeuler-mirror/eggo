@@ -9,31 +9,22 @@
  * PURPOSE.
  * See the Mulan PSL v2 for more details.
  * Author: wangfengtu
- * Create: 2021-05-31
- * Description: eggo create template command implement
+ * Create: 2021-05-28
+ * Description: eggo command implement
  ******************************************************************************/
 
-package cmd
+package main
 
 import (
-	"github.com/spf13/cobra"
+	"fmt"
+	"os"
+
+	"isula.org/eggo/cmd"
 )
 
-func createTemplate(cmd *cobra.Command, args []string) error {
-	if opts.debug {
-		initLog()
+func main() {
+	if err := cmd.NewEggoCmd().Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
-	return createDeployConfigTemplate(opts.templateConfig)
-}
-
-func NewTemplateCmd() *cobra.Command {
-	templateCmd := &cobra.Command{
-		Use:   "template",
-		Short: "create a default template of eggo config",
-		RunE:  createTemplate,
-	}
-
-	setupTemplateCmdOpts(templateCmd)
-
-	return templateCmd
 }

@@ -13,7 +13,7 @@
  * Description: eggo command configs implement
  ******************************************************************************/
 
-package main
+package cmd
 
 import (
 	"fmt"
@@ -92,7 +92,7 @@ func savedDeployConfigPath(ClusterID string) string {
 	return filepath.Join(api.EggoHomePath, ClusterID, "deploy.yaml")
 }
 
-func saveDeployConfig(cc *deployConfig, filePath string) error {
+func saveDeployConfig(cc *DeployConfig, filePath string) error {
 	d, err := yaml.Marshal(cc)
 	if err != nil {
 		return fmt.Errorf("marshal template config failed: %v", err)
@@ -114,7 +114,7 @@ func saveDeployConfig(cc *deployConfig, filePath string) error {
 	return nil
 }
 
-func fillEtcdsIfNotExist(cc *deployConfig) {
+func fillEtcdsIfNotExist(cc *DeployConfig) {
 	if len(cc.Etcds) != 0 {
 		return
 	}
@@ -122,13 +122,13 @@ func fillEtcdsIfNotExist(cc *deployConfig) {
 	cc.Etcds = append(cc.Etcds, cc.Masters...)
 }
 
-func loadDeployConfig(file string) (*deployConfig, error) {
+func loadDeployConfig(file string) (*DeployConfig, error) {
 	yamlStr, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
 
-	conf := &deployConfig{}
+	conf := &DeployConfig{}
 	if err := yaml.Unmarshal([]byte(yamlStr), conf); err != nil {
 		return nil, err
 	}
@@ -350,7 +350,7 @@ func checkJoinParam(joinHost *HostConfig, host *HostConfig) error {
 	return nil
 }
 
-func getAllHostConfigs(conf *deployConfig) []*HostConfig {
+func getAllHostConfigs(conf *DeployConfig) []*HostConfig {
 	allHostConfigs := append(conf.Masters, conf.Workers...)
 	allHostConfigs = append(allHostConfigs, conf.Etcds...)
 	allHostConfigs = append(allHostConfigs, &HostConfig{
@@ -389,7 +389,7 @@ func createHostConfig(host *HostConfig, joinHost *HostConfig, defaultName string
 	return &hostconfig
 }
 
-func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
+func fillHostConfig(ccfg *api.ClusterConfig, conf *DeployConfig) {
 	var hostconfig *api.HostConfig
 	cache := make(map[string]int)
 	var nodes []*api.HostConfig
@@ -514,7 +514,7 @@ func fillLoadBalance(LoadBalancer *api.LoadBalancer, lb LoadBalance) {
 	setIfStrConfigNotEmpty(&LoadBalancer.Port, strconv.Itoa(lb.BindPort))
 }
 
-func fillAPIEndPoint(APIEndpoint *api.APIEndpoint, conf *deployConfig) {
+func fillAPIEndPoint(APIEndpoint *api.APIEndpoint, conf *DeployConfig) {
 	host, port := "", ""
 	if conf.ApiServerEndpoint != "" {
 		var err error
@@ -567,7 +567,7 @@ func fillExtrArgs(ccfg *api.ClusterConfig, eargs []*ConfigExtraArgs) {
 	}
 }
 
-func toClusterdeploymentConfig(conf *deployConfig) *api.ClusterConfig {
+func toClusterdeploymentConfig(conf *DeployConfig) *api.ClusterConfig {
 	ccfg := getDefaultClusterdeploymentConfig()
 
 	setIfStrConfigNotEmpty(&ccfg.Name, conf.ClusterID)
@@ -657,7 +657,7 @@ func createDeployConfigTemplate(file string) error {
 	if etcds == nil {
 		etcds = masters
 	}
-	conf := &deployConfig{
+	conf := &DeployConfig{
 		ClusterID:      opts.name,
 		Username:       opts.username,
 		Password:       opts.password,
@@ -722,7 +722,7 @@ func createDeployConfigTemplate(file string) error {
 		InstallConfig: InstallConfig{
 			PackageSrc: &PackageSrcConfig{
 				Type:   "tar.gz",
-				ArmSrc: "/root/packages/pacakges-arm.tar.gz",
+				ArmSrc: "/root/packages/packages-arm.tar.gz",
 				X86Src: "/root/packages/packages-x86.tar.gz",
 			},
 			KubernetesMaster: []*PackageConfig{

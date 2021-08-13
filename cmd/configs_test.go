@@ -13,7 +13,7 @@
  * Description: cmd configs testcase
  ******************************************************************************/
 
-package main
+package cmd
 
 import (
 	"fmt"
@@ -34,7 +34,7 @@ func TestCmdConfigs(t *testing.T) {
 
 	f := filepath.Join(tempdir, "config.yaml")
 
-	if err := createDeployConfigTemplate(f); err != nil {
+	if err = createDeployConfigTemplate(f); err != nil {
 		t.Fatalf("create deploy template config file failed: %v", err)
 	}
 

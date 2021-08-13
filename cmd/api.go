@@ -1,4 +1,4 @@
-package main
+package cmd
 
 type ConfigExtraArgs struct {
 	Name      string            `yaml:"name"`
@@ -76,7 +76,7 @@ type OpenPorts struct {
 	Protocol string `yaml:"protocol"` // tcp/udp
 }
 
-type deployConfig struct {
+type DeployConfig struct {
 	ClusterID          string                  `yaml:"cluster-id"`
 	Username           string                  `yaml:"username"`
 	Password           string                  `yaml:"password"`
