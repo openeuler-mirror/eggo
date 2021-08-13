@@ -45,15 +45,6 @@ type MachineSpec struct {
 	//+kubebuilder:validation:Minimum=0
 	//+kubebuilder:validation:Maximum=65535
 	Port *int32 `json:"port,omitempty"`
-
-	// user for ssh login
-	User string `json:"user,omitempty"`
-
-	// password for ssh login
-	Password string `json:"password,omitempty"`
-
-	// privatekey for ssh login
-	PrivateKey string `json:"privatekey,omitempty"`
 }
 
 // MachineStatus defines the observed state of Machine

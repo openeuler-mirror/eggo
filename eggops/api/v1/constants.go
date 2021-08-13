@@ -14,4 +14,11 @@ const (
 
 	ClusterConfigMapNameFormat    string = "eggo-cluster-%s-%s"
 	ClusterConfigMapBinaryConfKey string = "eggo-binary-config"
+
+	EggoConfigVolumeFormat string = "/%s-config"
+	PrivateKeyVolumeFormat string = "/%s-privatekey"
+	PackageVolumeFormat    string = "/%s-package"
+
+	DefaultPackageArmName string = "packages-arm.tar.gz"
+	DefaultPackageX86Name string = "packages-x86.tar.gz"
 )

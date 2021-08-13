@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -49,13 +50,15 @@ type ClusterReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=eggo.isula.org,resources=clusters,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=eggo.isula.org,resources=clusters/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=eggo.isula.org,resources=clusters/finalizers,verbs=update
+// +kubebuilder:rbac:groups=eggo.isula.org,resources=clusters,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=eggo.isula.org,resources=clusters/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=eggo.isula.org,resources=clusters/finalizers,verbs=update
 // +kubebuilder:rbac:groups=eggo.isula.org,resources=machinebindings,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=eggo.isula.org,resources=machinebindings/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=v1,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=v1,resources=configmaps/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=v1,resources=persistentvolumeclaim,verbs=get;list;watch
+// +kubebuilder:rbac:groups=v1,resources=secret,verbs=get;list;watch;
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -82,9 +85,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 		if err != nil {
 			return
 		}
-		if cluster.Status.Deleted {
-			return
-		}
 		// TODO: maybe should use patch to replace
 		if err = r.Update(ctx, cluster); err != nil {
 			log.Error(err, "unable to update cluster", "name", cluster.Name)
@@ -104,8 +104,15 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 	} else {
 		// this cluster is being deleting
 		if foundString(cluster.GetFinalizers(), ClusterFinalizerName) {
-			return r.reconcileDelete(ctx, cluster)
+			res, err = r.reconcileDelete(ctx, cluster)
+			if err != nil {
+				return
+			}
+
+			// remove our finalizer, so we can remove cluster
+			controllerutil.RemoveFinalizer(cluster, ClusterFinalizerName)
 		}
+
 		// Stop reconcile, because this cluster is deleted
 		log.Info("cluster is being deleted", "name", cluster.Name)
 		return
@@ -141,11 +148,30 @@ func (r *ClusterReconciler) prepareDeleteClusterJob(ctx context.Context, cluster
 	if client.IgnoreNotFound(err) != nil {
 		return false, err
 	}
+
+	secret := v1.Secret{}
+	err = r.Get(ctx, ReferenceToNamespacedName(cluster.Status.MachineLoginSecretRef), &secret)
+	if err != nil {
+		r.Log.Error(err, "get machine login secret for cluster", "name", cluster.Name)
+		return false, err
+	}
+
+	packagePVC := v1.PersistentVolumeClaim{}
+	err = r.Get(ctx, ReferenceToNamespacedName(cluster.Status.PackagePersistentVolumeClaimRef), &packagePVC)
+	if err != nil {
+		r.Log.Error(err, "get package persistent volume claim for cluster", "name", cluster.Name)
+		return false, err
+	}
+
 	// if not found job, just create new job
-	yamlPath := "/config/" + cluster.Name + ".yaml"
-	//Command: []string{"eggo", "-d", "deploy", "-f", yamlPath},
-	job = createEggoJobConfig(jobName, "eggo-delete-cluster", "eggo:"+eggov1.ImageVersion,
-		yamlPath, cmName, []string{"sleep", "10"})
+	configPath := fmt.Sprintf(eggov1.EggoConfigVolumeFormat, cluster.Name)
+	Command := []string{"eggo", "-d", "cleanup", "-f", filepath.Join(configPath, eggov1.ClusterConfigMapBinaryConfKey)}
+	job = createEggoJobConfig(jobName, "eggo-create-cluster", "eggo:"+eggov1.ImageVersion, configPath, cmName,
+		fmt.Sprintf(eggov1.PackageVolumeFormat, cluster.Name), packagePVC.Name, Command)
+	if secret.Type == v1.SecretTypeSSHAuth {
+		addPrivateKeySecret(secret.Name, fmt.Sprintf(eggov1.PrivateKeyVolumeFormat, cluster.Name), job)
+	}
+
 	err = r.Create(ctx, job)
 	if err != nil {
 		return false, err
@@ -226,17 +252,23 @@ func (r *ClusterReconciler) reconcileDelete(ctx context.Context, cluster *eggov1
 		cluster.Status.ConfigRef = nil
 	}
 
+	// Step 5: reset secret and pvc
+	cluster.Status.MachineBindingRef = nil
+	cluster.Status.PackagePersistentVolumeClaimRef = nil
+
 	cluster.Status.Deleted = true
-	// Step 5: remove our finalizer, so we can remove cluster
-	controllerutil.RemoveFinalizer(cluster, ClusterFinalizerName)
+
+	// TODO: maybe should use patch to replace
+	if err := r.Status().Update(ctx, cluster); err != nil {
+		log.Error(err, "unable to update cluster status", "name", cluster.Name)
+		return ctrl.Result{RequeueAfter: time.Second * 5}, nil
+	}
+	log.Info("update cluster status success", "name", cluster.Name)
+
 	return ctrl.Result{}, nil
 }
 
-func (r *ClusterReconciler) filterMachines(ctx context.Context, namespace string, config eggov1.RequireMachineConfig, usage int32) ([]eggov1.Machine, error) {
-	var result []eggov1.Machine
-	if config.Number <= 0 {
-		return nil, nil
-	}
+func (r *ClusterReconciler) labelSelectMachines(ctx context.Context, namespace string, config eggov1.RequireMachineConfig) ([]eggov1.Machine, error) {
 	var tmp eggov1.MachineList
 	labelSet := labels.Set{}
 	for k, v := range config.Features {
@@ -247,12 +279,28 @@ func (r *ClusterReconciler) filterMachines(ctx context.Context, namespace string
 	if err := r.List(ctx, &tmp, &options); err != nil {
 		return nil, err
 	}
+
+	return tmp.Items, nil
+}
+
+func (r *ClusterReconciler) filterMachines(ctx context.Context, namespace string, config eggov1.RequireMachineConfig, machines []eggov1.Machine) ([]eggov1.Machine, []eggov1.Machine, error) {
+	var result []eggov1.Machine
+	var unused []eggov1.Machine
+	if config.Number <= 0 {
+		return nil, machines, nil
+	}
+
 	requiredNum := int(config.Number)
-	if len(tmp.Items) < requiredNum {
-		return nil, fmt.Errorf("no enough machine for requires")
+	if len(machines) < requiredNum {
+		return nil, nil, fmt.Errorf("no enough machine for requires")
 	}
 	foundCnt := 0
-	for _, item := range tmp.Items {
+	for _, item := range machines {
+		if foundCnt == requiredNum {
+			unused = append(unused, item)
+			continue
+		}
+
 		mbSet := labels.Set{}
 		var mbs eggov1.MachineBindingList
 		mbOptions := client.ListOptions{}
@@ -260,32 +308,119 @@ func (r *ClusterReconciler) filterMachines(ctx context.Context, namespace string
 		mbOptions.LabelSelector = labels.SelectorFromSet(mbSet)
 		mbOptions.Namespace = eggov1.EggoNamespaceName
 		if err := r.List(ctx, &mbs, &mbOptions); err == nil && len(mbs.Items) > 0 {
-			if u, ok := mbs.Items[0].Spec.Usages[string(item.GetUID())]; ok {
-				if u&usage != 0 {
-					// if machine is binding for usage, just skip it
-					continue
-				}
+			if _, ok := mbs.Items[0].Spec.Usages[string(item.GetUID())]; ok {
+				// if machine is binding for usage, just skip it
+				unused = append(unused, item)
+				continue
 			}
 		}
 		result = append(result, item)
 		foundCnt++
-		if foundCnt == requiredNum {
-			break
-		}
 	}
 	if foundCnt != requiredNum {
-		return nil, fmt.Errorf("no enough machine for requires")
+		return nil, nil, fmt.Errorf("no enough machine for requires")
 	}
 
-	return result, nil
+	return result, unused, nil
+}
+
+func (r *ClusterReconciler) prepareSecret(ctx context.Context, cluster *eggov1.Cluster) (err error) {
+	secret := v1.Secret{}
+	if cluster.Spec.MachineLoginSecret.Namespace != "" && cluster.Spec.MachineLoginSecret.Namespace != eggov1.EggoNamespaceName {
+		err = fmt.Errorf("machineLoginSecret %s namespace must be %s", cluster.Spec.MachineLoginSecret.Name, eggov1.EggoNamespaceName)
+		return
+	}
+
+	err = r.Get(ctx, types.NamespacedName{Name: cluster.Spec.MachineLoginSecret.Name, Namespace: eggov1.EggoNamespaceName}, &secret)
+	if err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			r.Log.Error(err, "get secret for cluster", "name", cluster.Name)
+		}
+		return
+	}
+
+	if secret.Type == v1.SecretTypeSSHAuth {
+		if _, ok := secret.Data[v1.SSHAuthPrivateKey]; !ok {
+			err = fmt.Errorf("invalid secret")
+			r.Log.Error(err, "get secret for cluster", "name", cluster.Name)
+		}
+		return
+	}
+
+	if secret.Type != v1.SecretTypeBasicAuth {
+		err = fmt.Errorf("secret %s type invalid", secret.Name)
+		r.Log.Error(err, "get secret for cluster", "name", cluster.Name)
+		return
+	}
+
+	// secret.Type == v1.SecretTypeBasicAuth
+	if _, ok := secret.Data[v1.BasicAuthUsernameKey]; !ok {
+		err = fmt.Errorf("invalid secret")
+		r.Log.Error(err, "get secret for cluster", "name", cluster.Name)
+		return
+	}
+
+	if _, ok := secret.Data[v1.BasicAuthPasswordKey]; !ok {
+		err = fmt.Errorf("invalid secret")
+		r.Log.Error(err, "get secret for cluster", "name", cluster.Name)
+		return
+	}
+
+	cluster.Status.MachineLoginSecretRef, err = reference.GetReference(r.Scheme, &secret)
+	if err != nil {
+		r.Log.Error(err, "unable to reference to secret for cluster", "name", cluster.Name)
+	}
+
+	return
+}
+
+func (r *ClusterReconciler) preparePVCRef(ctx context.Context, cluster *eggov1.Cluster) (err error) {
+	pvc := v1.PersistentVolumeClaim{}
+	if cluster.Spec.PackagePersistentVolumeClaim.Namespace == "" {
+		cluster.Spec.PackagePersistentVolumeClaim.Namespace = eggov1.EggoNamespaceName
+	}
+
+	if cluster.Spec.PackagePersistentVolumeClaim.Namespace != eggov1.EggoNamespaceName {
+		err = fmt.Errorf("PackagePersistentVolumeClaimRef %s namespace must be %s", cluster.Spec.PackagePersistentVolumeClaim.Name, eggov1.EggoNamespaceName)
+		return
+	}
+
+	err = r.Get(ctx, ReferenceToNamespacedName(cluster.Spec.PackagePersistentVolumeClaim), &pvc)
+	if err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			r.Log.Error(err, "get pvc for cluster", "name", cluster.Name)
+		}
+		return
+	}
+
+	if pvc.Status.Phase != v1.ClaimBound {
+		err = fmt.Errorf("persistentVolumeClaim %s is not bound to a PersistentVolume", pvc.Name)
+		r.Log.Error(err, "get persistentVolumeClaim for cluster", "name", cluster.Name)
+		return
+	}
+
+	cluster.Status.PackagePersistentVolumeClaimRef, err = reference.GetReference(r.Scheme, &pvc)
+	if err != nil {
+		r.Log.Error(err, "unable to reference to persistent volume claim for cluster", "name", cluster.Name)
+	}
+
+	return
 }
 
 func (r *ClusterReconciler) prepareMachineBinding(ctx context.Context, cluster *eggov1.Cluster) error {
 	log := r.Log
 	var mb eggov1.MachineBinding
 	labels := make(map[string]string)
-	// Step 1.1: get machines for master
-	masterSelectedMachines, err := r.filterMachines(ctx, cluster.Namespace, cluster.Spec.MasterRequire, eggov1.UsageMaster)
+
+	// Step 1.1: select machine by LabelSelector
+	machines, err := r.labelSelectMachines(ctx, cluster.Namespace, cluster.Spec.MasterRequire)
+	if err != nil {
+		log.Error(err, "label select machines")
+		return err
+	}
+
+	// Step 1.2: get machines for master
+	masterSelectedMachines, machines, err := r.filterMachines(ctx, cluster.Namespace, cluster.Spec.MasterRequire, machines)
 	if err != nil {
 		log.Error(err, "master requires")
 		return err
@@ -296,8 +431,8 @@ func (r *ClusterReconciler) prepareMachineBinding(ctx context.Context, cluster *
 		labels[m.Name] = ""
 	}
 
-	// Step 1.2: get machines for worker
-	workerSelectedMachines, err := r.filterMachines(ctx, cluster.Namespace, cluster.Spec.WorkerRequire, eggov1.UsageWorker)
+	// Step 1.3: get machines for worker
+	workerSelectedMachines, machines, err := r.filterMachines(ctx, cluster.Namespace, cluster.Spec.WorkerRequire, machines)
 	if err != nil {
 		log.Error(err, "worker requires")
 		return err
@@ -308,8 +443,8 @@ func (r *ClusterReconciler) prepareMachineBinding(ctx context.Context, cluster *
 		labels[m.Name] = ""
 	}
 
-	// Step 1.3: get machines for etcd
-	etcdSelectedMachines, err := r.filterMachines(ctx, cluster.Namespace, cluster.Spec.EtcdRequire, eggov1.UsageEtcd)
+	// Step 1.4: get machines for etcd
+	etcdSelectedMachines, machines, err := r.filterMachines(ctx, cluster.Namespace, cluster.Spec.EtcdRequire, machines)
 	if err != nil {
 		log.Error(err, "etcd requires")
 		return err
@@ -320,8 +455,8 @@ func (r *ClusterReconciler) prepareMachineBinding(ctx context.Context, cluster *
 		labels[m.Name] = ""
 	}
 
-	// Step 1.4: get machines for loadbalance
-	lbSelectedMachines, err := r.filterMachines(ctx, cluster.Namespace, cluster.Spec.LoadbalanceRequires, eggov1.UsageLoadbalance)
+	// Step 1.5: get machines for loadbalance
+	lbSelectedMachines, _, err := r.filterMachines(ctx, cluster.Namespace, cluster.Spec.LoadbalanceRequires, machines)
 	if err != nil {
 		log.Error(err, "loadbalance requires")
 		return err
@@ -355,7 +490,14 @@ func (r *ClusterReconciler) prepareEggoConfig(ctx context.Context, cluster *eggo
 		return ctrl.Result{}, err
 	}
 
-	data, err := ConvertClusterToEggoConfig(cluster, &mb)
+	secret := v1.Secret{}
+	err = r.Get(ctx, ReferenceToNamespacedName(cluster.Status.MachineLoginSecretRef), &secret)
+	if err != nil {
+		r.Log.Error(err, "get machine login secret for cluster config failed", "name", cluster.Name)
+		return ctrl.Result{}, err
+	}
+
+	data, err := ConvertClusterToEggoConfig(cluster, &mb, &secret)
 	if err != nil {
 		r.Log.Error(err, "convert cluster failed", "name", cluster.Name)
 		return res, err
@@ -383,7 +525,7 @@ func (r *ClusterReconciler) prepareEggoConfig(ctx context.Context, cluster *eggo
 	return res, nil
 }
 
-func createEggoJobConfig(jobName, containerName, image, configPath, configMapName string, command []string) *batch.Job {
+func createEggoJobConfig(jobName, containerName, image, configPath, configMapName, packagePath, pvcName string, command []string) *batch.Job {
 	return &batch.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:      make(map[string]string),
@@ -394,6 +536,8 @@ func createEggoJobConfig(jobName, containerName, image, configPath, configMapNam
 		Spec: batch.JobSpec{
 			Template: v1.PodTemplateSpec{
 				Spec: v1.PodSpec{
+					// use host network to ssh login machine
+					HostNetwork: true,
 					Containers: []v1.Container{
 						{
 							Name:  containerName,
@@ -402,6 +546,11 @@ func createEggoJobConfig(jobName, containerName, image, configPath, configMapNam
 								{
 									Name:      "cluster-config",
 									MountPath: configPath,
+									ReadOnly:  true,
+								},
+								{
+									Name:      "cluster-package",
+									MountPath: packagePath,
 									ReadOnly:  true,
 								},
 							},
@@ -420,11 +569,39 @@ func createEggoJobConfig(jobName, containerName, image, configPath, configMapNam
 								},
 							},
 						},
+						{
+							Name: "cluster-package",
+							VolumeSource: v1.VolumeSource{
+								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+									ClaimName: pvcName,
+									ReadOnly:  true,
+								},
+							},
+						},
 					},
 				},
 			},
 		},
 	}
+}
+
+func addPrivateKeySecret(machineLoginSecret, mountPath string, job *batch.Job) {
+	job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes,
+		v1.Volume{
+			Name: "privatekey-secret",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: machineLoginSecret,
+				},
+			},
+		})
+
+	job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts,
+		v1.VolumeMount{
+			Name:      "privatekey-secret",
+			MountPath: mountPath,
+			ReadOnly:  true,
+		})
 }
 
 func (r *ClusterReconciler) prepareCreateClusterJob(ctx context.Context, cluster *eggov1.Cluster) error {
@@ -442,11 +619,32 @@ func (r *ClusterReconciler) prepareCreateClusterJob(ctx context.Context, cluster
 	if client.IgnoreNotFound(err) != nil {
 		return err
 	}
+
+	secret := v1.Secret{}
+	err = r.Get(ctx, ReferenceToNamespacedName(cluster.Status.MachineLoginSecretRef), &secret)
+	if err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			r.Log.Error(err, "get machine login secret for cluster", "name", cluster.Name)
+		}
+		return err
+	}
+
+	packagePVC := v1.PersistentVolumeClaim{}
+	err = r.Get(ctx, ReferenceToNamespacedName(cluster.Status.PackagePersistentVolumeClaimRef), &packagePVC)
+	if err != nil {
+		r.Log.Error(err, "get package persistent volume claim for cluster", "name", cluster.Name)
+		return err
+	}
+
 	// if not found job, just create new job
-	yamlPath := "/config/" + cluster.Name + ".yaml"
-	//Command: []string{"eggo", "-d", "deploy", "-f", yamlPath},
-	job = createEggoJobConfig(jobName, "eggo-create-cluster", "eggo:"+eggov1.ImageVersion,
-		yamlPath, cmName, []string{"sleep", "10"})
+	configPath := fmt.Sprintf(eggov1.EggoConfigVolumeFormat, cluster.Name)
+	Command := []string{"eggo", "-d", "deploy", "-f", filepath.Join(configPath, eggov1.ClusterConfigMapBinaryConfKey)}
+	job = createEggoJobConfig(jobName, "eggo-create-cluster", "eggo:"+eggov1.ImageVersion, configPath, cmName,
+		fmt.Sprintf(eggov1.PackageVolumeFormat, cluster.Name), packagePVC.Name, Command)
+	if secret.Type == v1.SecretTypeSSHAuth {
+		addPrivateKeySecret(secret.Name, fmt.Sprintf(eggov1.PrivateKeyVolumeFormat, cluster.Name), job)
+	}
+
 	err = r.Create(ctx, job)
 	if err != nil {
 		return err
@@ -541,19 +739,36 @@ func (r *ClusterReconciler) reconcileCreate(ctx context.Context, cluster *eggov1
 		cluster.Status.MachineBindingRef, err = reference.GetReference(r.Scheme, &mb)
 		if err != nil {
 			r.Log.Error(err, "unable to reference to machine binding for cluster", "name", cluster.Name)
-			return
 		}
+		return
 	}
 
-	// Step 2: save cluster config into configmap
+	// Step 2: check username/password or privateKey for ssh
+	if cluster.Status.MachineLoginSecretRef == nil {
+		err = r.prepareSecret(ctx, cluster)
+		if err != nil {
+			res = ctrl.Result{RequeueAfter: time.Second * 30}
+		}
+		return
+	}
+
+	// Step 3: get persistentVolumeClaimRef
+	if cluster.Status.PackagePersistentVolumeClaimRef == nil {
+		err = r.preparePVCRef(ctx, cluster)
+		if err != nil {
+			res = ctrl.Result{RequeueAfter: time.Second * 30}
+		}
+		return
+	}
+
+	// Step 4: save cluster config into configmap
 	if cluster.Status.ConfigRef == nil {
 		return r.prepareEggoConfig(ctx, cluster)
 	}
 
-	// Step 3: create job to create cluster
+	// Step 5: create job to create cluster
 	if cluster.Status.JobRef == nil {
 		// create job
-		r.Log.Info("create job...")
 		err = r.prepareCreateClusterJob(ctx, cluster)
 		if err != nil {
 			r.Log.Error(err, "prepare job to create cluster", "name", cluster.Name)
@@ -562,13 +777,13 @@ func (r *ClusterReconciler) reconcileCreate(ctx context.Context, cluster *eggov1
 		return ctrl.Result{RequeueAfter: time.Second * 2}, err
 	}
 
-	// Step 4: wait job success
+	// Step 6: wait job success
 	finish, err := r.checkAndLogClusterJob(ctx, cluster)
 	if !finish || err != nil {
 		return ctrl.Result{RequeueAfter: time.Second * 5}, err
 	}
 
-	// Step 5: update status of resources, cluster and machinebinding
+	// Step 7: update status of resources, cluster and machinebinding
 	// TODO: update other status
 	err = r.updateMachineBindingStatus(ctx, cluster)
 	if err != nil {
@@ -602,6 +817,13 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *eggov1.Clust
 			return
 		}
 		// TODO: when need requeue
+
+		if err = r.Status().Update(ctx, cluster); err != nil {
+			log.Error(err, "unable to update cluster status", "name", cluster.Name)
+			return
+		}
+		log.Info("update cluster status success", "name", cluster.Name)
+
 		return
 	}
 
