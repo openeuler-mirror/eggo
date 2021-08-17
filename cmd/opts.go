@@ -13,7 +13,7 @@
  * Description: eggo command opts implement
  ******************************************************************************/
 
-package main
+package cmd
 
 import (
 	"os"

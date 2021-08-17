@@ -6,11 +6,11 @@ ARCH := $(shell arch)
 .PHONY: eggo
 eggo:
 	@echo "build eggo starting..."
-	@go build -buildmode=pie -ldflags '-extldflags=-static' -ldflags '-linkmode=external -extldflags=-Wl,-z,relro,-z,now' -o bin/eggo ./cmd/
+	@go build -buildmode=pie -ldflags '-extldflags=-static' -ldflags '-linkmode=external -extldflags=-Wl,-z,relro,-z,now' -o bin/eggo .
 	@echo "build eggo done!"
 local:
 	@echo "build eggo use vendor starting..."
-	@go build -buildmode=pie -ldflags '-extldflags=-static' -mod vendor -ldflags '-linkmode=external -extldflags=-Wl,-z,relro,-z,now' -o bin/eggo ./cmd/
+	@go build -buildmode=pie -ldflags '-extldflags=-static' -mod vendor -ldflags '-linkmode=external -extldflags=-Wl,-z,relro,-z,now' -o bin/eggo .
 	@echo "build eggo use vendor done!"
 test:
 	@echo "Unit tests starting..."

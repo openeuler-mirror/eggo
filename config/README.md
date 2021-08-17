@@ -24,8 +24,8 @@ config其他详细的配置请参见eggo操作手册
 
 用户根据config中的packages配置准备离线安装包。以openEuler.config为例，压缩包需要包含
 ```
-$ tree /root/pacakges
-/root/pacakges
+$ tree /root/packages
+/root/packages
 ├── file
 │   └── calico.yaml
 ├── image
@@ -93,7 +93,7 @@ Eggo的离线部署包应该包括三个部分，以`kubernetes-1.21.tar.gz`为�
 $ tar -tvf kubernetes-1.21.tar.gz
 centos.config
 packages/packages-x86.tar.gz
-packages/pacakges-arm.tar.gz
+packages/packages-arm.tar.gz
 notes
 ```
 

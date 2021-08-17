@@ -24,6 +24,95 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+type PackageSrcConfig struct {
+	// +optional
+	// tar.gz
+	Type string `json:"type"`
+
+	// +optional
+	// untar path on dst node
+	DstPath string `json:"dstpath"`
+
+	// +optional
+	ArmSrc string `json:"armsrc"`
+
+	// +optional
+	X86Src string `json:"x86src"`
+}
+
+type PackageConfig struct {
+	Name string `json:"name"`
+	// repo bin file dir image json shell
+	Type     string `json:"type"`
+	Dst      string `json:"dst,omitempty"`
+	Schedule string `json:"schedule,omitempty"`
+	TimeOut  string `json:"timeout,omitempty"`
+}
+
+type AdditionConfig struct {
+	// +optional
+	Master []*PackageConfig `json:"master"`
+
+	// +optional
+	Worker []*PackageConfig `json:"worker"`
+
+	// +optional
+	ETCD []*PackageConfig `json:"etcd"`
+
+	// +optional
+	LoadBalance []*PackageConfig `json:"loadbalance"`
+}
+
+type InstallConfig struct {
+	PackageSrc *PackageSrcConfig `json:"package-source"`
+
+	// +optional
+	KubernetesMaster []*PackageConfig `json:"kubernetes-master"`
+
+	// +optional
+	KubernetesWorker []*PackageConfig `json:"kubernetes-worker"`
+
+	// +optional
+	Network []*PackageConfig `json:"network"`
+
+	// +optional
+	ETCD []*PackageConfig `json:"etcd"`
+
+	// +optional
+	LoadBalance []*PackageConfig `json:"loadbalance"`
+
+	// +optional
+	Container []*PackageConfig `json:"container"`
+
+	// +optional
+	Image []*PackageConfig `json:"image"`
+
+	// +optional
+	Addition AdditionConfig `json:"addition"`
+}
+
+type OpenPorts struct {
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=65535
+	Port *int32 `json:"port"`
+
+	// tcp/udp
+	Protocol string `json:"protocol"`
+}
+type OpenPortsConfig struct {
+	// +optional
+	Master []*OpenPorts `json:"master"`
+
+	// +optional
+	Worker []*OpenPorts `json:"worker"`
+
+	// +optional
+	ETCD []*OpenPorts `json:"etcd"`
+
+	// +optional
+	LoadBalance []*OpenPorts `json:"loadbalance"`
+}
+
 type ClusterNetworkConfig struct {
 	// config for cluster service network
 	ServiceCidr    string `json:"service-cidr"`
@@ -77,6 +166,18 @@ type ClusterSpec struct {
 	LoadbalanceRequires RequireMachineConfig `json:"loadbalanceRequires,omitempty"`
 	LoadbalanceBindPort int32                `json:"loadbalance-bindport,omitempty"`
 
+	// MachineLoginSecret save user/password for ssh login
+	//+kubebuilder:validation:Required
+	MachineLoginSecret *v1.ObjectReference `json:"machineLoginSecret,omitempty"`
+
+	// PackagePersistentVolumeClaim for pod
+	//+kubebuilder:validation:Required
+	PackagePersistentVolumeClaim *v1.ObjectReference `json:"packagePersistentVolumeClaim,omitempty"`
+
+	InstallConfig InstallConfig `json:"install"`
+
+	OpenPorts OpenPortsConfig `json:"open-ports"`
+
 	ApiEndpoint APIEndpointConfig `json:"apiendpoint,omitempty"`
 
 	Runtime RuntimeConfig `json:"runtime,omitempty"`
@@ -98,6 +199,10 @@ type JobHistory struct {
 type ClusterStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	MachineLoginSecretRef *v1.ObjectReference `json:"machineLoginSecretRef,omitempty"`
+
+	PackagePersistentVolumeClaimRef *v1.ObjectReference `json:"packagePersistentVolumeClaimRef,omitempty"`
 
 	MachineBindingRef *v1.ObjectReference `json:"machineBindingRef,omitempty"`
 	ConfigRef         *v1.ObjectReference `json:"configRef,omitempty"`

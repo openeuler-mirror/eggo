@@ -13,7 +13,7 @@
  * Description: eggo deploy command implement
  ******************************************************************************/
 
-package main
+package cmd
 
 import (
 	"fmt"
@@ -24,7 +24,7 @@ import (
 	"isula.org/eggo/pkg/clusterdeployment"
 )
 
-func deploy(conf *deployConfig) error {
+func deploy(conf *DeployConfig) error {
 	if err := saveDeployConfig(conf, savedDeployConfigPath(conf.ClusterID)); err != nil {
 		return fmt.Errorf("save deploy config failed: %v", err)
 	}
