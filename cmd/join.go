@@ -24,11 +24,8 @@ import (
 
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment"
+	"isula.org/eggo/pkg/utils"
 )
-
-func join(conf *api.ClusterConfig, diffHostconfigs []*api.HostConfig) error {
-	return clusterdeployment.JoinNodes(conf, diffHostconfigs)
-}
 
 func checkConflict(joinYaml string, host *HostConfig, joinType string, clusterID string) error {
 	if joinYaml != "" {
@@ -137,6 +134,71 @@ func getJoinIps(hosts []*api.HostConfig) []string {
 	return ips
 }
 
+func getFailedConfigs(diffConfigs []*api.HostConfig, cstatus api.ClusterStatus) []*api.HostConfig {
+	var failedConfigs []*api.HostConfig
+	for _, h := range diffConfigs {
+		if success, ok := cstatus.StatusOfNodes[h.Address]; ok && success {
+			continue
+		}
+		failedConfigs = append(failedConfigs, h)
+	}
+
+	return failedConfigs
+}
+
+func isFailed(failedInfos map[string]uint16, hostconfig *HostConfig, t uint16) bool {
+	failedType, ok := failedInfos[hostconfig.Ip]
+	if ok && utils.IsType(failedType, t) {
+		return true
+	}
+	return false
+}
+
+func getFailedInfos(failedConfigs []*api.HostConfig) map[string]uint16 {
+	mapSize := 1
+	if len(failedConfigs) != 0 {
+		mapSize = len(failedConfigs)
+	}
+
+	failedInfos := make(map[string]uint16, mapSize)
+	for _, h := range failedConfigs {
+		failedInfos[h.Address] = h.Type
+	}
+
+	return failedInfos
+}
+
+func dropFailedConfigs(conf *deployConfig, failedConfigs []*api.HostConfig) {
+	var masters []*HostConfig
+
+	failedInfos := getFailedInfos(failedConfigs)
+	for _, n := range conf.Masters {
+		if isFailed(failedInfos, n, api.Master) {
+			continue
+		}
+		masters = append(masters, n)
+	}
+	conf.Masters = masters
+
+	var workers []*HostConfig
+	for _, n := range conf.Workers {
+		if isFailed(failedInfos, n, api.Worker) {
+			continue
+		}
+		workers = append(workers, n)
+	}
+	conf.Workers = workers
+
+	var etcds []*HostConfig
+	for _, n := range conf.Etcds {
+		if isFailed(failedInfos, n, api.ETCD) {
+			continue
+		}
+		etcds = append(etcds, n)
+	}
+	conf.Etcds = etcds
+}
+
 func joinCluster(cmd *cobra.Command, args []string) error {
 	if opts.debug {
 		initLog()
@@ -163,17 +225,22 @@ func joinCluster(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("get merged and diff config failed")
 	}
 
-	if err = join(toClusterdeploymentConfig(conf), diffConfigs); err != nil {
+	cstatus, err := clusterdeployment.JoinNodes(toClusterdeploymentConfig(conf), diffConfigs)
+	if err != nil {
+		failedConfigs := getFailedConfigs(diffConfigs, cstatus)
 		// rollback
-		if err1 := clusterdeployment.DeleteNodes(toClusterdeploymentConfig(mergedConf), diffConfigs); err1 != nil {
+		if err1 := clusterdeployment.DeleteNodes(toClusterdeploymentConfig(mergedConf), failedConfigs); err1 != nil {
 			logrus.Errorf("delete nodes failed when join failed: %v", err1)
 		}
-		return err
+
+		dropFailedConfigs(mergedConf, failedConfigs)
 	}
 
 	if err = saveDeployConfig(mergedConf, savedDeployConfigPath(joinConf.ClusterID)); err != nil {
 		return err
 	}
+
+	fmt.Print(cstatus.Show())
 
 	return nil
 }
