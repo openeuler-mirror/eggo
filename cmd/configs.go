@@ -617,10 +617,12 @@ func createDeployConfigTemplate(file string) error {
 	etcdsIP := masterIP
 	if opts.etcds != nil {
 		etcdsIP = opts.etcds
+		etcds = getHostconfigs("etcd-%d", etcdsIP)
+	} else {
+		etcds = getHostconfigs("k8s-master-%d", etcdsIP)
 	}
 	masters = getHostconfigs("k8s-master-%d", masterIP)
 	workers = getHostconfigs("k8s-worker-%d", workersIP)
-	etcds = getHostconfigs("etcd-%d", etcdsIP)
 	lb := LoadBalance{
 		Name:     "k8s-loadbalance",
 		Ip:       lbIP,
