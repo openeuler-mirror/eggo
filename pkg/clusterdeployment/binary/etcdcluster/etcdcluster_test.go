@@ -23,12 +23,107 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/utils"
+	"isula.org/eggo/pkg/utils/nodemanager"
 	"isula.org/eggo/pkg/utils/runner"
 )
 
-func TestDeployEtcd(t *testing.T) {
+const (
+	memberListOutput = `868b499159f00586, started, worker0, https://192.168.0.1:2380, https://192.168.0.1:2379, false
+6787454327e00766, started, worker1, https://192.168.0.2:2380, https://192.168.0.2:2379, true`
+	memberAddOutput = `added member 6787454327e00766 to cluster
+
+ETCD_NAME="worker1"
+ETCD_INITIAL_CLUSTER="worker0=http://192.168.0.1:2380,worker1=http://192.168.0.2:2380"
+ETCD_INITIAL_ADVERTISE_PEER_URLS="http://192.168.0.2:2380"
+ETCD_INITIAL_CLUSTER_STATE="existing"
+`
+)
+
+var (
+	nodes = []*api.HostConfig{
+		{
+			Arch:    "amd64",
+			Name:    "worker0",
+			Address: "192.168.0.1",
+			Type:    api.Master | api.Worker | api.ETCD,
+		},
+		{
+			Arch:    "amd64",
+			Name:    "worker1",
+			Address: "192.168.0.2",
+			Type:    api.Master | api.Worker | api.ETCD,
+		},
+	}
+	conf = &api.ClusterConfig{
+		Certificate: api.CertificateConfig{SavePath: "/tmp/test"},
+		Nodes:       nodes,
+		WorkerConfig: api.WorkerConfig{
+			ContainerEngineConf: &api.ContainerEngine{Runtime: "docker"},
+		},
+		EtcdCluster: api.EtcdClusterConfig{
+			Nodes: nodes,
+		},
+		RoleInfra: map[uint16]*api.RoleInfra{
+			api.Master: {},
+			api.Worker: {},
+			api.ETCD:   {},
+		},
+	}
+)
+
+type fakeRunner struct {
+}
+
+func (r *fakeRunner) Copy(src, dst string) error {
+	logrus.Infof("copy %v to %v", src, dst)
+	return nil
+}
+
+func (r *fakeRunner) RunCommand(cmd string) (string, error) {
+	logrus.Infof("run command:[%v]", cmd)
+
+	if strings.Contains(cmd, "which yum") {
+		return "/usr/bin/yum", nil
+	}
+
+	if strings.Contains(cmd, "member list") {
+		return memberListOutput, nil
+	}
+
+	if strings.Contains(cmd, "member add") {
+		return memberAddOutput, nil
+	}
+
+	return "", nil
+}
+
+func (m *fakeRunner) RunShell(shell string, name string) (string, error) {
+	logrus.Infof("run shell: %s", name)
+	return "", nil
+}
+
+func (r *fakeRunner) Reconnect() error {
+	// nothing to do
+	return nil
+}
+
+func (r *fakeRunner) Close() {
+	// nothing to do
+}
+
+func registerFakeRunner(t *testing.T) {
+	if err := nodemanager.RegisterNode(nodes[0], &fakeRunner{}); err != nil {
+		t.Fatalf("register fakerunner for worker0 failed")
+	}
+	if err := nodemanager.RegisterNode(nodes[1], &fakeRunner{}); err != nil {
+		t.Fatalf("register fakerunner for worker1 failed")
+	}
+}
+
+func TestEtcdCertsAndConfig(t *testing.T) {
 	certsTempDir, err := ioutil.TempDir("", "etcd-test-eggo-")
 	if err != nil {
 		t.Fatalf("create eggo config dir failed: %v", err)
@@ -44,7 +139,7 @@ func TestDeployEtcd(t *testing.T) {
 	}
 	defer os.RemoveAll(dstTempDir)
 
-	nodes := []*api.HostConfig{
+	allNodes := []*api.HostConfig{
 		{
 			Arch:    "amd64",
 			Name:    "node0",
@@ -56,20 +151,20 @@ func TestDeployEtcd(t *testing.T) {
 			Address: "192.168.0.2",
 		},
 	}
-	conf := &api.ClusterConfig{
+	deployConf := &api.ClusterConfig{
 		Name:        "test-cluster",
 		Certificate: api.CertificateConfig{SavePath: dstTempDir},
 		EtcdCluster: api.EtcdClusterConfig{
 			Token:     "etcd-cluster",
-			Nodes:     nodes,
+			Nodes:     allNodes,
 			CertsDir:  certsTempDir,
 			ExtraArgs: map[string]string{"TESTARG": "testval", "ETCD_UNSUPPORTED_ARCH": "testarch"},
 		},
-		Nodes: nodes,
+		Nodes: allNodes,
 	}
 
 	r := &runner.LocalRunner{}
-	if err = prepareEtcdConfigs(conf, r, &api.HostConfig{
+	if err = prepareEtcdConfigs(deployConf, r, &api.HostConfig{
 		Arch:    "aarch64",
 		Name:    "node0",
 		Address: "192.168.0.1",
@@ -77,11 +172,11 @@ func TestDeployEtcd(t *testing.T) {
 		t.Fatalf("prepare etcd configs failed: %v", err)
 	}
 
-	if err = generateCaAndApiserverEtcdCerts(r, conf); err != nil {
+	if err = generateCaAndApiserverEtcdCerts(r, deployConf); err != nil {
 		t.Fatalf("generate ca and apiserver etcd certs failed: %v", err)
 	}
 
-	if err = copyCa(conf, r, &api.HostConfig{
+	if err = copyCa(deployConf, r, &api.HostConfig{
 		Arch:    "aarch64",
 		Name:    "node0",
 		Address: "192.168.0.1",
@@ -89,7 +184,7 @@ func TestDeployEtcd(t *testing.T) {
 		t.Fatalf("copy etcd certs and configs failed: %v", err)
 	}
 
-	if err = generateEtcdCerts(r, conf, nodes[0]); err != nil {
+	if err = generateEtcdCerts(r, deployConf, allNodes[0]); err != nil {
 		t.Fatalf("generate etcd certs failed: %v", err)
 	}
 
@@ -124,5 +219,20 @@ func TestDeployEtcd(t *testing.T) {
 		!strings.Contains(string(envStr), "TESTARG=testval") ||
 		strings.Contains(string(envStr), "ETCD_UNSUPPORTED_ARCH=aarch64") {
 		t.Fatalf("etcd env config file not right")
+	}
+}
+
+func TestDeployEtcd(t *testing.T) {
+	tempdir, err := ioutil.TempDir("", "etcdcluster-test-")
+	if err != nil {
+		t.Fatalf("create tempdir for cmd configs failed: %v", err)
+	}
+	defer os.RemoveAll(tempdir)
+	api.EggoHomePath = tempdir
+
+	registerFakeRunner(t)
+
+	if err := Init(conf); err != nil {
+		t.Fatalf("deploy etcd cluster failed")
 	}
 }
