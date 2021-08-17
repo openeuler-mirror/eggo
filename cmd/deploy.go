@@ -29,6 +29,10 @@ func deploy(conf *DeployConfig) error {
 		return fmt.Errorf("save deploy config failed: %v", err)
 	}
 
+	if err := RunChecker(conf); err != nil {
+		return err
+	}
+
 	ccfg := toClusterdeploymentConfig(conf)
 
 	cstatus, err := clusterdeployment.CreateCluster(ccfg)

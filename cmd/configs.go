@@ -56,7 +56,7 @@ func ToEggoPackageConfig(pcs []*PackageConfig) []*api.PackageConfig {
 			Name:     pc.Name,
 			Type:     pc.Type,
 			Dst:      pc.Dst,
-			Schedule: api.Schedule(pc.Schedule),
+			Schedule: api.ScheduleType(pc.Schedule),
 			TimeOut:  pc.TimeOut,
 		})
 	}
@@ -312,41 +312,12 @@ func defaultHostName(clusterID string, nodeType string, i int) string {
 	return fmt.Sprintf("%s-%s-%s", clusterID, nodeType, strconv.Itoa(i))
 }
 
-func appendNodeNoDup(hostconfigs []*HostConfig, hostconfig *HostConfig) []*HostConfig {
-	for _, h := range hostconfigs {
-		if h.Ip == hostconfig.Ip {
-			return hostconfigs
-		}
-	}
-	return append(hostconfigs, hostconfig)
-}
-
 func getHostConfigByIp(nodes []*HostConfig, ip string) *HostConfig {
 	for _, node := range nodes {
 		if node.Ip == ip {
 			return node
 		}
 	}
-	return nil
-}
-
-func checkJoinParam(joinHost *HostConfig, host *HostConfig) error {
-	if host == nil {
-		return nil
-	}
-
-	if joinHost.Name != "" && joinHost.Name != host.Name {
-		return fmt.Errorf("name confliect with existing node, join: %v existing: %v", joinHost.Name, host.Name)
-	}
-
-	if joinHost.Port != 0 && joinHost.Port != host.Port {
-		return fmt.Errorf("port confliect with existing node, join: %v existing: %v", joinHost.Port, host.Port)
-	}
-
-	if joinHost.Arch != "" && joinHost.Arch != host.Arch {
-		return fmt.Errorf("arch confliect with existing node, join: %v existing: %v", joinHost.Arch, host.Arch)
-	}
-
 	return nil
 }
 
@@ -788,7 +759,7 @@ func createDeployConfigTemplate(file string) error {
 					{
 						Name:     "prejoin.sh",
 						Type:     "shell",
-						Schedule: "prejoin",
+						Schedule: string(api.SchedulePreJoin),
 						TimeOut:  "30s",
 					},
 					{
@@ -809,7 +780,7 @@ func createDeployConfigTemplate(file string) error {
 					{
 						Name:     "postjoin.sh",
 						Type:     "shell",
-						Schedule: "postjoin",
+						Schedule: string(api.SchedulePostJoin),
 					},
 				},
 			},

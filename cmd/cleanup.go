@@ -54,7 +54,9 @@ func cleanupCluster(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("load deploy config file %v failed: %v", confPath, err)
 	}
 
-	// TODO: make sure config valid
+	if err = RunChecker(conf); err != nil {
+		return err
+	}
 
 	if err = cleanup(toClusterdeploymentConfig(conf)); err != nil {
 		return err

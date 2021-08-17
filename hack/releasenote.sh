@@ -30,4 +30,9 @@ function get_release_notes()
         echo ""
 }
 
-get_release_notes
+if [ $# -ne 1 ];then
+        echo "Usage:"
+        echo "./hack/releasenote.sh v1.0.0"
+        exit 0
+fi
+get_release_notes $1

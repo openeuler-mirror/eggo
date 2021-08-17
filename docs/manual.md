@@ -257,9 +257,9 @@ open-ports:                                 // 配置需要额外打开的端口
 install:                                    // 配置各种类型节点上需要安装的安装包或者二进制文件的详细信息，注意将对应文件放到在tar.gz安装包中
   package-src:                              // 配置安装包的详细信息
     type: tar.gz                            // 安装包的压缩类型，目前只支持tar.gz类型的安装包
-    dstpath: ""                             // 安装包在对端机器上的路径
-    armsrc: /root/rpms/packages-arm.tar.gz  // arm类型安装包的路径，配置的机器中存在arm机器场景下需要配置
-    x86src: /root/rpms/packages-x86.tar.gz  // x86类型安装包的路径，配置的机器中存在x86机器场景下需要配置                                 
+    dstpath: ""                             // 安装包在对端机器上的路径，必须是合法绝对路径
+    armsrc: /root/rpms/packages-arm.tar.gz  // arm类型安装包的路径，配置的机器中存在arm机器场景下需要配置，必须是合法绝对路径
+    x86src: /root/rpms/packages-x86.tar.gz  // x86类型安装包的路径，配置的机器中存在x86机器场景下需要配置，必须是合法绝对路径                                 
   etcd:                                     // etcd类型节点需要安装的包或二进制文件列表
   - name: etcd                              // 需要安装的包或二进制文件的名称，如果是安装包则只写名称，不填写具体的版本号，安装时会使用`$name*`来识别
     type: pkg                               // package的类型，pkg/repo/bin/file/dir/image/yaml七种类型，如果配置为repo请在对应节点上配置好repo源

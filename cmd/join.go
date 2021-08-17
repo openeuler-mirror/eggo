@@ -126,14 +126,6 @@ func getMergedAndDiffConfigs(conf *DeployConfig, joinConf *DeployConfig) (*Deplo
 	return &mergedConfig, toClusterdeploymentConfig(&diffConfig).Nodes, nil
 }
 
-func getJoinIps(hosts []*api.HostConfig) []string {
-	var ips []string
-	for _, h := range hosts {
-		ips = append(ips, h.Address)
-	}
-	return ips
-}
-
 func getFailedConfigs(diffConfigs []*api.HostConfig, cstatus api.ClusterStatus) []*api.HostConfig {
 	var failedConfigs []*api.HostConfig
 	for _, h := range diffConfigs {
@@ -207,6 +199,7 @@ func joinCluster(cmd *cobra.Command, args []string) error {
 	if len(args) != 0 {
 		opts.joinHost.Ip = args[0]
 	}
+	var err error
 
 	joinConf, err := parseJoinInput(opts.joinYaml, &opts.joinHost, opts.joinType, opts.joinClusterID)
 	if err != nil {
@@ -218,11 +211,19 @@ func joinCluster(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("load saved deploy config failed: %v", err)
 	}
 
-	// TODO: make sure config valid
+	// check saved config
+	if err = RunChecker(conf); err != nil {
+		return err
+	}
 
 	mergedConf, diffConfigs, err := getMergedAndDiffConfigs(conf, joinConf)
 	if mergedConf == nil || diffConfigs == nil || err != nil {
 		return fmt.Errorf("get merged and diff config failed")
+	}
+
+	// check joined config
+	if err = RunChecker(mergedConf); err != nil {
+		return err
 	}
 
 	cstatus, err := clusterdeployment.JoinNodes(toClusterdeploymentConfig(conf), diffConfigs)
