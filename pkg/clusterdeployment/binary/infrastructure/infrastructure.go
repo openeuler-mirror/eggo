@@ -117,19 +117,19 @@ vm.swappiness=0
 #!/bin/bash
 echo {{ .Config }} | base64 -d > /etc/sysctl.d/k8s.conf
 if [ $? -ne 0 ]; then
-	echo "set sysctl file failed"
+	echo "set sysctl file failed" 1>&2
 	exit 1
 fi
 
 modprobe br_netfilter
 if [ $? -ne 0 ]; then
-	echo "modprobe br_netfilter failed"
+	echo "modprobe br_netfilter failed" 1>&2
 	exit 1
 fi
 
 sysctl -p /etc/sysctl.d/k8s.conf
 if [ $? -ne 0 ]; then
-	echo "sysctl -p /etc/sysctl.d/k8s.conf failed"
+	echo "sysctl -p /etc/sysctl.d/k8s.conf failed" 1>&2
 	exit 1
 fi
 
