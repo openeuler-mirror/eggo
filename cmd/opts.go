@@ -41,7 +41,6 @@ type eggoOptions struct {
 	joinClusterID    string
 	joinYaml         string
 	joinHost         HostConfig
-	delName          string
 	delClusterID     string
 }
 
