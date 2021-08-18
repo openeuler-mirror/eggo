@@ -1,0 +1,24 @@
+# permissions for end users to edit infrastructures.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: infrastructure-editor-role
+rules:
+- apiGroups:
+  - eggo.isula.org
+  resources:
+  - infrastructures
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - eggo.isula.org
+  resources:
+  - infrastructures/status
+  verbs:
+  - get
