@@ -106,7 +106,7 @@ func SetupControllerManagerService(r runner.Runner, ccfg *api.ClusterConfig, hcf
 		"--bind-address":                     "0.0.0.0",
 		"--cluster-cidr":                     ccfg.Network.PodCIDR,
 		"--allocate-node-cidrs":              "true",
-		"--cluster-name":                     "kubernetes",
+		"--cluster-name":                     ccfg.Name,
 		"--cluster-signing-cert-file":        "/etc/kubernetes/pki/ca.crt",
 		"--cluster-signing-key-file":         "/etc/kubernetes/pki/ca.key",
 		"--kubeconfig":                       "/etc/kubernetes/controller-manager.conf",

@@ -13,7 +13,7 @@
  * Description: eggo delete command implement
  ******************************************************************************/
 
-package main
+package cmd
 
 import (
 	"fmt"
@@ -46,7 +46,7 @@ func splitDeletedConfigs(hosts []*HostConfig, delNames []string) ([]*HostConfig,
 	return diff, deleted
 }
 
-func getDeletedAndDiffConfigs(conf *deployConfig, delNames []string) (*deployConfig, []*api.HostConfig, error) {
+func getDeletedAndDiffConfigs(conf *DeployConfig, delNames []string) (*DeployConfig, []*api.HostConfig, error) {
 	if len(conf.Masters) == 0 {
 		return nil, nil, fmt.Errorf("invalid cluster config, no master found")
 	}
@@ -88,11 +88,26 @@ func deleteCluster(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("load saved deploy config failed: %v", err)
 	}
-	// TODO: make sure config valid
+
+	// check saved deploy config
+	if err = RunChecker(conf); err != nil {
+		return err
+	}
+
+	holder, err := NewProcessPlaceHolder(eggoPlaceHolderPath(conf.ClusterID))
+	if err != nil {
+		return fmt.Errorf("create process holder failed: %v, mayebe other eggo is running with cluster: %s", err, conf.ClusterID)
+	}
+	defer holder.Remove()
 
 	deletedConfig, diffHostconfigs, err := getDeletedAndDiffConfigs(conf, args)
 	if err != nil {
 		return fmt.Errorf("get deleted and diff config failed: %v", err)
+	}
+
+	// check deleted config
+	if err = RunChecker(deletedConfig); err != nil {
+		return err
 	}
 
 	if err = clusterdeployment.DeleteNodes(toClusterdeploymentConfig(conf), diffHostconfigs); err != nil {

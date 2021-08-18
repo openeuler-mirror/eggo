@@ -34,6 +34,7 @@ import (
 	"isula.org/eggo/pkg/utils/nodemanager"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/task"
+	"isula.org/eggo/pkg/utils/template"
 )
 
 const (
@@ -121,9 +122,31 @@ func check(r runner.Runner, ccfg *api.ClusterConfig) error {
 		return fmt.Errorf("invalid endpoint")
 	}
 
-	_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"ls %s\"", filepath.Join(ccfg.Certificate.SavePath, "ca.crt")))
+	checkTmpl := `
+#!/bin/bash
+if [ ! -f {{ .CAFile }} ]; then
+	echo "{{ .CAFile }} not found" 1>&2
+	exit 1
+fi
+
+if [ ! -f /etc/resolv.conf ]; then
+	echo "/etc/resolv.conf not found, will cause kubelet start failed" 1>&2
+	exit 1
+fi
+
+exit 0
+`
+	datastore := make(map[string]interface{})
+	datastore["CAFile"] = filepath.Join(ccfg.Certificate.SavePath, "ca.crt")
+
+	cmdStr, err := template.TemplateRender(checkTmpl, datastore)
 	if err != nil {
-		logrus.Errorf("check ca cert failed: %v\n", err)
+		return err
+	}
+
+	_, err = r.RunShell(cmdStr, "bootstrap-check")
+	if err != nil {
+		logrus.Errorf("bootstrap-check failed: %v\n", err)
 		return err
 	}
 
@@ -173,7 +196,7 @@ func genKubeletBootstrapAndConfig(r runner.Runner, ccfg *api.ClusterConfig, toke
 func genKubeletBootstrap(r runner.Runner, ccfg *api.ClusterConfig, token, apiEndpoint string) error {
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"cd /etc/kubernetes/ && ")
-	sb.WriteString("kubectl config set-cluster kubernetes" +
+	sb.WriteString("kubectl config set-cluster " + ccfg.Name +
 		" --certificate-authority=/etc/kubernetes/pki/ca.crt" +
 		" --embed-certs=true" +
 		" --server=" + apiEndpoint +
@@ -184,7 +207,7 @@ func genKubeletBootstrap(r runner.Runner, ccfg *api.ClusterConfig, token, apiEnd
 		" --kubeconfig=kubelet-bootstrap.kubeconfig")
 	sb.WriteString(" && ")
 	sb.WriteString("kubectl config set-context default" +
-		" --cluster=kubernetes" +
+		" --cluster=" + ccfg.Name +
 		" --user=kubelet-bootstrap" +
 		" --kubeconfig=kubelet-bootstrap.kubeconfig")
 	sb.WriteString(" && ")
@@ -288,7 +311,7 @@ mode: "iptables"
 	rootPath := ccfg.GetConfigDir()
 	certPath := ccfg.GetCertDir()
 	configGen := certs.NewOpensshBinCertGenerator(r)
-	err := configGen.CreateKubeConfig(rootPath, KubeConfigFileNameKubeProxy, filepath.Join(certPath, "ca.crt"), "default-kube-proxy",
+	err := configGen.CreateKubeConfig(rootPath, KubeConfigFileNameKubeProxy, filepath.Join(certPath, "ca.crt"), ccfg.Name, "default-kube-proxy",
 		filepath.Join(certPath, "kube-proxy.crt"), filepath.Join(certPath, "kube-proxy.key"), apiEndpoint)
 	if err != nil {
 		logrus.Errorf("generate proxy kube config failed: %v", err)

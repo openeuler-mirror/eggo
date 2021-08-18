@@ -117,19 +117,19 @@ vm.swappiness=0
 #!/bin/bash
 echo {{ .Config }} | base64 -d > /etc/sysctl.d/k8s.conf
 if [ $? -ne 0 ]; then
-	echo "set sysctl file failed"
+	echo "set sysctl file failed" 1>&2
 	exit 1
 fi
 
 modprobe br_netfilter
 if [ $? -ne 0 ]; then
-	echo "modprobe br_netfilter failed"
+	echo "modprobe br_netfilter failed" 1>&2
 	exit 1
 fi
 
 sysctl -p /etc/sysctl.d/k8s.conf
 if [ $? -ne 0 ]; then
-	echo "sysctl -p /etc/sysctl.d/k8s.conf failed"
+	echo "sysctl -p /etc/sysctl.d/k8s.conf failed" 1>&2
 	exit 1
 fi
 
@@ -197,7 +197,7 @@ func copyPackage(r runner.Runner, hcg *api.HostConfig, pcfg *api.PackageSrcConfi
 	// 5. uncompress package
 	// TODO: support other compress method
 	switch pcfg.Type {
-	case "tar.gz":
+	case "tar.gz", "":
 		_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"cd %s && tar -zxvf %s\"", dstDir, file))
 		if err != nil {
 			return fmt.Errorf("uncompress %s failed for %s: %v", src, hcg.Address, err)

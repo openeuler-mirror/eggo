@@ -13,7 +13,7 @@
  * Description: eggo command opts implement
  ******************************************************************************/
 
-package main
+package cmd
 
 import (
 	"os"
@@ -41,7 +41,6 @@ type eggoOptions struct {
 	joinClusterID    string
 	joinYaml         string
 	joinHost         HostConfig
-	delName          string
 	delClusterID     string
 }
 

@@ -16,6 +16,7 @@
 package utils
 
 import (
+	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
@@ -96,4 +97,15 @@ func RemoveDupString(str []string) []string {
 	}
 
 	return result
+}
+
+func CheckPathExist(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
 }

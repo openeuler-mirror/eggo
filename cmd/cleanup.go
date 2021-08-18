@@ -13,7 +13,7 @@
  * Description: eggo cleanup command implement
  ******************************************************************************/
 
-package main
+package cmd
 
 import (
 	"fmt"
@@ -38,8 +38,6 @@ func cleanupCluster(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("please specify cluster id")
 	}
 
-	var conf *deployConfig
-	var err error
 	confPath := opts.cleanupConfig
 	if confPath == "" {
 		confPath = savedDeployConfigPath(opts.cleanupClusterID)
@@ -51,12 +49,20 @@ func cleanupCluster(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	conf, err = loadDeployConfig(confPath)
+	conf, err := loadDeployConfig(confPath)
 	if err != nil {
 		return fmt.Errorf("load deploy config file %v failed: %v", confPath, err)
 	}
 
-	// TODO: make sure config valid
+	if err = RunChecker(conf); err != nil {
+		return err
+	}
+
+	holder, err := NewProcessPlaceHolder(eggoPlaceHolderPath(conf.ClusterID))
+	if err != nil {
+		return fmt.Errorf("create process holder failed: %v, mayebe other eggo is running with cluster: %s", err, conf.ClusterID)
+	}
+	defer holder.Remove()
 
 	if err = cleanup(toClusterdeploymentConfig(conf)); err != nil {
 		return err

@@ -33,6 +33,10 @@ import (
 	"isula.org/eggo/pkg/constants"
 )
 
+const (
+	RunnerShellPrefix = "eggo-shell-"
+)
+
 type Runner interface {
 	// only copy file, do not support copy dir
 	Copy(src, dst string) error
@@ -158,9 +162,10 @@ func (ssh *SSHRunner) Reconnect() error {
 }
 
 func clearUserTempDir(conn ssh.Connection, host *kkv1alpha1.HostCfg) {
+	tmpShell := "/tmp/" + RunnerShellPrefix + "*"
 	// scp to tmp file
 	dir := fmt.Sprintf(constants.DefaultUserCopyTempDirFormat, host.User)
-	_, err := conn.Exec(fmt.Sprintf("sudo -E /bin/sh -c \"rm -rf %s\"", dir), host)
+	_, err := conn.Exec(fmt.Sprintf("sudo -E /bin/sh -c \"rm -rf %s; rm -rf %s\"", dir, tmpShell), host)
 	if err != nil {
 		logrus.Warnf("[%s] remove temp dir: %s failed: %v", host.Name, dir, err)
 		return
@@ -268,7 +273,7 @@ func (ssh *SSHRunner) RunCommand(cmd string) (string, error) {
 }
 
 func (ssh *SSHRunner) RunShell(shell string, name string) (string, error) {
-	tmpDir, err := ioutil.TempDir("", "eggo-shell-")
+	tmpDir, err := ioutil.TempDir("", RunnerShellPrefix)
 	if err != nil {
 		return "", err
 	}
@@ -278,7 +283,7 @@ func (ssh *SSHRunner) RunShell(shell string, name string) (string, error) {
 	roleBase64 := base64.StdEncoding.EncodeToString([]byte(shell))
 	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/%s", roleBase64, tmpDir, name))
 	sb.WriteString(fmt.Sprintf(" && chmod +x %s/%s", tmpDir, name))
-	sb.WriteString(fmt.Sprintf(" && %s/%s > /dev/null; rm -rf %s", tmpDir, name, tmpDir))
+	sb.WriteString(fmt.Sprintf(" && %s/%s > /dev/null", tmpDir, name))
 	sb.WriteString("\"")
 
 	output, err := ssh.RunCommand(sb.String())

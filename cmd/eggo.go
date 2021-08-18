@@ -13,7 +13,7 @@
  * Description: eggo command implement
  ******************************************************************************/
 
-package main
+package cmd
 
 import (
 	"fmt"
@@ -21,6 +21,7 @@ import (
 	"path"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -53,7 +54,9 @@ func preCheck() {
 	}
 	if flag {
 		sb.WriteString("Maybe cause to failure!!!\n")
+		sb.WriteString("Shutdown current operator!!!\n")
 		fmt.Println(sb.String())
+		time.Sleep(time.Second * 10)
 	}
 }
 
@@ -86,11 +89,4 @@ func NewEggoCmd() *cobra.Command {
 	eggoCmd.AddCommand(NewDeleteCmd())
 
 	return eggoCmd
-}
-
-func main() {
-	if err := NewEggoCmd().Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
 }

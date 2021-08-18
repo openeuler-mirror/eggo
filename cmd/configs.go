@@ -13,7 +13,7 @@
  * Description: eggo command configs implement
  ******************************************************************************/
 
-package main
+package cmd
 
 import (
 	"fmt"
@@ -56,7 +56,7 @@ func ToEggoPackageConfig(pcs []*PackageConfig) []*api.PackageConfig {
 			Name:     pc.Name,
 			Type:     pc.Type,
 			Dst:      pc.Dst,
-			Schedule: api.Schedule(pc.Schedule),
+			Schedule: api.ScheduleType(pc.Schedule),
 			TimeOut:  pc.TimeOut,
 		})
 	}
@@ -88,11 +88,15 @@ func defaultDeployConfigPath() string {
 	return filepath.Join(utils.GetEggoDir(), "deploy.yaml")
 }
 
+func eggoPlaceHolderPath(ClusterID string) string {
+	return filepath.Join(api.EggoHomePath, ClusterID, ".eggo.pid")
+}
+
 func savedDeployConfigPath(ClusterID string) string {
 	return filepath.Join(api.EggoHomePath, ClusterID, "deploy.yaml")
 }
 
-func saveDeployConfig(cc *deployConfig, filePath string) error {
+func saveDeployConfig(cc *DeployConfig, filePath string) error {
 	d, err := yaml.Marshal(cc)
 	if err != nil {
 		return fmt.Errorf("marshal template config failed: %v", err)
@@ -114,7 +118,7 @@ func saveDeployConfig(cc *deployConfig, filePath string) error {
 	return nil
 }
 
-func fillEtcdsIfNotExist(cc *deployConfig) {
+func fillEtcdsIfNotExist(cc *DeployConfig) {
 	if len(cc.Etcds) != 0 {
 		return
 	}
@@ -122,13 +126,13 @@ func fillEtcdsIfNotExist(cc *deployConfig) {
 	cc.Etcds = append(cc.Etcds, cc.Masters...)
 }
 
-func loadDeployConfig(file string) (*deployConfig, error) {
+func loadDeployConfig(file string) (*DeployConfig, error) {
 	yamlStr, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
 
-	conf := &deployConfig{}
+	conf := &DeployConfig{}
 	if err := yaml.Unmarshal([]byte(yamlStr), conf); err != nil {
 		return nil, err
 	}
@@ -312,15 +316,6 @@ func defaultHostName(clusterID string, nodeType string, i int) string {
 	return fmt.Sprintf("%s-%s-%s", clusterID, nodeType, strconv.Itoa(i))
 }
 
-func appendNodeNoDup(hostconfigs []*HostConfig, hostconfig *HostConfig) []*HostConfig {
-	for _, h := range hostconfigs {
-		if h.Ip == hostconfig.Ip {
-			return hostconfigs
-		}
-	}
-	return append(hostconfigs, hostconfig)
-}
-
 func getHostConfigByIp(nodes []*HostConfig, ip string) *HostConfig {
 	for _, node := range nodes {
 		if node.Ip == ip {
@@ -330,27 +325,7 @@ func getHostConfigByIp(nodes []*HostConfig, ip string) *HostConfig {
 	return nil
 }
 
-func checkJoinParam(joinHost *HostConfig, host *HostConfig) error {
-	if host == nil {
-		return nil
-	}
-
-	if joinHost.Name != "" && joinHost.Name != host.Name {
-		return fmt.Errorf("name confliect with existing node, join: %v existing: %v", joinHost.Name, host.Name)
-	}
-
-	if joinHost.Port != 0 && joinHost.Port != host.Port {
-		return fmt.Errorf("port confliect with existing node, join: %v existing: %v", joinHost.Port, host.Port)
-	}
-
-	if joinHost.Arch != "" && joinHost.Arch != host.Arch {
-		return fmt.Errorf("arch confliect with existing node, join: %v existing: %v", joinHost.Arch, host.Arch)
-	}
-
-	return nil
-}
-
-func getAllHostConfigs(conf *deployConfig) []*HostConfig {
+func getAllHostConfigs(conf *DeployConfig) []*HostConfig {
 	allHostConfigs := append(conf.Masters, conf.Workers...)
 	allHostConfigs = append(allHostConfigs, conf.Etcds...)
 	allHostConfigs = append(allHostConfigs, &HostConfig{
@@ -389,7 +364,7 @@ func createHostConfig(host *HostConfig, joinHost *HostConfig, defaultName string
 	return &hostconfig
 }
 
-func fillHostConfig(ccfg *api.ClusterConfig, conf *deployConfig) {
+func fillHostConfig(ccfg *api.ClusterConfig, conf *DeployConfig) {
 	var hostconfig *api.HostConfig
 	cache := make(map[string]int)
 	var nodes []*api.HostConfig
@@ -514,7 +489,7 @@ func fillLoadBalance(LoadBalancer *api.LoadBalancer, lb LoadBalance) {
 	setIfStrConfigNotEmpty(&LoadBalancer.Port, strconv.Itoa(lb.BindPort))
 }
 
-func fillAPIEndPoint(APIEndpoint *api.APIEndpoint, conf *deployConfig) {
+func fillAPIEndPoint(APIEndpoint *api.APIEndpoint, conf *DeployConfig) {
 	host, port := "", ""
 	if conf.ApiServerEndpoint != "" {
 		var err error
@@ -567,7 +542,7 @@ func fillExtrArgs(ccfg *api.ClusterConfig, eargs []*ConfigExtraArgs) {
 	}
 }
 
-func toClusterdeploymentConfig(conf *deployConfig) *api.ClusterConfig {
+func toClusterdeploymentConfig(conf *DeployConfig) *api.ClusterConfig {
 	ccfg := getDefaultClusterdeploymentConfig()
 
 	setIfStrConfigNotEmpty(&ccfg.Name, conf.ClusterID)
@@ -657,7 +632,7 @@ func createDeployConfigTemplate(file string) error {
 	if etcds == nil {
 		etcds = masters
 	}
-	conf := &deployConfig{
+	conf := &DeployConfig{
 		ClusterID:      opts.name,
 		Username:       opts.username,
 		Password:       opts.password,
@@ -722,7 +697,7 @@ func createDeployConfigTemplate(file string) error {
 		InstallConfig: InstallConfig{
 			PackageSrc: &PackageSrcConfig{
 				Type:   "tar.gz",
-				ArmSrc: "/root/packages/pacakges-arm.tar.gz",
+				ArmSrc: "/root/packages/packages-arm.tar.gz",
 				X86Src: "/root/packages/packages-x86.tar.gz",
 			},
 			KubernetesMaster: []*PackageConfig{
@@ -788,7 +763,7 @@ func createDeployConfigTemplate(file string) error {
 					{
 						Name:     "prejoin.sh",
 						Type:     "shell",
-						Schedule: "prejoin",
+						Schedule: string(api.SchedulePreJoin),
 						TimeOut:  "30s",
 					},
 					{
@@ -809,7 +784,7 @@ func createDeployConfigTemplate(file string) error {
 					{
 						Name:     "postjoin.sh",
 						Type:     "shell",
-						Schedule: "postjoin",
+						Schedule: string(api.SchedulePostJoin),
 					},
 				},
 			},

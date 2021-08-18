@@ -13,7 +13,7 @@
  * Description: eggo deploy command implement
  ******************************************************************************/
 
-package main
+package cmd
 
 import (
 	"fmt"
@@ -22,9 +22,10 @@ import (
 
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment"
+	"isula.org/eggo/pkg/utils"
 )
 
-func deploy(conf *deployConfig) error {
+func deploy(conf *DeployConfig) error {
 	if err := saveDeployConfig(conf, savedDeployConfigPath(conf.ClusterID)); err != nil {
 		return fmt.Errorf("save deploy config failed: %v", err)
 	}
@@ -84,19 +85,41 @@ func deploy(conf *deployConfig) error {
 	return err
 }
 
+func checkClusterExist(ClusterID string) error {
+	clusterHomeDir := api.GetClusterHomePath(ClusterID)
+	if exist, err := utils.CheckPathExist(clusterHomeDir); err != nil || exist {
+		return fmt.Errorf("cluster: %s exist, please check it", ClusterID)
+	}
+	return nil
+}
+
 func deployCluster(cmd *cobra.Command, args []string) error {
 	if opts.debug {
 		initLog()
 	}
+	var err error
 
 	conf, err := loadDeployConfig(opts.deployConfig)
 	if err != nil {
 		return fmt.Errorf("load deploy config file failed: %v", err)
 	}
 
-	// TODO: make sure config valid
+	if err = RunChecker(conf); err != nil {
+		return err
+	}
 
-	if err := deploy(conf); err != nil {
+	// check cluster home dir
+	if err = checkClusterExist(conf.ClusterID); err != nil {
+		return err
+	}
+
+	holder, err := NewProcessPlaceHolder(eggoPlaceHolderPath(conf.ClusterID))
+	if err != nil {
+		return fmt.Errorf("create process holder failed: %v, mayebe other eggo is running with cluster: %s", err, conf.ClusterID)
+	}
+	defer holder.Remove()
+
+	if err = deploy(conf); err != nil {
 		return err
 	}
 

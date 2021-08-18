@@ -307,7 +307,7 @@ func createAdminKubeConfigForEggo(lcg certs.CertGenerator, caPath string, savePa
 	if err != nil {
 		return err
 	}
-	err = lcg.CreateKubeConfig(savePath, constants.KubeConfigFileNameAdmin, caCertPath, "default-admin",
+	err = lcg.CreateKubeConfig(savePath, constants.KubeConfigFileNameAdmin, caCertPath, ccfg.Name, "default-admin",
 		filepath.Join(savePath, "admin.crt"), filepath.Join(savePath, "admin.key"), apiEndpoint)
 	if err != nil {
 		logrus.Errorf("create admin kubeconfig for eggo failed: %v", err)
@@ -334,7 +334,7 @@ func generateKubeConfigs(rootPath, certPath string, cg certs.CertGenerator, ccfg
 		return
 	}
 
-	err = cg.CreateKubeConfig(rootPath, constants.KubeConfigFileNameAdmin, filepath.Join(certPath, "ca.crt"), "default-admin",
+	err = cg.CreateKubeConfig(rootPath, constants.KubeConfigFileNameAdmin, filepath.Join(certPath, "ca.crt"), ccfg.Name, "default-admin",
 		filepath.Join(certPath, "admin.crt"), filepath.Join(certPath, "admin.key"), apiEndpoint)
 	if err != nil {
 		return
@@ -343,7 +343,7 @@ func generateKubeConfigs(rootPath, certPath string, cg certs.CertGenerator, ccfg
 	if err = generateControllerManagerCertificate(certPath, cg); err != nil {
 		return
 	}
-	err = cg.CreateKubeConfig(rootPath, constants.KubeConfigFileNameController, filepath.Join(certPath, "ca.crt"), "default-controller-manager",
+	err = cg.CreateKubeConfig(rootPath, constants.KubeConfigFileNameController, filepath.Join(certPath, "ca.crt"), ccfg.Name, "default-controller-manager",
 		filepath.Join(certPath, "controller-manager.crt"), filepath.Join(certPath, "controller-manager.key"), LocalEndpoint)
 	if err != nil {
 		return
@@ -353,7 +353,7 @@ func generateKubeConfigs(rootPath, certPath string, cg certs.CertGenerator, ccfg
 		return
 	}
 
-	return cg.CreateKubeConfig(rootPath, constants.KubeConfigFileNameScheduler, filepath.Join(certPath, "ca.crt"), "default-scheduler",
+	return cg.CreateKubeConfig(rootPath, constants.KubeConfigFileNameScheduler, filepath.Join(certPath, "ca.crt"), ccfg.Name, "default-scheduler",
 		filepath.Join(certPath, "scheduler.crt"), filepath.Join(certPath, "scheduler.key"), LocalEndpoint)
 }
 

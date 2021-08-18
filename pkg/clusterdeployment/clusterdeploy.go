@@ -57,9 +57,9 @@ func splitNodes(nodes []*api.HostConfig) (*api.HostConfig, []*api.HostConfig, []
 	return lb, masters, workers, etcdNodes
 }
 
-func doJoinNodeOfCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, masters, workers []*api.HostConfig) ([]string, []*api.HostConfig, error) {
+func doJoinNodeOfCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, masters, workers []*api.HostConfig) ([]string, []*api.HostConfig, []*api.HostConfig) {
 	var joinedNodeIDs []string
-	var failedNodes []*api.HostConfig
+	var joinedNodes, failedNodes []*api.HostConfig
 	for _, node := range workers {
 		if err := handler.ClusterNodeJoin(node); err != nil {
 			failedNodes = append(failedNodes, node)
@@ -80,13 +80,23 @@ func doJoinNodeOfCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig
 		// update joined and failed nodes
 		failedNodes = append(failedNodes, tFailedNodes...)
 		joinedNodeIDs = successNodes
-		if len(successNodes) == 0 {
-			return joinedNodeIDs, nil, err
-		}
+		// allow all join nodes failed
 		logrus.Warnf("wait some node to complete join failed: %v", err)
 	}
+	flags := make(map[string]bool)
+	for _, jid := range joinedNodeIDs {
+		flags[jid] = true
+	}
+	for _, node := range workers {
+		for _, jid := range joinedNodeIDs {
+			if jid == node.Address {
+				joinedNodes = append(joinedNodes, node)
+				break
+			}
+		}
+	}
 
-	return joinedNodeIDs, failedNodes, nil
+	return joinedNodeIDs, joinedNodes, failedNodes
 }
 
 func doCreateCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, cstatus *api.ClusterStatus) ([]*api.HostConfig, error) {
@@ -144,9 +154,9 @@ func doCreateCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, cs
 	}
 
 	//Step6: setup left nodes for cluster
-	joinedNodeIDs, failedNodes, err := doJoinNodeOfCluster(handler, cc, masters, workers)
-	if err != nil {
-		return nil, err
+	joinedNodeIDs, joinedNodes, failedNodes := doJoinNodeOfCluster(handler, cc, masters, workers)
+	if len(joinedNodeIDs) == 0 {
+		logrus.Warnln("all join nodes failed")
 	}
 
 	//Step7: setup addons for cluster
@@ -155,7 +165,7 @@ func doCreateCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, cs
 	}
 
 	// Step8: run postcreate cluster hooks
-	if err = handler.PostCreateClusterHooks(); err != nil {
+	if err = handler.PostCreateClusterHooks(joinedNodes); err != nil {
 		return nil, err
 	}
 
@@ -285,20 +295,24 @@ func doJoinNode(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, hostcon
 	return nil
 }
 
-func JoinNodes(cc *api.ClusterConfig, hostconfigs []*api.HostConfig) error {
+func JoinNodes(cc *api.ClusterConfig, hostconfigs []*api.HostConfig) (api.ClusterStatus, error) {
+	cstatus := api.ClusterStatus{
+		StatusOfNodes: make(map[string]bool),
+	}
+
 	if cc == nil {
-		return fmt.Errorf("[cluster] cluster config is required")
+		return cstatus, fmt.Errorf("[cluster] cluster config is required")
 	}
 
 	creator, err := manager.GetClusterDeploymentDriver(cc.DeployDriver)
 	if err != nil {
 		logrus.Errorf("[cluster] get cluster deployment driver: %s failed: %v", cc.DeployDriver, err)
-		return err
+		return cstatus, err
 	}
 	handler, err := creator(cc)
 	if err != nil {
 		logrus.Errorf("[cluster] create cluster deployment instance with driver: %s, failed: %v", cc.DeployDriver, err)
-		return err
+		return cstatus, err
 	}
 	defer handler.Finish()
 
@@ -312,33 +326,70 @@ func JoinNodes(cc *api.ClusterConfig, hostconfigs []*api.HostConfig) error {
 		}
 	}
 
+	var joinedNodeIDs []string
+	var failedNodes []*api.HostConfig
+
 	// join nodes with etcd
 	for _, h := range withEtcd {
 		if err := doJoinNode(handler, cc, h); err != nil {
+			failedNodes = append(failedNodes, h)
 			logrus.Errorf("join node with etcd failed: %v", err)
-			return err
+			continue
 		}
+		joinedNodeIDs = append(joinedNodeIDs, h.Address)
 		logrus.Infof("[cluster] join '%s' with etcd to cluster successed", cc.Name)
 	}
 
 	// join nodes without etcd
-	var result error
+	var lock sync.Mutex
 	var wg sync.WaitGroup
 	wg.Add(len(withoutEtcd))
 	for _, h := range withoutEtcd {
 		go func(hostconfig *api.HostConfig) {
 			defer wg.Done()
 			if err := doJoinNode(handler, cc, hostconfig); err != nil {
-				// TODO: support part success
-				result = err
+				lock.Lock()
+				failedNodes = append(failedNodes, hostconfig)
+				lock.Unlock()
 				logrus.Infof("[cluster] join '%s' to cluster failed: %v", cc.Name, err)
 				return
 			}
+			lock.Lock()
+			joinedNodeIDs = append(joinedNodeIDs, hostconfig.Address)
+			lock.Unlock()
 			logrus.Infof("[cluster] join '%s' to cluster successed", cc.Name)
 		}(h)
 	}
 	wg.Wait()
-	return result
+
+	for _, sid := range joinedNodeIDs {
+		cstatus.StatusOfNodes[sid] = true
+		cstatus.SuccessCnt += 1
+	}
+
+	if len(failedNodes) == 0 {
+		cstatus.Message = "join nodes to cluster success"
+		return cstatus, nil
+	}
+
+	var failureIDs []string
+	for _, fid := range failedNodes {
+		failureIDs = append(failureIDs, fid.Address)
+		success, ok := cstatus.StatusOfNodes[fid.Address]
+		if ok && success {
+			cstatus.SuccessCnt -= 1
+		}
+		cstatus.StatusOfNodes[fid.Address] = false
+		cstatus.FailureCnt += 1
+	}
+
+	logrus.Warnf("[cluster] failed nodes: %v", failureIDs)
+	if cstatus.SuccessCnt > 0 {
+		cstatus.Message = "partial success of join nodes to cluster"
+	} else {
+		cstatus.Message = "failed to join nodes to cluster"
+	}
+	return cstatus, fmt.Errorf("some nodes failed to join to cluster")
 }
 
 func doDeleteNode(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, h *api.HostConfig) error {

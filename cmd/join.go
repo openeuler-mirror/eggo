@@ -13,7 +13,7 @@
  * Description: eggo join command implement
  ******************************************************************************/
 
-package main
+package cmd
 
 import (
 	"fmt"
@@ -24,11 +24,8 @@ import (
 
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment"
+	"isula.org/eggo/pkg/utils"
 )
-
-func join(conf *api.ClusterConfig, diffHostconfigs []*api.HostConfig) error {
-	return clusterdeployment.JoinNodes(conf, diffHostconfigs)
-}
 
 func checkConflict(joinYaml string, host *HostConfig, joinType string, clusterID string) error {
 	if joinYaml != "" {
@@ -53,7 +50,7 @@ func checkConflict(joinYaml string, host *HostConfig, joinType string, clusterID
 	return nil
 }
 
-func parseJoinInput(joinYaml string, host *HostConfig, joinType string, clusterID string) (*deployConfig, error) {
+func parseJoinInput(joinYaml string, host *HostConfig, joinType string, clusterID string) (*DeployConfig, error) {
 	if err := checkConflict(joinYaml, host, joinType, clusterID); err != nil {
 		return nil, err
 	}
@@ -67,7 +64,7 @@ func parseJoinInput(joinYaml string, host *HostConfig, joinType string, clusterI
 	}
 
 	var err error
-	conf := &deployConfig{}
+	conf := &DeployConfig{}
 	if joinYaml != "" {
 		conf, err = loadDeployConfig(joinYaml)
 		if err != nil {
@@ -95,7 +92,7 @@ func parseJoinInput(joinYaml string, host *HostConfig, joinType string, clusterI
 	return conf, nil
 }
 
-func getMergedAndDiffConfigs(conf *deployConfig, joinConf *deployConfig) (*deployConfig, []*api.HostConfig, error) {
+func getMergedAndDiffConfigs(conf *DeployConfig, joinConf *DeployConfig) (*DeployConfig, []*api.HostConfig, error) {
 	allHostConfigs := getAllHostConfigs(conf)
 
 	mergedConfig := *conf
@@ -129,12 +126,69 @@ func getMergedAndDiffConfigs(conf *deployConfig, joinConf *deployConfig) (*deplo
 	return &mergedConfig, toClusterdeploymentConfig(&diffConfig).Nodes, nil
 }
 
-func getJoinIps(hosts []*api.HostConfig) []string {
-	var ips []string
-	for _, h := range hosts {
-		ips = append(ips, h.Address)
+func getFailedConfigs(diffConfigs []*api.HostConfig, cstatus api.ClusterStatus) []*api.HostConfig {
+	var failedConfigs []*api.HostConfig
+	for _, h := range diffConfigs {
+		if success, ok := cstatus.StatusOfNodes[h.Address]; ok && success {
+			continue
+		}
+		failedConfigs = append(failedConfigs, h)
 	}
-	return ips
+
+	return failedConfigs
+}
+
+func isFailed(failedInfos map[string]uint16, hostconfig *HostConfig, t uint16) bool {
+	failedType, ok := failedInfos[hostconfig.Ip]
+	if ok && utils.IsType(failedType, t) {
+		return true
+	}
+	return false
+}
+
+func getFailedInfos(failedConfigs []*api.HostConfig) map[string]uint16 {
+	mapSize := 1
+	if len(failedConfigs) != 0 {
+		mapSize = len(failedConfigs)
+	}
+
+	failedInfos := make(map[string]uint16, mapSize)
+	for _, h := range failedConfigs {
+		failedInfos[h.Address] = h.Type
+	}
+
+	return failedInfos
+}
+
+func dropFailedConfigs(conf *DeployConfig, failedConfigs []*api.HostConfig) {
+	var masters []*HostConfig
+
+	failedInfos := getFailedInfos(failedConfigs)
+	for _, n := range conf.Masters {
+		if isFailed(failedInfos, n, api.Master) {
+			continue
+		}
+		masters = append(masters, n)
+	}
+	conf.Masters = masters
+
+	var workers []*HostConfig
+	for _, n := range conf.Workers {
+		if isFailed(failedInfos, n, api.Worker) {
+			continue
+		}
+		workers = append(workers, n)
+	}
+	conf.Workers = workers
+
+	var etcds []*HostConfig
+	for _, n := range conf.Etcds {
+		if isFailed(failedInfos, n, api.ETCD) {
+			continue
+		}
+		etcds = append(etcds, n)
+	}
+	conf.Etcds = etcds
 }
 
 func joinCluster(cmd *cobra.Command, args []string) error {
@@ -145,6 +199,7 @@ func joinCluster(cmd *cobra.Command, args []string) error {
 	if len(args) != 0 {
 		opts.joinHost.Ip = args[0]
 	}
+	var err error
 
 	joinConf, err := parseJoinInput(opts.joinYaml, &opts.joinHost, opts.joinType, opts.joinClusterID)
 	if err != nil {
@@ -156,24 +211,43 @@ func joinCluster(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("load saved deploy config failed: %v", err)
 	}
 
-	// TODO: make sure config valid
+	// check saved config
+	if err = RunChecker(conf); err != nil {
+		return err
+	}
+
+	holder, err := NewProcessPlaceHolder(eggoPlaceHolderPath(conf.ClusterID))
+	if err != nil {
+		return fmt.Errorf("create process holder failed: %v, mayebe other eggo is running with cluster: %s", err, conf.ClusterID)
+	}
+	defer holder.Remove()
 
 	mergedConf, diffConfigs, err := getMergedAndDiffConfigs(conf, joinConf)
 	if mergedConf == nil || diffConfigs == nil || err != nil {
 		return fmt.Errorf("get merged and diff config failed")
 	}
 
-	if err = join(toClusterdeploymentConfig(conf), diffConfigs); err != nil {
+	// check joined config
+	if err = RunChecker(mergedConf); err != nil {
+		return err
+	}
+
+	cstatus, err := clusterdeployment.JoinNodes(toClusterdeploymentConfig(conf), diffConfigs)
+	if err != nil {
+		failedConfigs := getFailedConfigs(diffConfigs, cstatus)
 		// rollback
-		if err1 := clusterdeployment.DeleteNodes(toClusterdeploymentConfig(mergedConf), diffConfigs); err1 != nil {
+		if err1 := clusterdeployment.DeleteNodes(toClusterdeploymentConfig(mergedConf), failedConfigs); err1 != nil {
 			logrus.Errorf("delete nodes failed when join failed: %v", err1)
 		}
-		return err
+
+		dropFailedConfigs(mergedConf, failedConfigs)
 	}
 
 	if err = saveDeployConfig(mergedConf, savedDeployConfigPath(joinConf.ClusterID)); err != nil {
 		return err
 	}
+
+	fmt.Print(cstatus.Show())
 
 	return nil
 }

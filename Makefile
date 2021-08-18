@@ -6,11 +6,11 @@ ARCH := $(shell arch)
 .PHONY: eggo
 eggo:
 	@echo "build eggo starting..."
-	@go build -buildmode=pie -ldflags '-extldflags=-static' -ldflags '-linkmode=external -extldflags=-Wl,-z,relro,-z,now' -o bin/eggo ./cmd/
+	@go build -buildmode=pie -ldflags '-extldflags=-static' -ldflags '-linkmode=external -extldflags=-Wl,-z,relro,-z,now' -o bin/eggo .
 	@echo "build eggo done!"
 local:
 	@echo "build eggo use vendor starting..."
-	@go build -buildmode=pie -ldflags '-extldflags=-static' -mod vendor -ldflags '-linkmode=external -extldflags=-Wl,-z,relro,-z,now' -o bin/eggo ./cmd/
+	@go build -buildmode=pie -ldflags '-extldflags=-static' -mod vendor -ldflags '-linkmode=external -extldflags=-Wl,-z,relro,-z,now' -o bin/eggo .
 	@echo "build eggo use vendor done!"
 test:
 	@echo "Unit tests starting..."
@@ -28,7 +28,7 @@ image-eggo: eggo
 install:
 	@echo "install eggo..."
 	@install -d /usr/local/bin
-	@install -m 0755 bin/eggo /usr/local/bin
+	@install -m 0750 bin/eggo /usr/local/bin
 	@echo "install eggo done"
 
 .PHONY: clean
