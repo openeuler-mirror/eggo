@@ -88,6 +88,10 @@ func defaultDeployConfigPath() string {
 	return filepath.Join(utils.GetEggoDir(), "deploy.yaml")
 }
 
+func eggoPlaceHolderPath(ClusterID string) string {
+	return filepath.Join(api.EggoHomePath, ClusterID, ".eggo.pid")
+}
+
 func savedDeployConfigPath(ClusterID string) string {
 	return filepath.Join(api.EggoHomePath, ClusterID, "deploy.yaml")
 }

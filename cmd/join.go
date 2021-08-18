@@ -216,6 +216,12 @@ func joinCluster(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	holder, err := NewProcessPlaceHolder(eggoPlaceHolderPath(conf.ClusterID))
+	if err != nil {
+		return fmt.Errorf("create process holder failed: %v, mayebe other eggo is running with cluster: %s", err, conf.ClusterID)
+	}
+	defer holder.Remove()
+
 	mergedConf, diffConfigs, err := getMergedAndDiffConfigs(conf, joinConf)
 	if mergedConf == nil || diffConfigs == nil || err != nil {
 		return fmt.Errorf("get merged and diff config failed")
