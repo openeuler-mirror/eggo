@@ -94,6 +94,12 @@ func deleteCluster(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	holder, err := NewProcessPlaceHolder(eggoPlaceHolderPath(conf.ClusterID))
+	if err != nil {
+		return fmt.Errorf("create process holder failed: %v, mayebe other eggo is running with cluster: %s", err, conf.ClusterID)
+	}
+	defer holder.Remove()
+
 	deletedConfig, diffHostconfigs, err := getDeletedAndDiffConfigs(conf, args)
 	if err != nil {
 		return fmt.Errorf("get deleted and diff config failed: %v", err)

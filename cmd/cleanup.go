@@ -58,6 +58,12 @@ func cleanupCluster(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	holder, err := NewProcessPlaceHolder(eggoPlaceHolderPath(conf.ClusterID))
+	if err != nil {
+		return fmt.Errorf("create process holder failed: %v, mayebe other eggo is running with cluster: %s", err, conf.ClusterID)
+	}
+	defer holder.Remove()
+
 	if err = cleanup(toClusterdeploymentConfig(conf)); err != nil {
 		return err
 	}
