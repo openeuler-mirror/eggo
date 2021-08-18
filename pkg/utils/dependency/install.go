@@ -335,7 +335,7 @@ func CheckDependency(r runner.Runner, softwares []string) error {
 	return nil
 }
 
-func getShell(roleInfra *api.RoleInfra, schedule api.Schedule) []*api.PackageConfig {
+func getShell(roleInfra *api.RoleInfra, schedule api.ScheduleType) []*api.PackageConfig {
 	shell := []*api.PackageConfig{}
 	for _, s := range roleInfra.Softwares {
 		if s.Type == "shell" && s.Schedule == schedule {
@@ -346,7 +346,7 @@ func getShell(roleInfra *api.RoleInfra, schedule api.Schedule) []*api.PackageCon
 	return shell
 }
 
-func ExecuteShell(roleInfra *api.RoleInfra, packagePath string, hcf *api.HostConfig, schedule api.Schedule) error {
+func ExecuteShell(roleInfra *api.RoleInfra, packagePath string, hcf *api.HostConfig, schedule api.ScheduleType) error {
 	shell := getShell(roleInfra, schedule)
 	if len(shell) == 0 {
 		return nil
@@ -372,7 +372,7 @@ func ExecuteShell(roleInfra *api.RoleInfra, packagePath string, hcf *api.HostCon
 	return nil
 }
 
-func HookSchedule(ccfg *api.ClusterConfig, nodes []*api.HostConfig, role []uint16, schedule api.Schedule) error {
+func HookSchedule(ccfg *api.ClusterConfig, nodes []*api.HostConfig, role []uint16, schedule api.ScheduleType) error {
 	for _, n := range nodes {
 		for _, r := range role {
 			if !utils.IsType(n.Type, r) {

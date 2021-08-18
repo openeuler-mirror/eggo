@@ -78,7 +78,7 @@ func GetEtcdServers(ecc *EtcdClusterConfig) string {
 	return ret[0 : len(ret)-1]
 }
 
-func IsCleanupSchedule(schedule Schedule) bool {
+func IsCleanupSchedule(schedule ScheduleType) bool {
 	return schedule == SchedulePreCleanup || schedule == SchedulePostCleanup
 }
 
@@ -163,5 +163,20 @@ func WithKubeProxyExtrArgs(eargs map[string]string) ClusterConfigOption {
 	return func(conf *ClusterConfig) *ClusterConfig {
 		conf.WorkerConfig.ProxyConf.ExtraArgs = eargs
 		return conf
+	}
+}
+
+func ParseScheduleType(schedule string) (ScheduleType, error) {
+	switch schedule {
+	case string(SchedulePreJoin):
+		return SchedulePreJoin, nil
+	case string(SchedulePostJoin):
+		return SchedulePostJoin, nil
+	case string(SchedulePreCleanup):
+		return SchedulePreCleanup, nil
+	case string(SchedulePostCleanup):
+		return SchedulePostCleanup, nil
+	default:
+		return SchedulePreJoin, fmt.Errorf("invalid schedule type: %s", schedule)
 	}
 }

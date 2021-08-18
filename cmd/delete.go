@@ -88,11 +88,20 @@ func deleteCluster(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("load saved deploy config failed: %v", err)
 	}
-	// TODO: make sure config valid
+
+	// check saved deploy config
+	if err = RunChecker(conf); err != nil {
+		return err
+	}
 
 	deletedConfig, diffHostconfigs, err := getDeletedAndDiffConfigs(conf, args)
 	if err != nil {
 		return fmt.Errorf("get deleted and diff config failed: %v", err)
+	}
+
+	// check deleted config
+	if err = RunChecker(deletedConfig); err != nil {
+		return err
 	}
 
 	if err = clusterdeployment.DeleteNodes(toClusterdeploymentConfig(conf), diffHostconfigs); err != nil {

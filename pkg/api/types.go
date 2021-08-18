@@ -26,13 +26,13 @@ const (
 	LoadBalance = 0x8
 )
 
-type Schedule string
+type ScheduleType string
 
 const (
-	SchedulePreJoin     Schedule = "prejoin"
-	SchedulePostJoin    Schedule = "postjoin"
-	SchedulePreCleanup  Schedule = "precleanup"
-	SchedulePostCleanup Schedule = "postcleanup"
+	SchedulePreJoin     ScheduleType = "prejoin"
+	SchedulePostJoin    ScheduleType = "postjoin"
+	SchedulePreCleanup  ScheduleType = "precleanup"
+	SchedulePostCleanup ScheduleType = "postcleanup"
 )
 
 type RoleInfra struct {
@@ -46,11 +46,11 @@ type OpenPorts struct {
 }
 
 type PackageConfig struct {
-	Name     string   `json:"name"`
-	Type     string   `json:"type"` // repo bin file dir image yaml shell
-	Dst      string   `json:"dst,omitempty"`
-	Schedule Schedule `json:"schedule,omitempty"`
-	TimeOut  string   `json:"timeout,omitempty"`
+	Name     string       `json:"name"`
+	Type     string       `json:"type"` // repo bin file dir image yaml shell
+	Dst      string       `json:"dst,omitempty"`
+	Schedule ScheduleType `json:"schedule,omitempty"`
+	TimeOut  string       `json:"timeout,omitempty"`
 }
 
 type PackageSrcConfig struct {
