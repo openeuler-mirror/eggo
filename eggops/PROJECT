@@ -30,4 +30,12 @@ resources:
   kind: MachineBinding
   path: isula.org/eggo/eggops/api/v1
   version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: isula.org
+  group: eggo
+  kind: Infrastructure
+  path: isula.org/eggo/eggops/api/v1
+  version: v1
 version: "3"

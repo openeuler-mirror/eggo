@@ -140,7 +140,7 @@ func fillOpenPortsConfig(openPorts eggov1.OpenPortsConfig) map[string][]*cmd.Ope
 	return copy
 }
 
-func ConvertClusterToEggoConfig(cluster *eggov1.Cluster, mb *eggov1.MachineBinding, secret *v1.Secret) ([]byte, error) {
+func ConvertClusterToEggoConfig(cluster *eggov1.Cluster, mb *eggov1.MachineBinding, secret *v1.Secret, infrastructure *eggov1.Infrastructure) ([]byte, error) {
 	conf := cmd.DeployConfig{}
 	// set cluster config
 	conf.ClusterID = cluster.GetName()
@@ -153,9 +153,9 @@ func ConvertClusterToEggoConfig(cluster *eggov1.Cluster, mb *eggov1.MachineBindi
 	}
 
 	packagePath := fmt.Sprintf(eggov1.PackageVolumeFormat, cluster.Name)
-	conf.InstallConfig = fillInstallConfig(cluster.Spec.InstallConfig, packagePath)
+	conf.InstallConfig = fillInstallConfig(infrastructure.Spec.InstallConfig, packagePath)
 
-	conf.OpenPorts = fillOpenPortsConfig(cluster.Spec.OpenPorts)
+	conf.OpenPorts = fillOpenPortsConfig(infrastructure.Spec.OpenPorts)
 
 	if cluster.Spec.ApiEndpoint.Advertise != "" {
 		conf.ApiServerEndpoint = getEndpoint(cluster.Spec.ApiEndpoint)
