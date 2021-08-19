@@ -190,7 +190,6 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 	*out = *in
 	in.MasterRequire.DeepCopyInto(&out.MasterRequire)
 	in.WorkerRequire.DeepCopyInto(&out.WorkerRequire)
-	in.EtcdRequire.DeepCopyInto(&out.EtcdRequire)
 	in.LoadbalanceRequires.DeepCopyInto(&out.LoadbalanceRequires)
 	if in.MachineLoginSecret != nil {
 		in, out := &in.MachineLoginSecret, &out.MachineLoginSecret

@@ -271,60 +271,190 @@ func (r *ClusterReconciler) reconcileDelete(ctx context.Context, cluster *eggov1
 	return ctrl.Result{}, nil
 }
 
-func (r *ClusterReconciler) labelSelectMachines(ctx context.Context, namespace string, config eggov1.RequireMachineConfig) ([]eggov1.Machine, error) {
-	var tmp eggov1.MachineList
+func (r *ClusterReconciler) bindedSelectMachines(ctx context.Context, namespace string) (map[string]bool, error) {
+	var mbList eggov1.MachineBindingList
+	mbOptions := client.ListOptions{Namespace: namespace}
+	mbOptions.LabelSelector = labels.SelectorFromSet(labels.Set{})
+	if err := r.List(ctx, &mbList, &mbOptions); err != nil {
+		return nil, err
+	}
+
+	machinesBinded := make(map[string]bool)
+	for _, mb := range mbList.Items {
+		for _, ms := range mb.Spec.MachineSets {
+			for _, m := range ms.Machines {
+				machinesBinded[m.GetName()] = true
+			}
+		}
+	}
+
+	return machinesBinded, nil
+}
+
+func (r *ClusterReconciler) labelSelectMachines(ctx context.Context, namespace string, config eggov1.RequireMachineConfig) (map[string]eggov1.Machine, error) {
+	var mList eggov1.MachineList
 	labelSet := labels.Set{}
 	for k, v := range config.Features {
 		labelSet[k] = v
 	}
 	options := client.ListOptions{Namespace: namespace}
 	options.LabelSelector = labels.SelectorFromSet(labelSet)
-	if err := r.List(ctx, &tmp, &options); err != nil {
+	if err := r.List(ctx, &mList, &options); err != nil {
 		return nil, err
 	}
 
-	return tmp.Items, nil
+	machinesSelected := make(map[string]eggov1.Machine)
+	for _, m := range mList.Items {
+		machinesSelected[m.GetName()] = m
+	}
+
+	return machinesSelected, nil
 }
 
-func (r *ClusterReconciler) filterMachines(ctx context.Context, namespace string, config eggov1.RequireMachineConfig, machines []eggov1.Machine) ([]eggov1.Machine, []eggov1.Machine, error) {
-	var result []eggov1.Machine
-	var unused []eggov1.Machine
+func (r *ClusterReconciler) availableSelectMachines(ctx context.Context, namespace string, config eggov1.RequireMachineConfig, machineBinded map[string]bool) (map[string]eggov1.Machine, error) {
 	if config.Number <= 0 {
-		return nil, machines, nil
+		return map[string]eggov1.Machine{}, nil
 	}
 
-	requiredNum := int(config.Number)
-	if len(machines) < requiredNum {
-		return nil, nil, fmt.Errorf("no enough machine for requires")
+	machinesSelected, err := r.labelSelectMachines(ctx, namespace, config)
+	if err != nil {
+		return nil, err
 	}
-	foundCnt := 0
-	for _, item := range machines {
-		if foundCnt == requiredNum {
-			unused = append(unused, item)
+
+	if int(config.Number) > len(machinesSelected) {
+		return nil, fmt.Errorf("cannot find enough machine")
+	}
+
+	machinesAvailable := make(map[string]eggov1.Machine)
+	for name, m := range machinesSelected {
+		if _, ok := machineBinded[name]; !ok {
+			machinesAvailable[name] = m
+		}
+	}
+
+	if int(config.Number) > len(machinesAvailable) {
+		return nil, fmt.Errorf("cannot find enough machine")
+	}
+
+	return machinesAvailable, nil
+}
+
+type machineFilter struct {
+	name    string
+	role    uint32
+	require eggov1.RequireMachineConfig
+
+	// available machines and hasn't filter
+	available map[string]eggov1.Machine
+
+	// filter machines
+	filter     []eggov1.Machine
+	filter_len int32
+}
+
+// TODO: filter Machines by better algorithm
+func (r *ClusterReconciler) filterMachines(ctx context.Context, cluster *eggov1.Cluster) (mMachines, wMachines, lMachines []eggov1.Machine, err error) {
+	log := r.Log
+
+	machineBinded, err := r.bindedSelectMachines(ctx, cluster.Namespace)
+	if err != nil {
+		log.Error(err, "select binded machines")
+		return
+	}
+
+	masterFilter := machineFilter{
+		name:       "master",
+		role:       0x0001,
+		available:  nil,
+		require:    cluster.Spec.MasterRequire,
+		filter_len: 0,
+		filter:     make([]eggov1.Machine, 0),
+	}
+	workerFilter := machineFilter{
+		name:       "worker",
+		role:       0x0010,
+		available:  nil,
+		require:    cluster.Spec.WorkerRequire,
+		filter_len: 0,
+		filter:     make([]eggov1.Machine, 0),
+	}
+	loadbalanceFilter := machineFilter{
+		name:       "loadbalance",
+		role:       0x1000,
+		available:  nil,
+		require:    cluster.Spec.LoadbalanceRequires,
+		filter_len: 0,
+		filter:     make([]eggov1.Machine, 0),
+	}
+	machinesFilter := []*machineFilter{&masterFilter, &workerFilter, &loadbalanceFilter}
+
+	for _, mf := range machinesFilter {
+		mf.available, err = r.availableSelectMachines(ctx, cluster.Namespace, mf.require, machineBinded)
+		if err != nil {
+			log.Error(err, "available select machines")
+			return
+		}
+	}
+
+	// set machineTable
+	machineTable := make(map[string]uint32)
+	for _, mf := range machinesFilter {
+		for m := range mf.available {
+			if _, ok := machineTable[m]; ok {
+				machineTable[m] |= mf.role
+			} else {
+				machineTable[m] = mf.role
+			}
+		}
+	}
+
+	// select unique machine
+	for _, mf := range machinesFilter {
+		if mf.filter_len >= mf.require.Number {
 			continue
 		}
 
-		mbSet := labels.Set{}
-		var mbs eggov1.MachineBindingList
-		mbOptions := client.ListOptions{}
-		mbSet[item.Name] = ""
-		mbOptions.LabelSelector = labels.SelectorFromSet(mbSet)
-		mbOptions.Namespace = eggov1.EggoNamespaceName
-		if err := r.List(ctx, &mbs, &mbOptions); err == nil && len(mbs.Items) > 0 {
-			if _, ok := mbs.Items[0].Spec.Usages[string(item.GetUID())]; ok {
-				// if machine is binding for usage, just skip it
-				unused = append(unused, item)
+		for m, types := range machineTable {
+			if types != mf.role {
 				continue
 			}
+
+			// types == mf.role && mf.filter_len < mf.require.Number
+			mf.filter = append(mf.filter, mf.available[m])
+			mf.filter_len++
+			delete(mf.available, m)
 		}
-		result = append(result, item)
-		foundCnt++
-	}
-	if foundCnt != requiredNum {
-		return nil, nil, fmt.Errorf("no enough machine for requires")
 	}
 
-	return result, unused, nil
+	// try to select enough machines
+	for _, mf := range machinesFilter {
+		if mf.filter_len >= mf.require.Number {
+			continue
+		}
+
+		for k, v := range mf.available {
+			mf.filter = append(mf.filter, v)
+			mf.filter_len++
+
+			// delete machine from available machines
+			for _, mf := range machinesFilter {
+				delete(mf.available, k)
+			}
+
+			if mf.filter_len == mf.require.Number {
+				break
+			}
+		}
+	}
+
+	for _, mf := range machinesFilter {
+		if mf.filter_len != mf.require.Number {
+			err = fmt.Errorf("%s, require machines %d but filter %d machines, no enough machines", mf.name, mf.require.Number, mf.filter_len)
+			return
+		}
+	}
+
+	return masterFilter.filter, workerFilter.filter, loadbalanceFilter.filter, nil
 }
 
 func (r *ClusterReconciler) prepareSecret(ctx context.Context, cluster *eggov1.Cluster) (err error) {
@@ -440,57 +570,26 @@ func (r *ClusterReconciler) prepareMachineBinding(ctx context.Context, cluster *
 	var mb eggov1.MachineBinding
 	labels := make(map[string]string)
 
-	// Step 1.1: select machine by LabelSelector
-	machines, err := r.labelSelectMachines(ctx, cluster.Namespace, cluster.Spec.MasterRequire)
+	mMachines, wMachines, lMachines, err := r.filterMachines(ctx, cluster)
 	if err != nil {
-		log.Error(err, "label select machines")
+		log.Error(err, "filter machines")
 		return err
 	}
 
-	// Step 1.2: get machines for master
-	masterSelectedMachines, machines, err := r.filterMachines(ctx, cluster.Namespace, cluster.Spec.MasterRequire, machines)
-	if err != nil {
-		log.Error(err, "master requires")
-		return err
-	}
-	log.Info(fmt.Sprintf("get machines for master: %v", eggov1.PrintMachineSlice(masterSelectedMachines)))
-	for _, m := range masterSelectedMachines {
+	log.Info(fmt.Sprintf("get machines for master: %v", eggov1.PrintMachineSlice(mMachines)))
+	for _, m := range mMachines {
 		mb.AddMachine(m, eggov1.UsageMaster)
 		labels[m.Name] = ""
 	}
 
-	// Step 1.3: get machines for worker
-	workerSelectedMachines, machines, err := r.filterMachines(ctx, cluster.Namespace, cluster.Spec.WorkerRequire, machines)
-	if err != nil {
-		log.Error(err, "worker requires")
-		return err
-	}
-	log.Info(fmt.Sprintf("get machines for worker: %v", eggov1.PrintMachineSlice(workerSelectedMachines)))
-	for _, m := range workerSelectedMachines {
+	log.Info(fmt.Sprintf("get machines for worker: %v", eggov1.PrintMachineSlice(wMachines)))
+	for _, m := range wMachines {
 		mb.AddMachine(m, eggov1.UsageWorker)
 		labels[m.Name] = ""
 	}
 
-	// Step 1.4: get machines for etcd
-	etcdSelectedMachines, machines, err := r.filterMachines(ctx, cluster.Namespace, cluster.Spec.EtcdRequire, machines)
-	if err != nil {
-		log.Error(err, "etcd requires")
-		return err
-	}
-	log.Info(fmt.Sprintf("get machines for etcd: %v", eggov1.PrintMachineSlice(etcdSelectedMachines)))
-	for _, m := range etcdSelectedMachines {
-		mb.AddMachine(m, eggov1.UsageEtcd)
-		labels[m.Name] = ""
-	}
-
-	// Step 1.5: get machines for loadbalance
-	lbSelectedMachines, _, err := r.filterMachines(ctx, cluster.Namespace, cluster.Spec.LoadbalanceRequires, machines)
-	if err != nil {
-		log.Error(err, "loadbalance requires")
-		return err
-	}
-	log.Info(fmt.Sprintf("get machines for loadbalance: %v", eggov1.PrintMachineSlice(lbSelectedMachines)))
-	for _, m := range lbSelectedMachines {
+	log.Info(fmt.Sprintf("get machines for loadbalance: %v", eggov1.PrintMachineSlice(lMachines)))
+	for _, m := range lMachines {
 		mb.AddMachine(m, eggov1.UsageLoadbalance)
 		labels[m.Name] = ""
 	}
