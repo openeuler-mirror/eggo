@@ -70,9 +70,6 @@ type ClusterSpec struct {
 	//+kubebuilder:validation:Required
 	WorkerRequire RequireMachineConfig `json:"workerRequire"`
 
-	// machines for etcd nodes
-	EtcdRequire RequireMachineConfig `json:"etcdRequire,omitempty"`
-
 	// machines for loadbalance
 	LoadbalanceRequires RequireMachineConfig `json:"loadbalanceRequires,omitempty"`
 	LoadbalanceBindPort int32                `json:"loadbalance-bindport,omitempty"`
