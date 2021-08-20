@@ -56,15 +56,16 @@ func fillPackageConfig(src []*eggov1.PackageConfig) []*cmd.PackageConfig {
 }
 
 func fillInstallConfig(installConfig eggov1.InstallConfig, packagePath string) (config cmd.InstallConfig) {
+	// TODO: eggo src package api changes
 	if installConfig.PackageSrc != nil {
 		armSrc := filepath.Join(packagePath, eggov1.DefaultPackageArmName)
-		if installConfig.PackageSrc.ArmSrc != "" {
-			armSrc = filepath.Join(packagePath, installConfig.PackageSrc.ArmSrc)
-		}
-
 		x86Src := filepath.Join(packagePath, eggov1.DefaultPackageX86Name)
-		if installConfig.PackageSrc.X86Src != "" {
-			x86Src = filepath.Join(packagePath, installConfig.PackageSrc.X86Src)
+
+		if _, ok := installConfig.PackageSrc.SrcPackages["arm"]; ok {
+			armSrc = filepath.Join(packagePath, installConfig.PackageSrc.SrcPackages["arm"])
+		}
+		if _, ok := installConfig.PackageSrc.SrcPackages["x86"]; ok {
+			x86Src = filepath.Join(packagePath, installConfig.PackageSrc.SrcPackages["x86"])
 		}
 
 		config.PackageSrc = &cmd.PackageSrcConfig{
@@ -189,11 +190,14 @@ func ConvertClusterToEggoConfig(cluster *eggov1.Cluster, mb *eggov1.MachineBindi
 	}
 
 	// set machines
+	conf.Workers = make([]*cmd.HostConfig, 0)
 	for _, set := range mb.Spec.MachineSets {
 		if set.MatchType(eggov1.UsageMaster) {
 			conf.Masters = toEggoHosts(set.Machines)
+			// set master machines as worker machines
+			conf.Workers = append(conf.Workers, conf.Masters...)
 		} else if set.MatchType(eggov1.UsageWorker) {
-			conf.Workers = toEggoHosts(set.Machines)
+			conf.Workers = append(conf.Workers, toEggoHosts(set.Machines)...)
 		} else if set.MatchType(eggov1.UsageEtcd) {
 			conf.Etcds = toEggoHosts(set.Machines)
 		} else if set.MatchType(eggov1.UsageLoadbalance) {

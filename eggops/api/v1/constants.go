@@ -19,6 +19,7 @@ const (
 	PrivateKeyVolumeFormat string = "/%s-privatekey"
 	PackageVolumeFormat    string = "/%s-package"
 
-	DefaultPackageArmName string = "packages-arm.tar.gz"
-	DefaultPackageX86Name string = "packages-x86.tar.gz"
+	DefaultPackageArmName   string = "packages-arm.tar.gz"
+	DefaultPackageX86Name   string = "packages-x86.tar.gz"
+	DefaultPackageRISCVName string = "packages-risc-v.tar.gz"
 )

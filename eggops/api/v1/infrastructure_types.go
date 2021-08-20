@@ -33,11 +33,8 @@ type PackageSrcConfig struct {
 	// untar path on dst node
 	DstPath string `json:"dstpath,omitempty"`
 
-	// +optional
-	ArmSrc string `json:"armsrc,omitempty"`
-
-	// +optional
-	X86Src string `json:"x86src,omitempty"`
+	// source packages name
+	SrcPackages map[string]string `json:"srcPackages,omitempty"`
 }
 
 type PackageConfig struct {

@@ -152,13 +152,6 @@ func (r *ClusterReconciler) prepareDeleteClusterJob(ctx context.Context, cluster
 	}
 
 	// if not found job, just create new job
-	secret := v1.Secret{}
-	err = r.Get(ctx, ReferenceToNamespacedName(cluster.Status.MachineLoginSecretRef), &secret)
-	if err != nil {
-		r.Log.Error(err, "get machine login secret for cluster", "name", cluster.Name)
-		return false, err
-	}
-
 	packagePVC := v1.PersistentVolumeClaim{}
 	err = r.Get(ctx, ReferenceToNamespacedName(cluster.Status.PackagePersistentVolumeClaimRef), &packagePVC)
 	if err != nil {
@@ -170,8 +163,11 @@ func (r *ClusterReconciler) prepareDeleteClusterJob(ctx context.Context, cluster
 	Command := []string{"eggo", "-d", "cleanup", "-f", filepath.Join(configPath, eggov1.ClusterConfigMapBinaryConfKey)}
 	job = createEggoJobConfig(jobName, "eggo-create-cluster", "eggo:"+eggov1.ImageVersion, configPath, cmName,
 		fmt.Sprintf(eggov1.PackageVolumeFormat, cluster.Name), packagePVC.Name, Command)
-	if secret.Type == v1.SecretTypeSSHAuth {
-		addPrivateKeySecret(secret.Name, fmt.Sprintf(eggov1.PrivateKeyVolumeFormat, cluster.Name), job)
+
+	err = fillEggoJobConfig(r, ctx, cluster, job)
+	if err != nil {
+		r.Log.Error(err, "fill eggo job config", "name", cluster.Name)
+		return false, err
 	}
 
 	err = r.Create(ctx, job)
@@ -735,6 +731,28 @@ func addPrivateKeySecret(machineLoginSecret, mountPath string, job *batch.Job) {
 		})
 }
 
+func fillEggoJobConfig(r *ClusterReconciler, ctx context.Context, cluster *eggov1.Cluster, job *batch.Job) (err error) {
+	// ssh privatekey
+	secret := v1.Secret{}
+	err = r.Get(ctx, ReferenceToNamespacedName(cluster.Status.MachineLoginSecretRef), &secret)
+	if err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			r.Log.Error(err, "get machine login secret for cluster", "name", cluster.Name)
+		}
+		return err
+	}
+	if secret.Type == v1.SecretTypeSSHAuth {
+		addPrivateKeySecret(secret.Name, fmt.Sprintf(eggov1.PrivateKeyVolumeFormat, cluster.Name), job)
+	}
+
+	// eggo pod affinity
+	if cluster.Spec.EggoAffinity != nil {
+		job.Spec.Template.Spec.Affinity = cluster.Spec.EggoAffinity
+	}
+
+	return
+}
+
 func (r *ClusterReconciler) prepareCreateClusterJob(ctx context.Context, cluster *eggov1.Cluster) error {
 	cmName := fmt.Sprintf(eggov1.ClusterConfigMapNameFormat, cluster.Name, "cmd-config")
 	job := &batch.Job{}
@@ -752,15 +770,6 @@ func (r *ClusterReconciler) prepareCreateClusterJob(ctx context.Context, cluster
 	}
 
 	// if not found job, just create new job
-	secret := v1.Secret{}
-	err = r.Get(ctx, ReferenceToNamespacedName(cluster.Status.MachineLoginSecretRef), &secret)
-	if err != nil {
-		if client.IgnoreNotFound(err) != nil {
-			r.Log.Error(err, "get machine login secret for cluster", "name", cluster.Name)
-		}
-		return err
-	}
-
 	packagePVC := v1.PersistentVolumeClaim{}
 	err = r.Get(ctx, ReferenceToNamespacedName(cluster.Status.PackagePersistentVolumeClaimRef), &packagePVC)
 	if err != nil {
@@ -772,8 +781,11 @@ func (r *ClusterReconciler) prepareCreateClusterJob(ctx context.Context, cluster
 	Command := []string{"eggo", "-d", "deploy", "-f", filepath.Join(configPath, eggov1.ClusterConfigMapBinaryConfKey)}
 	job = createEggoJobConfig(jobName, "eggo-create-cluster", "eggo:"+eggov1.ImageVersion, configPath, cmName,
 		fmt.Sprintf(eggov1.PackageVolumeFormat, cluster.Name), packagePVC.Name, Command)
-	if secret.Type == v1.SecretTypeSSHAuth {
-		addPrivateKeySecret(secret.Name, fmt.Sprintf(eggov1.PrivateKeyVolumeFormat, cluster.Name), job)
+
+	err = fillEggoJobConfig(r, ctx, cluster, job)
+	if err != nil {
+		r.Log.Error(err, "fill eggo job config", "name", cluster.Name)
+		return err
 	}
 
 	err = r.Create(ctx, job)

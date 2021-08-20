@@ -74,6 +74,9 @@ type ClusterSpec struct {
 	LoadbalanceRequires RequireMachineConfig `json:"loadbalanceRequires,omitempty"`
 	LoadbalanceBindPort int32                `json:"loadbalance-bindport,omitempty"`
 
+	// Describe affinity scheduling rules for eggo pod
+	EggoAffinity *v1.Affinity `json:"eggoAffinity,omitempty"`
+
 	// MachineLoginSecret save user/password for ssh login
 	//+kubebuilder:validation:Required
 	MachineLoginSecret *v1.ObjectReference `json:"machineLoginSecret,omitempty"`
