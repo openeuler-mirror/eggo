@@ -277,6 +277,7 @@ func (ssh *SSHRunner) RunShell(shell string, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer os.RemoveAll(tmpDir)
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	sb.WriteString(fmt.Sprintf("mkdir -p %s", tmpDir))

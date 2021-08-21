@@ -13,5 +13,13 @@ func RunChainOfResponsibility(res Responsibility) error {
 	if err := res.Execute(); err != nil {
 		return err
 	}
-	return res.Nexter().Execute()
+	nexter := res.Nexter()
+	for nexter != nil {
+		if err := nexter.Execute(); err != nil {
+			return err
+		}
+		nexter = nexter.Nexter()
+	}
+
+	return nil
 }

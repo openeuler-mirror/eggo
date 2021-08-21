@@ -137,7 +137,11 @@ func checkHostconfig(h *HostConfig) error {
 	return nil
 }
 
-func checkNodeList(nodes []*HostConfig) error {
+func compareHost(a, b *HostConfig) bool {
+	return a.Ip == b.Ip && a.Name == b.Name && a.Port == b.Port && a.Arch == b.Arch
+}
+
+func checkNodeList(nodes []*HostConfig, allHosts map[string]*HostConfig) error {
 	useIPs := make(map[string]bool)
 	useNames := make(map[string]bool)
 	for _, m := range nodes {
@@ -152,18 +156,26 @@ func checkNodeList(nodes []*HostConfig) error {
 			return fmt.Errorf("duplicate name: %s", m.Name)
 		}
 		useNames[m.Name] = true
+		if fh, ok := allHosts[m.Ip]; ok {
+			if !compareHost(m, fh) {
+				return fmt.Errorf("same ip in different host: %v, %v", fh, m)
+			}
+		} else {
+			allHosts[m.Ip] = m
+		}
 	}
 	return nil
 }
 
 func (ccr *NodesResponsibility) Execute() error {
-	if err := checkNodeList(ccr.conf.Masters); err != nil {
+	allHosts := make(map[string]*HostConfig, len(ccr.conf.Masters)+len(ccr.conf.Workers))
+	if err := checkNodeList(ccr.conf.Masters, allHosts); err != nil {
 		return err
 	}
-	if err := checkNodeList(ccr.conf.Workers); err != nil {
+	if err := checkNodeList(ccr.conf.Workers, allHosts); err != nil {
 		return err
 	}
-	if err := checkNodeList(ccr.conf.Etcds); err != nil {
+	if err := checkNodeList(ccr.conf.Etcds, allHosts); err != nil {
 		return err
 	}
 
