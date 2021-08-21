@@ -20,6 +20,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,7 +29,18 @@ import (
 )
 
 func showVersion() {
-	fmt.Println("eggo version 0.0.1")
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Version:\t%s\n", Version))
+	sb.WriteString(fmt.Sprintf("CommitID:\t%s\n", Commit))
+	sb.WriteString(fmt.Sprintf("Architecture:\t%s\n", Arch))
+	btInt, err := strconv.Atoi(BuildTime)
+	if err != nil {
+		btInt = int(time.Now().Unix())
+	}
+	bt := time.Unix(int64(btInt), 0)
+	sb.WriteString(fmt.Sprintf("BuildTime:\t%s\n", bt.Format("2006-01-02 15:04:05")))
+
+	fmt.Printf("%s", sb.String())
 }
 
 func initLog() {

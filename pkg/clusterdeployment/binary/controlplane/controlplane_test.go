@@ -111,6 +111,7 @@ func TestInit(t *testing.T) {
 	if err := Init(conf, master); err != nil {
 		t.Fatalf("do control plane init failed: %v", err)
 	}
-	//lr.RunCommand(fmt.Sprintf("sudo rm -rf 0777 %s/%s", api.EggoHomePath, conf.Name))
+
+	lr.RunCommand(fmt.Sprintf("sudo rm -rf %s", api.EggoHomePath))
 	t.Logf("do control plane init success")
 }
