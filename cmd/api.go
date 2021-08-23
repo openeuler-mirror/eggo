@@ -6,10 +6,9 @@ type ConfigExtraArgs struct {
 }
 
 type PackageSrcConfig struct {
-	Type    string `yaml:"type"`    // tar.gz...
-	DstPath string `yaml:"dstpath"` // untar path on dst node
-	ArmSrc  string `yaml:"armsrc"`
-	X86Src  string `yaml:"x86src"`
+	Type    string            `yaml:"type"`    // tar.gz...
+	DstPath string            `yaml:"dstpath"` // untar path on dst node
+	SrcPath map[string]string `yaml:"srcpath"` // key: arm/amd/risc-v
 }
 
 type PackageConfig struct {
@@ -77,33 +76,34 @@ type OpenPorts struct {
 }
 
 type DeployConfig struct {
-	ClusterID          string                  `yaml:"cluster-id"`
-	Username           string                  `yaml:"username"`
-	Password           string                  `yaml:"password"`
-	PrivateKeyPath     string                  `yaml:"private-key-path"`
-	Masters            []*HostConfig           `yaml:"masters"`
-	Workers            []*HostConfig           `yaml:"workers"`
-	Etcds              []*HostConfig           `yaml:"etcds"`
-	LoadBalance        LoadBalance             `yaml:"loadbalance"`
-	ExternalCA         bool                    `yaml:"external-ca"`
-	ExternalCAPath     string                  `yaml:"external-ca-path"`
-	Service            ServiceClusterConfig    `yaml:"service"`
-	NetWork            NetworkConfig           `yaml:"network"`
-	ApiServerEndpoint  string                  `yaml:"apiserver-endpoint"`
-	ApiServerCertSans  Sans                    `yaml:"apiserver-cert-sans"`
-	ApiServerTimeout   string                  `yaml:"apiserver-timeout"`
-	EtcdExternal       bool                    `yaml:"etcd-external"`
-	EtcdToken          string                  `yaml:"etcd-token"`
-	DnsVip             string                  `yaml:"dns-vip"`
-	DnsDomain          string                  `yaml:"dns-domain"`
-	PauseImage         string                  `yaml:"pause-image"`
-	NetworkPlugin      string                  `yaml:"network-plugin"`
-	CniBinDir          string                  `yaml:"cni-bin-dir"`
-	Runtime            string                  `yaml:"runtime"`
-	RuntimeEndpoint    string                  `yaml:"runtime-endpoint"`
-	RegistryMirrors    []string                `yaml:"registry-mirrors"`
-	InsecureRegistries []string                `yaml:"insecure-registries"`
-	ConfigExtraArgs    []*ConfigExtraArgs      `yaml:"config-extra-args"`
-	OpenPorts          map[string][]*OpenPorts `yaml:"open-ports"` // key: master, worker, etcd, loadbalance
-	InstallConfig      InstallConfig           `yaml:"install"`
+	ClusterID            string                  `yaml:"cluster-id"`
+	Username             string                  `yaml:"username"`
+	Password             string                  `yaml:"password"`
+	PrivateKeyPath       string                  `yaml:"private-key-path"`
+	Masters              []*HostConfig           `yaml:"masters"`
+	Workers              []*HostConfig           `yaml:"workers"`
+	Etcds                []*HostConfig           `yaml:"etcds"`
+	LoadBalance          LoadBalance             `yaml:"loadbalance"`
+	ExternalCA           bool                    `yaml:"external-ca"`
+	ExternalCAPath       string                  `yaml:"external-ca-path"`
+	Service              ServiceClusterConfig    `yaml:"service"`
+	NetWork              NetworkConfig           `yaml:"network"`
+	ApiServerEndpoint    string                  `yaml:"apiserver-endpoint"`
+	ApiServerCertSans    Sans                    `yaml:"apiserver-cert-sans"`
+	ApiServerTimeout     string                  `yaml:"apiserver-timeout"`
+	EtcdExternal         bool                    `yaml:"etcd-external"`
+	EtcdToken            string                  `yaml:"etcd-token"`
+	DnsVip               string                  `yaml:"dns-vip"`
+	DnsDomain            string                  `yaml:"dns-domain"`
+	PauseImage           string                  `yaml:"pause-image"`
+	NetworkPlugin        string                  `yaml:"network-plugin"`
+	EnableKubeletServing bool                    `yaml:"enable-kubelet-serving"`
+	CniBinDir            string                  `yaml:"cni-bin-dir"`
+	Runtime              string                  `yaml:"runtime"`
+	RuntimeEndpoint      string                  `yaml:"runtime-endpoint"`
+	RegistryMirrors      []string                `yaml:"registry-mirrors"`
+	InsecureRegistries   []string                `yaml:"insecure-registries"`
+	ConfigExtraArgs      []*ConfigExtraArgs      `yaml:"config-extra-args"`
+	OpenPorts            map[string][]*OpenPorts `yaml:"open-ports"` // key: master, worker, etcd, loadbalance
+	InstallConfig        InstallConfig           `yaml:"install"`
 }

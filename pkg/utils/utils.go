@@ -19,26 +19,9 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
-	"strings"
 
 	"isula.org/eggo/pkg/api"
 )
-
-func IsX86Arch(arch string) bool {
-	if strings.HasPrefix(arch, "x86") || strings.HasPrefix(arch, "X86") || strings.HasPrefix(arch, "amd64") {
-		return true
-	}
-
-	return false
-}
-
-func IsArmArch(arch string) bool {
-	if strings.HasPrefix(arch, "arm") || strings.HasPrefix(arch, "Arm") || strings.HasPrefix(arch, "ARM") {
-		return true
-	}
-
-	return false
-}
 
 func GetSysHome() string {
 	if user, err := user.Current(); err == nil {

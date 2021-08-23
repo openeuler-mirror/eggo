@@ -70,6 +70,30 @@ rules:
     verbs:
       - "*"
 `
+	ClusterRoleTemplate = `apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Name }}
+rules:
+{{- $alen := len .APIGroups }}
+{{- if ne $alen 0 }}
+- apiGroups: [{{- range $i, $v := .APIGroups }}"{{ $v }}"{{if NotLast $i $alen }}, {{end}}{{- end }}]
+{{- else }}
+- apiGroups: [ "" ]
+{{- end }}
+{{- $alen := len .Resources }}
+{{- if ne $alen 0 }}
+  resources: [{{- range $i, $v := .Resources }}"{{ $v }}"{{if NotLast $i $alen }}, {{end}}{{- end }}]
+{{- else }}
+  resources: [ "" ]
+{{- end }}
+{{- $alen := len .Verbs }}
+{{- if ne $alen 0 }}
+  verbs: [{{- range $i, $v := .Verbs }}"{{ $v }}"{{if NotLast $i $alen }}, {{end}}{{- end }}]
+{{- else }}
+  verbs: [ "" ]
+{{- end }}
+`
 	ClusterRoleBindingTemplate = `apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -545,6 +569,33 @@ func (ct *PostControlPlaneTask) createBootstrapCrb() []*api.ClusterRoleBindingCo
 	return []*api.ClusterRoleBindingConfig{csr, approve, renew}
 }
 
+func (ct *PostControlPlaneTask) applyClusterRole(r runner.Runner, crc *api.ClusterRoleConfig, manifestDir string) error {
+	datastore := map[string]interface{}{}
+	datastore["Name"] = crc.Name
+	datastore["APIGroups"] = crc.APIGroups
+	datastore["Resources"] = crc.Resources
+	datastore["Verbs"] = crc.Verbs
+	cr, err := template.TemplateRender(ClusterRoleTemplate, datastore)
+	if err != nil {
+		return err
+	}
+
+	var sb strings.Builder
+	sb.WriteString("sudo -E /bin/sh -c \"")
+	sb.WriteString(fmt.Sprintf("mkdir -p %s", manifestDir))
+	crYamlBase64 := base64.StdEncoding.EncodeToString([]byte(cr))
+	sb.WriteString(fmt.Sprintf(" && echo %s | base64 -d > %s/%s.yaml", crYamlBase64, manifestDir, crc.Name))
+	sb.WriteString(fmt.Sprintf(" && KUBECONFIG=%s/admin.conf kubectl apply -f %s/%s.yaml", ct.cluster.GetConfigDir(), manifestDir, crc.Name))
+	sb.WriteString("\"")
+
+	_, err = r.RunCommand(sb.String())
+	if err != nil {
+		logrus.Errorf("apply crs failed: %v", err)
+		return err
+	}
+	return nil
+}
+
 func (ct *PostControlPlaneTask) applyClusterRoleBinding(r runner.Runner, crbc *api.ClusterRoleBindingConfig, manifestDir string) error {
 	datastore := map[string]interface{}{}
 	datastore["Name"] = crbc.Name
@@ -579,6 +630,36 @@ func (ct *PostControlPlaneTask) bootstrapClusterRoleBinding(r runner.Runner) err
 			logrus.Errorf("apply ClusterRoleBinding failed: %v", err)
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (ct *PostControlPlaneTask) kubeletServerCRB(r runner.Runner) error {
+	if !ct.cluster.WorkerConfig.KubeletConf.EnableServer {
+		return nil
+	}
+
+	crc := &api.ClusterRoleConfig{
+		Name:      "approve-node-server-renewal-csr",
+		APIGroups: []string{"certificates.k8s.io"},
+		Resources: []string{"certificatesigningrequests/selfnodeserver"},
+		Verbs:     []string{"create"},
+	}
+	if err := ct.applyClusterRole(r, crc, ct.cluster.GetManifestDir()); err != nil {
+		logrus.Errorf("apply ClusterRole failed: %v", err)
+		return err
+	}
+
+	crbc := &api.ClusterRoleBindingConfig{
+		Name:        "auto-approve-renewals-server-for-nodes",
+		SubjectName: "system:nodes",
+		SubjectKind: "Group",
+		RoleName:    "approve-node-server-renewal-csr",
+	}
+	if err := ct.applyClusterRoleBinding(r, crbc, ct.cluster.GetManifestDir()); err != nil {
+		logrus.Errorf("apply ClusterRoleBinding failed: %v", err)
+		return err
 	}
 
 	return nil
@@ -626,6 +707,11 @@ func (ct *PostControlPlaneTask) Run(r runner.Runner, hcf *api.HostConfig) error 
 
 	// 2. create bootstrap clusterrolebinding
 	if err := ct.bootstrapClusterRoleBinding(r); err != nil {
+		return err
+	}
+
+	// 3. create kubelet renew server certificates clusterrolebinding
+	if err := ct.kubeletServerCRB(r); err != nil {
 		return err
 	}
 

@@ -26,6 +26,7 @@ import (
 	_ "isula.org/eggo/pkg/clusterdeployment/binary"
 	"isula.org/eggo/pkg/clusterdeployment/manager"
 	"isula.org/eggo/pkg/utils"
+	"isula.org/eggo/pkg/utils/certs"
 	"isula.org/eggo/pkg/utils/nodemanager"
 )
 
@@ -55,6 +56,28 @@ func splitNodes(nodes []*api.HostConfig) (*api.HostConfig, []*api.HostConfig, []
 	}
 
 	return lb, masters, workers, etcdNodes
+}
+
+func approveServingCsr(cc *api.ClusterConfig, nodes []*api.HostConfig) {
+	if cc.WorkerConfig.KubeletConf == nil || !cc.WorkerConfig.KubeletConf.EnableServer {
+		return
+	}
+
+	var workers []*api.HostConfig
+	for _, n := range nodes {
+		if utils.IsType(n.Type, api.Worker) {
+			workers = append(workers, n)
+		}
+	}
+
+	if len(workers) == 0 {
+		return
+	}
+
+	if err := certs.ApproveCsr(cc.Name, workers); err != nil {
+		// ignore approve csr error
+		logrus.Errorf("approve serving certificates failed: %v", err)
+	}
 }
 
 func doJoinNodeOfCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, masters, workers []*api.HostConfig) ([]string, []*api.HostConfig, []*api.HostConfig) {
@@ -153,18 +176,21 @@ func doCreateCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, cs
 		}
 	}
 
-	//Step6: setup left nodes for cluster
+	// Step6: setup left nodes for cluster
 	joinedNodeIDs, joinedNodes, failedNodes := doJoinNodeOfCluster(handler, cc, masters, workers)
 	if len(joinedNodeIDs) == 0 {
 		logrus.Warnln("all join nodes failed")
 	}
 
-	//Step7: setup addons for cluster
+	// Step7: setup addons for cluster
 	if err = handler.AddonsSetup(); err != nil {
 		return nil, err
 	}
 
-	// Step8: run postcreate cluster hooks
+	// Step8: approve kubelet serving csr
+	approveServingCsr(cc, append(joinedNodes, controlPlaneNode))
+
+	// Step9: run postcreate cluster hooks
 	if err = handler.PostCreateClusterHooks(joinedNodes); err != nil {
 		return nil, err
 	}
@@ -327,6 +353,7 @@ func JoinNodes(cc *api.ClusterConfig, hostconfigs []*api.HostConfig) (api.Cluste
 	}
 
 	var joinedNodeIDs []string
+	var joinedNodes []*api.HostConfig
 	var failedNodes []*api.HostConfig
 
 	// join nodes with etcd
@@ -337,6 +364,7 @@ func JoinNodes(cc *api.ClusterConfig, hostconfigs []*api.HostConfig) (api.Cluste
 			continue
 		}
 		joinedNodeIDs = append(joinedNodeIDs, h.Address)
+		joinedNodes = append(joinedNodes, h)
 		logrus.Infof("[cluster] join '%s' with etcd to cluster successed", cc.Name)
 	}
 
@@ -356,6 +384,7 @@ func JoinNodes(cc *api.ClusterConfig, hostconfigs []*api.HostConfig) (api.Cluste
 			}
 			lock.Lock()
 			joinedNodeIDs = append(joinedNodeIDs, hostconfig.Address)
+			joinedNodes = append(joinedNodes, hostconfig)
 			lock.Unlock()
 			logrus.Infof("[cluster] join '%s' to cluster successed", cc.Name)
 		}(h)
@@ -366,6 +395,9 @@ func JoinNodes(cc *api.ClusterConfig, hostconfigs []*api.HostConfig) (api.Cluste
 		cstatus.StatusOfNodes[sid] = true
 		cstatus.SuccessCnt += 1
 	}
+
+	// approve kubelet serving csr
+	approveServingCsr(cc, joinedNodes)
 
 	if len(failedNodes) == 0 {
 		cstatus.Message = "join nodes to cluster success"

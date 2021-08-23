@@ -22,6 +22,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"isula.org/eggo/pkg/api"
@@ -94,8 +95,10 @@ func check(r runner.Runner, hcg *api.HostConfig, packageSrc *api.PackageSrcConfi
 		return fmt.Errorf("empty package source config")
 	}
 
-	if !utils.IsX86Arch(hcg.Arch) && !utils.IsArmArch(hcg.Arch) {
-		return fmt.Errorf("invalid Arch %s for %s", hcg.Arch, hcg.Address)
+	if len(packageSrc.SrcPath) != 0 {
+		if _, ok := packageSrc.SrcPath[strings.ToLower(hcg.Arch)]; !ok {
+			return fmt.Errorf("no package for Arch %s", hcg.Arch)
+		}
 	}
 
 	if _, err := r.RunCommand("sudo -E /bin/sh -c \"which md5sum\""); err != nil {
@@ -153,11 +156,7 @@ exit 0
 }
 
 func getPackageSrcPath(arch string, pcfg *api.PackageSrcConfig) string {
-	if utils.IsX86Arch(arch) {
-		return pcfg.X86Src
-	}
-
-	return pcfg.ArmSrc
+	return pcfg.SrcPath[strings.ToLower(arch)]
 }
 
 func copyPackage(r runner.Runner, hcg *api.HostConfig, pcfg *api.PackageSrcConfig) error {
