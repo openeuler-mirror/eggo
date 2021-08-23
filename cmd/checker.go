@@ -321,6 +321,7 @@ func (ccr *OpenPortResponsibility) Execute() error {
 type InstallConfigResponsibility struct {
 	next chain.Responsibility
 	conf InstallConfig
+	arch map[string]bool
 }
 
 func (ccr *InstallConfigResponsibility) SetNexter(nexter chain.Responsibility) {
@@ -368,14 +369,18 @@ func (ccr *InstallConfigResponsibility) Execute() error {
 				return fmt.Errorf("srcpackage dst path: %s must be absolute", ccr.conf.PackageSrc.DstPath)
 			}
 		}
-		if ccr.conf.PackageSrc.ArmSrc != "" {
-			if !filepath.IsAbs(ccr.conf.PackageSrc.ArmSrc) {
-				return fmt.Errorf("srcpackage arm path: %s must be absolute", ccr.conf.PackageSrc.ArmSrc)
+
+		for arch, path := range ccr.conf.PackageSrc.SrcPath {
+			if !filepath.IsAbs(path) {
+				return fmt.Errorf("srcpackage %s path: %s must be absolute", arch, path)
 			}
 		}
-		if ccr.conf.PackageSrc.X86Src != "" {
-			if !filepath.IsAbs(ccr.conf.PackageSrc.X86Src) {
-				return fmt.Errorf("srcpackage x86 path: %s must be absolute", ccr.conf.PackageSrc.X86Src)
+
+		if len(ccr.conf.PackageSrc.SrcPath) != 0 {
+			for a := range ccr.arch {
+				if _, ok := ccr.conf.PackageSrc.SrcPath[a]; !ok {
+					return fmt.Errorf("no source package for arch %s", a)
+				}
 			}
 		}
 	}
@@ -430,8 +435,27 @@ func RunChecker(conf *DeployConfig) error {
 	if conf == nil {
 		return errors.New("deploy config is nil")
 	}
+
+	arch := make(map[string]bool)
+	for _, m := range conf.Masters {
+		arch[m.Arch] = true
+	}
+	for _, w := range conf.Workers {
+		arch[w.Arch] = true
+	}
+	for _, m := range conf.Masters {
+		arch[m.Arch] = true
+	}
+	for _, m := range conf.Masters {
+		arch[m.Arch] = true
+	}
+	if conf.LoadBalance.Arch != "" {
+		arch[conf.LoadBalance.Arch] = true
+	}
+
 	install := InstallConfigResponsibility{
 		conf: conf.InstallConfig,
+		arch: arch,
 	}
 	openport := OpenPortResponsibility{
 		next: &install,

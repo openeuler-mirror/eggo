@@ -112,10 +112,9 @@ func TestRunChecker(t *testing.T) {
 	}
 
 	// test invalid install config
-	tmpX86Src := conf.InstallConfig.PackageSrc.X86Src
-	conf.InstallConfig.PackageSrc.X86Src = "package.tar.gz"
+	conf.InstallConfig.PackageSrc.SrcPath["test-arch"] = "package-test-arch.tar.gz"
 	if err = RunChecker(conf); err == nil {
 		t.Fatalf("test invalid install config failed: %v", err)
 	}
-	conf.InstallConfig.PackageSrc.X86Src = tmpX86Src
+	delete(conf.InstallConfig.PackageSrc.SrcPath, "test-arch")
 }

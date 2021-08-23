@@ -8,7 +8,7 @@
 
 ​    eggo支持在多种常见的linux发行版上部署k8s集群，例如openeuler/centos/ubuntu。
 
-​    eggo支持在集群中混合部署不同架构(x86_64/arm64)的机器。
+​    eggo支持在集群中混合部署不同架构(amd64/arm64等)机器。
 
 ​    eggo已实现使用命令行的方式进行集群的一键部署，并提供了多种集群部署方式：
 
@@ -115,7 +115,7 @@ $ eggo -d join --id k8s-cluster --type master,worker --arch arm64 --port 22 192.
 * -d参数表示打印调试信息
 * --id集群的id
 * --type可以为master或者worker，默认为worker，也可以同时作为master和worker加入，值为master,worker，如果添加的类型里有master，则会同时部署etcd到该节点。
-* --arch机器架构，支持amd64或者arm64，不填则使用原有配置，无配置则用默认值amd64
+* --arch机器架构，支持amd64、arm64等多种配置，需要对应架构的安装包。不指定默认为amd64
 * --port使用ssh登录的端口号，不填则使用原有配置，无配置则用默认值22
 
 
@@ -258,8 +258,9 @@ install:                                    // 配置各种类型节点上需要
   package-src:                              // 配置安装包的详细信息
     type: tar.gz                            // 安装包的压缩类型，目前只支持tar.gz类型的安装包
     dstpath: ""                             // 安装包在对端机器上的路径，必须是合法绝对路径
-    armsrc: /root/rpms/packages-arm.tar.gz  // arm类型安装包的路径，配置的机器中存在arm机器场景下需要配置，必须是合法绝对路径
-    x86src: /root/rpms/packages-x86.tar.gz  // x86类型安装包的路径，配置的机器中存在x86机器场景下需要配置，必须是合法绝对路径                                 
+    srcpath:                                // 不同架构安装包的存放路径，架构必须与机器架构相对应，必须是合法绝对路径
+      arm64: /root/rpms/packages-arm64.tar.gz // arm64架构安装包的路径，配置的机器中存在arm64机器场景下需要配置，必须是合法绝对路径
+      amd64: /root/rpms/packages-x86.tar.gz   // amd64类型安装包的路径，配置的机器中存在amd64机器场景下需要配置，必须是合法绝对路径                                 
   etcd:                                     // etcd类型节点需要安装的包或二进制文件列表
   - name: etcd                              // 需要安装的包或二进制文件的名称，如果是安装包则只写名称，不填写具体的版本号，安装时会使用`$name*`来识别
     type: pkg                               // package的类型，pkg/repo/bin/file/dir/image/yaml七种类型，如果配置为repo请在对应节点上配置好repo源

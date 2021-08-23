@@ -171,6 +171,7 @@ func getDefaultClusterdeploymentConfig() *api.ClusterConfig {
 				PauseImage:    "k8s.gcr.io/pause:3.2",
 				NetworkPlugin: "cni",
 				CniBinDir:     "/usr/libexec/cni,/opt/cni/bin",
+				EnableServer:  false,
 			},
 			ContainerEngineConf: &api.ContainerEngine{
 				RegistryMirrors:    []string{},
@@ -252,10 +253,12 @@ func appendSoftware(software, packageConfig, defaultPackage []*api.PackageConfig
 }
 
 func fillPackageConfig(ccfg *api.ClusterConfig, icfg *InstallConfig) {
+	ccfg.PackageSrc.SrcPath = make(map[string]string)
 	if icfg.PackageSrc != nil {
 		setIfStrConfigNotEmpty(&ccfg.PackageSrc.Type, icfg.PackageSrc.Type)
-		setIfStrConfigNotEmpty(&ccfg.PackageSrc.ArmSrc, icfg.PackageSrc.ArmSrc)
-		setIfStrConfigNotEmpty(&ccfg.PackageSrc.X86Src, icfg.PackageSrc.X86Src)
+		for arch, path := range icfg.PackageSrc.SrcPath {
+			ccfg.PackageSrc.SrcPath[strings.ToLower(arch)] = path
+		}
 	}
 
 	software := []struct {
@@ -581,6 +584,7 @@ func toClusterdeploymentConfig(conf *DeployConfig) *api.ClusterConfig {
 	fillAPIEndPoint(&ccfg.APIEndpoint, conf)
 	fillPackageConfig(ccfg, &conf.InstallConfig)
 	fillOpenPort(ccfg, conf.OpenPorts, conf.Service.DNS.CorednsType)
+	ccfg.WorkerConfig.KubeletConf.EnableServer = conf.EnableKubeletServing
 
 	fillExtrArgs(ccfg, conf.ConfigExtraArgs)
 
@@ -698,9 +702,11 @@ func createDeployConfigTemplate(file string) error {
 		},
 		InstallConfig: InstallConfig{
 			PackageSrc: &PackageSrcConfig{
-				Type:   "tar.gz",
-				ArmSrc: "/root/packages/packages-arm.tar.gz",
-				X86Src: "/root/packages/packages-x86.tar.gz",
+				Type: "tar.gz",
+				SrcPath: map[string]string{
+					"arm64": "/root/packages/packages-arm64.tar.gz",
+					"amd64": "/root/packages/packages-amd64.tar.gz",
+				},
 			},
 			KubernetesMaster: []*PackageConfig{
 				{
