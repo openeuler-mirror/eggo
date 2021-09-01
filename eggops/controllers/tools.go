@@ -58,21 +58,19 @@ func fillPackageConfig(src []*eggov1.PackageConfig) []*cmd.PackageConfig {
 func fillInstallConfig(installConfig eggov1.InstallConfig, packagePath string) (config cmd.InstallConfig) {
 	// TODO: eggo src package api changes
 	if installConfig.PackageSrc != nil {
-		armSrc := filepath.Join(packagePath, eggov1.DefaultPackageArmName)
-		x86Src := filepath.Join(packagePath, eggov1.DefaultPackageX86Name)
+		srcPath := make(map[string]string)
 
-		if _, ok := installConfig.PackageSrc.SrcPackages["arm"]; ok {
-			armSrc = filepath.Join(packagePath, installConfig.PackageSrc.SrcPackages["arm"])
-		}
-		if _, ok := installConfig.PackageSrc.SrcPackages["x86"]; ok {
-			x86Src = filepath.Join(packagePath, installConfig.PackageSrc.SrcPackages["x86"])
+		srcPath["arm"] = filepath.Join(packagePath, eggov1.DefaultPackageArmName)
+		srcPath["x86"] = filepath.Join(packagePath, eggov1.DefaultPackageX86Name)
+		srcPath["risc-v"] = filepath.Join(packagePath, eggov1.DefaultPackageRISCVName)
+		for arch, path := range installConfig.PackageSrc.SrcPackages {
+			srcPath[arch] = filepath.Join(packagePath, path)
 		}
 
 		config.PackageSrc = &cmd.PackageSrcConfig{
 			Type:    installConfig.PackageSrc.Type,
 			DstPath: installConfig.PackageSrc.DstPath,
-			ArmSrc:  armSrc,
-			X86Src:  x86Src,
+			SrcPath: srcPath,
 		}
 	}
 
