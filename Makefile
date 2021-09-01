@@ -18,7 +18,7 @@ eggo:
 	@echo "build eggo done!"
 local:
 	@echo "build eggo use vendor starting..."
-	@go build -ldflags '$(LDFLAGS)' -mod vendor -ldflags -o bin/eggo .
+	@go build -ldflags '$(LDFLAGS)' -mod vendor -o bin/eggo .
 	@echo "build eggo use vendor done!"
 test:
 	@echo "Unit tests starting..."
