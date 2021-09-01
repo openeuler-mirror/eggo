@@ -8,32 +8,27 @@
  * IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR
  * PURPOSE.
  * See the Mulan PSL v2 for more details.
- * Author: haozi007
- * Create: 2021-09-01
- * Description: tools for chain of Responsibility
+ * Author: wangfengtu
+ * Create: 2021-08-18
+ * Description: etcd reconfig testcase
  ******************************************************************************/
-package responsibilitychain
 
-type Responsibility interface {
-	Execute() error
-	SetNexter(Responsibility)
-	Nexter() Responsibility
+package etcdcluster
+
+import (
+	"testing"
+)
+
+func TestExecRemoveEtcdsTask(t *testing.T) {
+	registerFakeRunner(t)
+	if err := ExecRemoveEtcdsTask(conf); err != nil {
+		t.Fatalf("test exec remove etcds task failed")
+	}
 }
 
-func RunChainOfResponsibility(res Responsibility) error {
-	if res == nil {
-		return nil
+func TestExecRemoveMemberTask(t *testing.T) {
+	registerFakeRunner(t)
+	if err := ExecRemoveMemberTask(conf, nodes[1]); err != nil {
+		t.Fatalf("test exec remove member task failed")
 	}
-	if err := res.Execute(); err != nil {
-		return err
-	}
-	nexter := res.Nexter()
-	for nexter != nil {
-		if err := nexter.Execute(); err != nil {
-			return err
-		}
-		nexter = nexter.Nexter()
-	}
-
-	return nil
 }

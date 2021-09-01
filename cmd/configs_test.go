@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"gopkg.in/yaml.v1"
+	"isula.org/eggo/pkg/api"
 )
 
 func TestCmdConfigs(t *testing.T) {
@@ -58,4 +59,9 @@ func TestCmdConfigs(t *testing.T) {
 	}
 
 	fmt.Printf("%v\n", string(d))
+
+	api.EggoHomePath = tempdir
+	if err := saveDeployConfig(conf, savedDeployConfigPath(conf.ClusterID)); err != nil {
+		t.Fatalf("save deploy config to file failed: %v", err)
+	}
 }

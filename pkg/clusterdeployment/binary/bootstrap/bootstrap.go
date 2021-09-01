@@ -235,13 +235,27 @@ authentication:
 authorization:
   mode: Webhook
 clusterDNS:
-- ` + ccfg.WorkerConfig.KubeletConf.DnsVip + `
-clusterDomain: ` + ccfg.WorkerConfig.KubeletConf.DnsDomain + `
+- {{ .DnsVip }}
+clusterDomain: {{ .DnsDomain }}
+rotateCertificates: true
 runtimeRequestTimeout: "15m"
+{{- if .EnableServer }}
+serverTLSBootstrap: true
+{{- end}}
 `
 
+	datastore := make(map[string]interface{})
+	datastore["DnsVip"] = ccfg.WorkerConfig.KubeletConf.DnsVip
+	datastore["DnsDomain"] = ccfg.WorkerConfig.KubeletConf.DnsDomain
+	datastore["EnableServer"] = ccfg.WorkerConfig.KubeletConf.EnableServer
+
+	config, err := template.TemplateRender(kubeletConfig, datastore)
+	if err != nil {
+		return err
+	}
+	cfgBase64 := base64.StdEncoding.EncodeToString([]byte(config))
+
 	var sb strings.Builder
-	cfgBase64 := base64.StdEncoding.EncodeToString([]byte(kubeletConfig))
 	sb.WriteString(fmt.Sprintf("sudo -E /bin/sh -c \"echo %s | base64 -d > %s\"", cfgBase64, "/etc/kubernetes/kubelet_config.yaml"))
 	if _, err := r.RunCommand(sb.String()); err != nil {
 		return err

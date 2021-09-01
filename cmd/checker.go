@@ -1,3 +1,17 @@
+/******************************************************************************
+ * Copyright (c) Huawei Technologies Co., Ltd. 2021. All rights reserved.
+ * eggo licensed under the Mulan PSL v2.
+ * You can use this software according to the terms and conditions of the Mulan PSL v2.
+ * You may obtain a copy of Mulan PSL v2 at:
+ *     http://license.coscl.org.cn/MulanPSL2
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR
+ * PURPOSE.
+ * See the Mulan PSL v2 for more details.
+ * Author: haozi007
+ * Create: 2021-08-18
+ * Description: checker for cluster config
+ ******************************************************************************/
 package cmd
 
 import (
@@ -137,7 +151,11 @@ func checkHostconfig(h *HostConfig) error {
 	return nil
 }
 
-func checkNodeList(nodes []*HostConfig) error {
+func compareHost(a, b *HostConfig) bool {
+	return a.Ip == b.Ip && a.Name == b.Name && a.Port == b.Port && a.Arch == b.Arch
+}
+
+func checkNodeList(nodes []*HostConfig, allHosts map[string]*HostConfig) error {
 	useIPs := make(map[string]bool)
 	useNames := make(map[string]bool)
 	for _, m := range nodes {
@@ -152,18 +170,26 @@ func checkNodeList(nodes []*HostConfig) error {
 			return fmt.Errorf("duplicate name: %s", m.Name)
 		}
 		useNames[m.Name] = true
+		if fh, ok := allHosts[m.Ip]; ok {
+			if !compareHost(m, fh) {
+				return fmt.Errorf("same ip in different host: %v, %v", fh, m)
+			}
+		} else {
+			allHosts[m.Ip] = m
+		}
 	}
 	return nil
 }
 
 func (ccr *NodesResponsibility) Execute() error {
-	if err := checkNodeList(ccr.conf.Masters); err != nil {
+	allHosts := make(map[string]*HostConfig, len(ccr.conf.Masters)+len(ccr.conf.Workers))
+	if err := checkNodeList(ccr.conf.Masters, allHosts); err != nil {
 		return err
 	}
-	if err := checkNodeList(ccr.conf.Workers); err != nil {
+	if err := checkNodeList(ccr.conf.Workers, allHosts); err != nil {
 		return err
 	}
-	if err := checkNodeList(ccr.conf.Etcds); err != nil {
+	if err := checkNodeList(ccr.conf.Etcds, allHosts); err != nil {
 		return err
 	}
 
@@ -309,6 +335,7 @@ func (ccr *OpenPortResponsibility) Execute() error {
 type InstallConfigResponsibility struct {
 	next chain.Responsibility
 	conf InstallConfig
+	arch map[string]bool
 }
 
 func (ccr *InstallConfigResponsibility) SetNexter(nexter chain.Responsibility) {
@@ -356,14 +383,18 @@ func (ccr *InstallConfigResponsibility) Execute() error {
 				return fmt.Errorf("srcpackage dst path: %s must be absolute", ccr.conf.PackageSrc.DstPath)
 			}
 		}
-		if ccr.conf.PackageSrc.ArmSrc != "" {
-			if !filepath.IsAbs(ccr.conf.PackageSrc.ArmSrc) {
-				return fmt.Errorf("srcpackage arm path: %s must be absolute", ccr.conf.PackageSrc.ArmSrc)
+
+		for arch, path := range ccr.conf.PackageSrc.SrcPath {
+			if !filepath.IsAbs(path) {
+				return fmt.Errorf("srcpackage %s path: %s must be absolute", arch, path)
 			}
 		}
-		if ccr.conf.PackageSrc.X86Src != "" {
-			if !filepath.IsAbs(ccr.conf.PackageSrc.X86Src) {
-				return fmt.Errorf("srcpackage x86 path: %s must be absolute", ccr.conf.PackageSrc.X86Src)
+
+		if len(ccr.conf.PackageSrc.SrcPath) != 0 {
+			for a := range ccr.arch {
+				if _, ok := ccr.conf.PackageSrc.SrcPath[a]; !ok {
+					return fmt.Errorf("no source package for arch %s", a)
+				}
 			}
 		}
 	}
@@ -418,8 +449,27 @@ func RunChecker(conf *DeployConfig) error {
 	if conf == nil {
 		return errors.New("deploy config is nil")
 	}
+
+	arch := make(map[string]bool)
+	for _, m := range conf.Masters {
+		arch[m.Arch] = true
+	}
+	for _, w := range conf.Workers {
+		arch[w.Arch] = true
+	}
+	for _, m := range conf.Masters {
+		arch[m.Arch] = true
+	}
+	for _, m := range conf.Masters {
+		arch[m.Arch] = true
+	}
+	if conf.LoadBalance.Arch != "" {
+		arch[conf.LoadBalance.Arch] = true
+	}
+
 	install := InstallConfigResponsibility{
 		conf: conf.InstallConfig,
+		arch: arch,
 	}
 	openport := OpenPortResponsibility{
 		next: &install,

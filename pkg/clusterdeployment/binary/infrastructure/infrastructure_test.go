@@ -97,9 +97,11 @@ func TestPrepareInfrastructure(t *testing.T) {
 			},
 		},
 		PackageSrc: api.PackageSrcConfig{
-			Type:   "",
-			ArmSrc: "",
-			X86Src: "",
+			Type: "",
+			SrcPath: map[string]string{
+				"arm64":  "/root/packages/packages-arm64.tar.gz",
+				"x86_64": "/root/packages/packages-x86_64.tar.gz",
+			},
 		},
 		RoleInfra: map[uint16]*api.RoleInfra{
 			api.Master: {

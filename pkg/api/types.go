@@ -54,10 +54,9 @@ type PackageConfig struct {
 }
 
 type PackageSrcConfig struct {
-	Type    string `json:"type"`     // tar.gz...
-	DstPath string `json:"dst-path"` // untar path on dst node
-	ArmSrc  string `json:"arm-srcpath"`
-	X86Src  string `json:"x86-srcPath"`
+	Type    string            `json:"type"`     // tar.gz...
+	DstPath string            `json:"dst-path"` // untar path on dst node
+	SrcPath map[string]string `json:"srcpath"`  // key: arm/amd/risc-v...
 }
 
 type HostConfig struct {
@@ -110,6 +109,7 @@ type Kubelet struct {
 	NetworkPlugin string            `json:"network-plugin"`
 	CniBinDir     string            `json:"cni-bin-dir"`
 	CniConfDir    string            `json:"cni-conf-dir"`
+	EnableServer  bool              `json:"enable-server"`
 	ExtraArgs     map[string]string `json:"extra-args,omitempty"`
 }
 
@@ -178,6 +178,12 @@ type BootstrapTokenConfig struct {
 	AuthExtraGroups []string       `json:"auth_extra_groups"`
 }
 
+type ClusterRoleConfig struct {
+	Name      string   `json:"Name"`
+	APIGroups []string `json:"APIGroups"`
+	Resources []string `json:"Resources"`
+	Verbs     []string `json:"Verbs"`
+}
 type ClusterRoleBindingConfig struct {
 	Name        string `json:"Name"`
 	SubjectName string `json:"SubjectName"`
