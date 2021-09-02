@@ -199,9 +199,9 @@ func (ct *DeployRuntimeTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 	}
 
 	// start service
-	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"systemctl daemon-reload && systemctl restart %s\"",
+	if output, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"systemctl daemon-reload && systemctl restart %s\"",
 		ct.runtime.GetRuntimeService())); err != nil {
-		logrus.Errorf("start %s failed: %v", ct.runtime.GetRuntimeService(), err)
+		logrus.Errorf("start %s failed: %v\nout: %s", ct.runtime.GetRuntimeService(), err, output)
 		return err
 	}
 

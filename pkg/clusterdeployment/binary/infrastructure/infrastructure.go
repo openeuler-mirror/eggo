@@ -27,6 +27,7 @@ import (
 
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment/binary/cleanupcluster"
+	"isula.org/eggo/pkg/constants"
 	"isula.org/eggo/pkg/utils"
 	"isula.org/eggo/pkg/utils/dependency"
 	"isula.org/eggo/pkg/utils/nodemanager"
@@ -319,6 +320,13 @@ func (it *DestroyInfraTask) Name() string {
 	return "DestroyInfraTask"
 }
 
+func getCopyDefaultDir(user string) string {
+	if user == "root" {
+		return constants.DefaultRootCopyTempDirHome
+	}
+	return fmt.Sprintf(constants.DefaultUserCopyTempHomeFormat, user)
+}
+
 func (it *DestroyInfraTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 	if hcg == nil {
 		return fmt.Errorf("empty host config")
@@ -339,7 +347,8 @@ func (it *DestroyInfraTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 		logrus.Errorf("path %s not in White List and cannot remove", dstDir)
 		return nil
 	}
-	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"rm -rf %s\"", dstDir)); err != nil {
+	copyTempDir := getCopyDefaultDir(hcg.UserName)
+	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"rm -rf %s %s\"", dstDir, copyTempDir)); err != nil {
 		return fmt.Errorf("rm dependency failed: %v", err)
 	}
 

@@ -636,7 +636,7 @@ func (ct *PostControlPlaneTask) bootstrapClusterRoleBinding(r runner.Runner) err
 }
 
 func (ct *PostControlPlaneTask) kubeletServerCRB(r runner.Runner) error {
-	if !ct.cluster.WorkerConfig.KubeletConf.EnableServer {
+	if ct.cluster.WorkerConfig.KubeletConf == nil || !ct.cluster.WorkerConfig.KubeletConf.EnableServer {
 		return nil
 	}
 

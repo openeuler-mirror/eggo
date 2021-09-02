@@ -21,8 +21,9 @@ const (
 	DefaultImagePath   = "/image"
 
 	// user home dir formats
-	UserHomeFormat               = "/home/%s"
-	DefaultUserCopyTempDirFormat = "/home/%s/.eggo/temp"
+	UserHomeFormat                = "/home/%s"
+	DefaultUserCopyTempHomeFormat = "/home/%s/.eggo"
+	DefaultRootCopyTempDirHome    = "/root/.eggo"
 
 	// network plugin arguments key
 	NetworkPluginArgKeyYamlPath = "NetworkYamlPath"

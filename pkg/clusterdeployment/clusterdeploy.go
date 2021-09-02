@@ -216,6 +216,7 @@ func rollbackFailedNoeds(handler api.ClusterDeploymentAPI, nodes []*api.HostConf
 	for _, n := range nodes {
 		// do best to cleanup, if error, just ignore
 		handler.ClusterNodeCleanup(n, n.Type)
+		handler.PostNodeCleanupHooks(n)
 		handler.MachineInfraDestroy(n)
 		rollIDs = append(rollIDs, n.Address)
 	}
