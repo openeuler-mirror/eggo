@@ -55,10 +55,14 @@ type ClusterReconciler struct {
 // +kubebuilder:rbac:groups=eggo.isula.org,resources=clusters/finalizers,verbs=update
 // +kubebuilder:rbac:groups=eggo.isula.org,resources=machinebindings,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=eggo.isula.org,resources=machinebindings/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=v1,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=v1,resources=configmaps/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=v1,resources=persistentvolumeclaim,verbs=get;list;watch
-// +kubebuilder:rbac:groups=v1,resources=secret,verbs=get;list;watch;
+// +kubebuilder:rbac:groups=eggo.isula.org,resources=infrastructures,verbs=get;list;watch
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=jobs/status,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=configmaps/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims/status,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

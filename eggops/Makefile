@@ -4,6 +4,12 @@ IMG ?= controller:latest
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
 
+# Image Arch amd64/arm64
+ARCH ?= amd64
+ifeq ($(shell uname -p),aarch64)
+ARCH ?= arm64
+endif
+
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -64,7 +70,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
 docker-build: test ## Build docker image with the manager.
-	docker build -t ${IMG} .
+	docker build --build-arg ARCH="${ARCH}" -t ${IMG} -f Dockerfile ..
 
 docker-push: ## Push docker image with the manager.
 	docker push ${IMG}

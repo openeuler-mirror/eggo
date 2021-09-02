@@ -88,6 +88,9 @@ type ClusterSpec struct {
 
 	Runtime RuntimeConfig `json:"runtime,omitempty"`
 
+	// +optional
+	EnableKubeletServing bool `json:"enableKubeletServing"`
+
 	// network config of cluster
 	Network ClusterNetworkConfig `json:"network,omitempty"`
 
