@@ -444,35 +444,9 @@ func (bcp *BinaryClusterDeployment) PreDeleteClusterHooks() {
 	}
 }
 
-func clearResiduals(nodes []*api.HostConfig, confDir string) error {
-	if len(nodes) == 0 {
-		return nil
-	}
-
-	var strNodes []string
-	for _, n := range nodes {
-		strNodes = append(strNodes, n.Address)
-	}
-
-	shell := fmt.Sprintf("#!/bin/bash\nrm -rf %s\nexit 0", confDir)
-
-	checker := task.NewTaskIgnoreErrInstance(
-		&commontools.RunShellTask{
-			ShellName: "checkMaster",
-			Shell:     shell,
-		},
-	)
-
-	return nodemanager.RunTaskOnNodes(checker, strNodes)
-}
-
 func (bcp *BinaryClusterDeployment) PostDeleteClusterHooks() {
 	role := []uint16{api.Worker, api.Master, api.ETCD, api.LoadBalance}
 	if err := dependency.HookSchedule(bcp.config, bcp.config.Nodes, role, api.SchedulePostCleanup); err != nil {
-		logrus.Warnf("Ignore: Delete cluster PostHook failed: %v", err)
-	}
-	// clear all residual objects
-	if err := clearResiduals(bcp.config.Nodes, bcp.config.GetConfigDir()); err != nil {
 		logrus.Warnf("Ignore: Delete cluster PostHook failed: %v", err)
 	}
 }
@@ -587,9 +561,5 @@ func (bcp *BinaryClusterDeployment) PostNodeCleanupHooks(node *api.HostConfig) {
 	role := []uint16{api.Worker, api.Master, api.ETCD}
 	if err := dependency.HookSchedule(bcp.config, []*api.HostConfig{node}, role, api.SchedulePostCleanup); err != nil {
 		logrus.Warnf("Ignore: Delete Node PostHook failed: %v", err)
-	}
-
-	if err := clearResiduals([]*api.HostConfig{node}, bcp.config.GetConfigDir()); err != nil {
-		logrus.Warnf("Ignore: Delete cluster PostHook failed: %v", err)
 	}
 }
