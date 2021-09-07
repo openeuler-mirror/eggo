@@ -312,8 +312,9 @@ func NodeInfrastructureSetup(config *api.ClusterConfig, nodeID string, role uint
 }
 
 type DestroyInfraTask struct {
-	packageSrc *api.PackageSrcConfig
-	roleInfra  *api.RoleInfra
+	packageSrc   *api.PackageSrcConfig
+	roleInfra    *api.RoleInfra
+	k8sConfigDir string
 }
 
 func (it *DestroyInfraTask) Name() string {
@@ -348,7 +349,7 @@ func (it *DestroyInfraTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 		return nil
 	}
 	copyTempDir := getCopyDefaultDir(hcg.UserName)
-	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"rm -rf %s %s\"", dstDir, copyTempDir)); err != nil {
+	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"rm -rf %s %s %s\"", dstDir, copyTempDir, it.k8sConfigDir)); err != nil {
 		return fmt.Errorf("rm dependency failed: %v", err)
 	}
 
@@ -429,8 +430,9 @@ func NodeInfrastructureDestroy(config *api.ClusterConfig, hostconfig *api.HostCo
 
 	itask := task.NewTaskIgnoreErrInstance(
 		&DestroyInfraTask{
-			packageSrc: &config.PackageSrc,
-			roleInfra:  roleInfra,
+			packageSrc:   &config.PackageSrc,
+			roleInfra:    roleInfra,
+			k8sConfigDir: config.GetConfigDir(),
 		})
 
 	if err := nodemanager.RunTaskOnNodes(itask, []string{hostconfig.Address}); err != nil {
