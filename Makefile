@@ -9,26 +9,30 @@ LDFLAGS := -X isula.org/eggo/cmd.Version=$(VERSION) \
 		   -X isula.org/eggo/cmd.BuildTime=$(SOURCE_DATE_EPOCH) \
 		   -X isula.org/eggo/cmd.Arch=$(ARCH) \
 		   $(EXTRALDFLAGS)
+STATIC_LDFLAGS := -extldflags=-static -linkmode=external
 SAFEBUILDFLAGS := -buildmode=pie -extldflags=-ftrapv -extldflags=-zrelro -extldflags=-znow -tmpdir=/tmp/xxeggo $(LDFLAGS)
+
+GO := go
+GO_BUILD := CGO_ENABLED=0 $(GO)
 
 .PHONY: eggo
 eggo:
 	@echo "build eggo starting..."
-	@go build -ldflags '$(LDFLAGS)' -o bin/eggo .
+	@$(GO_BUILD) build -ldflags '$(LDFLAGS) $(STATIC_LDFLAGS)' -o bin/eggo .
 	@echo "build eggo done!"
 local:
 	@echo "build eggo use vendor starting..."
-	@go build -ldflags '$(LDFLAGS)' -mod vendor -o bin/eggo .
+	@$(GO_BUILD) build -ldflags '$(LDFLAGS) $(STATIC_LDFLAGS)' -mod vendor -o bin/eggo .
 	@echo "build eggo use vendor done!"
 test:
 	@echo "Unit tests starting..."
-	@go test -race -cover -count=1 -timeout=300s  ./...
+	@$(GO) test -race -cover -count=1 -timeout=300s  ./...
 	@echo "Units test done!"
 
 .PHONY: safe
 safe:
 	@echo "build safe eggo starting..."
-	go build -ldflags '$(SAFEBUILDFLAGS)' -o bin/eggo .
+	$(GO_BUILD) build -ldflags '$(SAFEBUILDFLAGS) $(STATIC_LDFLAGS)' -o bin/eggo .
 	@echo "build safe eggo done!"
 
 images: image-eggo
