@@ -164,7 +164,7 @@ func (ssh *SSHRunner) Reconnect() error {
 func clearUserTempDir(conn ssh.Connection, host *kkv1alpha1.HostCfg) {
 	tmpShell := "/tmp/" + RunnerShellPrefix + "*"
 	// scp to tmp file
-	dir := fmt.Sprintf(constants.DefaultUserCopyTempDirFormat, host.User)
+	dir := getCopyDefaultDir(host.User)
 	_, err := conn.Exec(fmt.Sprintf("sudo -E /bin/sh -c \"rm -rf %s; rm -rf %s\"", dir, tmpShell), host)
 	if err != nil {
 		logrus.Warnf("[%s] remove temp dir: %s failed: %v", host.Name, dir, err)
@@ -175,7 +175,7 @@ func clearUserTempDir(conn ssh.Connection, host *kkv1alpha1.HostCfg) {
 
 func prepareUserTempDir(conn ssh.Connection, host *kkv1alpha1.HostCfg) error {
 	// scp to tmp file
-	dir := fmt.Sprintf(constants.DefaultUserCopyTempDirFormat, host.User)
+	dir := getCopyDefaultDir(host.User)
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	sb.WriteString(fmt.Sprintf("mkdir -p %s", dir))
@@ -190,11 +190,18 @@ func prepareUserTempDir(conn ssh.Connection, host *kkv1alpha1.HostCfg) error {
 	return nil
 }
 
+func getCopyDefaultDir(user string) string {
+	if user == "root" {
+		return constants.DefaultRootCopyTempDirHome + "/temp"
+	}
+	return fmt.Sprintf(constants.DefaultUserCopyTempHomeFormat, user) + "/temp"
+}
+
 func (ssh *SSHRunner) copyFile(src, dst string) error {
 	if ssh.Conn == nil {
 		return fmt.Errorf("[%s] SSH runner is not connected", ssh.Host.Name)
 	}
-	tempDir := fmt.Sprintf(constants.DefaultUserCopyTempDirFormat, ssh.Host.User)
+	tempDir := getCopyDefaultDir(ssh.Host.User)
 	// scp to tmp file
 	tempCpyFile := filepath.Join(tempDir, filepath.Base(src))
 	err := ssh.Conn.Scp(src, tempCpyFile)
@@ -240,7 +247,7 @@ func (ssh *SSHRunner) copyDir(srcDir, dstDir string) error {
 		logrus.Errorf("[%s] create cert tmp tar failed: %v", ssh.Host.Name, err)
 		return err
 	}
-	tmpCpyDir := fmt.Sprintf(constants.DefaultUserCopyTempDirFormat, ssh.Host.User)
+	tmpCpyDir := getCopyDefaultDir(ssh.Host.User)
 	tmpPkiFile := filepath.Join(tmpCpyDir, "pkg.tar")
 	// scp to user home directory
 	err = ssh.Copy(tmpPkgFile, tmpPkiFile)
