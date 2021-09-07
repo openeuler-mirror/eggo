@@ -156,6 +156,11 @@ func ConvertClusterToEggoConfig(cluster *eggov1.Cluster, mb *eggov1.MachineBindi
 
 	conf.OpenPorts = fillOpenPortsConfig(infrastructure.Spec.OpenPorts)
 
+	conf.EnableKubeletServing = false
+	if cluster.Spec.EnableKubeletServing {
+		conf.EnableKubeletServing = true
+	}
+
 	if cluster.Spec.ApiEndpoint.Advertise != "" {
 		conf.ApiServerEndpoint = getEndpoint(cluster.Spec.ApiEndpoint)
 	}
