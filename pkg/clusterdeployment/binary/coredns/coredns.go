@@ -33,6 +33,14 @@ func init() {
 	cbs[CorednsTypeOfBinary] = &BinaryCoredns{}
 }
 
+func IsTypeBinary(configType string) bool {
+	return configType == CorednsTypeOfBinary || configType == ""
+}
+
+func IsTypePod(configType string) bool {
+	return configType == CorednsTypeOfPod
+}
+
 func getTypeOfCoredns(configType string) string {
 	if configType != "" {
 		return configType

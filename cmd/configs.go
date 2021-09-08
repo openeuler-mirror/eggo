@@ -28,6 +28,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
+	"isula.org/eggo/pkg/clusterdeployment/binary/coredns"
 	"isula.org/eggo/pkg/constants"
 	"isula.org/eggo/pkg/utils"
 	"isula.org/eggo/pkg/utils/infra"
@@ -279,6 +280,10 @@ func fillPackageConfig(ccfg *api.ClusterConfig, icfg *InstallConfig) {
 		ccfg.RoleInfra[s.role].Softwares = appendSoftware(ccfg.RoleInfra[s.role].Softwares, s.pc, s.dpc)
 	}
 
+	if coredns.IsTypeBinary(ccfg.ServiceCluster.DNS.CorednsType) {
+		ccfg.RoleInfra[api.Master].Softwares = appendSoftware(ccfg.RoleInfra[api.Master].Softwares, ToEggoPackageConfig(icfg.Dns), infra.DnsPackages)
+	}
+
 	if len(icfg.Addition) == 0 {
 		return
 	}
@@ -306,12 +311,9 @@ func fillOpenPort(ccfg *api.ClusterConfig, openports map[string][]*OpenPorts, dn
 		ccfg.RoleInfra[role].OpenPorts = append(ccfg.RoleInfra[role].OpenPorts, ToEggoOpenPort(p)...)
 	}
 
-	if dnsType == "binary" || dnsType == "" {
+	if coredns.IsTypeBinary(dnsType) {
 		ccfg.RoleInfra[api.Master].OpenPorts =
 			append(ccfg.RoleInfra[api.Master].OpenPorts, infra.CorednsPorts...)
-	} else if dnsType == "pod" {
-		ccfg.RoleInfra[api.Worker].OpenPorts =
-			append(ccfg.RoleInfra[api.Worker].OpenPorts, infra.CorednsPorts...)
 	}
 }
 
@@ -766,6 +768,12 @@ func createDeployConfigTemplate(file string) error {
 					Type: "image",
 				},
 			},
+			Dns: []*PackageConfig{
+				{
+					Name: "coredns",
+					Type: "pkg",
+				},
+			},
 			Addition: map[string][]*PackageConfig{
 				"master": {
 					{
@@ -777,10 +785,6 @@ func createDeployConfigTemplate(file string) error {
 					{
 						Name: "calico.yaml",
 						Type: "yaml",
-					},
-					{
-						Name: "coredns",
-						Type: "pkg",
 					},
 				},
 				"worker": {

@@ -300,6 +300,10 @@ install:                                    // 配置各种类型节点上需要
   - name: pause.tar
     type: image
     dst: ""
+  dns:                                      // k8s coredns安装包。如果corednstype配置为pod，此处无需配置
+  - name: coredns
+    type: pkg
+    dst: ""
   addition:                                 // 额外的安装包或二进制文件列表
     master:
     - name: prejoin.sh
@@ -308,9 +312,6 @@ install:                                    // 配置各种类型节点上需要
       TimeOut:  "30s"                       // 脚本执行时间，超时则被杀死，未配置默认30s
     - name: calico.yaml
       type: yaml
-      dst: ""
-    - name: coredns
-      type: pkg
       dst: ""
     worker:
     - name: docker.service
