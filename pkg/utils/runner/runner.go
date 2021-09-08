@@ -51,7 +51,7 @@ type LocalRunner struct {
 }
 
 func (r *LocalRunner) copyDir(srcDir, dstDir string) error {
-	output, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("sudo cp -rf %v %v", srcDir, dstDir)).CombinedOutput()
+	output, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("cp -rf %v %v", srcDir, dstDir)).CombinedOutput()
 	if err != nil {
 		logrus.Errorf("[local] copy %s to %s failed: %v\noutput: %v\n", srcDir, dstDir, err, string(output))
 		return err
@@ -70,7 +70,7 @@ func (r *LocalRunner) Copy(src, dst string) error {
 		// just copy file
 		return r.copyDir(src, dst)
 	}
-	output, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("sudo cp -f %v %v", src, dst)).CombinedOutput()
+	output, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("cp -f %v %v", src, dst)).CombinedOutput()
 	if err != nil {
 		logrus.Errorf("[local] copy %s to %s failed: %v\noutput: %v\n", src, dst, err, string(output))
 	} else {
