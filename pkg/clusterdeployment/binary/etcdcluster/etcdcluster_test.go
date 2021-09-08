@@ -172,7 +172,7 @@ func TestEtcdCertsAndConfig(t *testing.T) {
 		t.Fatalf("prepare etcd configs failed: %v", err)
 	}
 
-	if err = generateCaAndApiserverEtcdCerts(r, deployConf); err != nil {
+	if err = generateCaAndApiserverEtcdCerts(deployConf); err != nil {
 		t.Fatalf("generate ca and apiserver etcd certs failed: %v", err)
 	}
 

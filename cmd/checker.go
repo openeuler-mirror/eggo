@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"isula.org/eggo/pkg/api"
+	"isula.org/eggo/pkg/utils"
 	"isula.org/eggo/pkg/utils/endpoint"
 	chain "isula.org/eggo/pkg/utils/responsibilitychain"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -373,6 +374,15 @@ func (ccr *InstallConfigResponsibility) Execute() error {
 		for arch, path := range ccr.conf.PackageSrc.SrcPath {
 			if !filepath.IsAbs(path) {
 				return fmt.Errorf("srcpackage %s path: %s must be absolute", arch, path)
+			}
+			if _, ok := ccr.arch[arch]; ok {
+				exist, err := utils.CheckPathExist(path)
+				if err != nil {
+					return err
+				}
+				if !exist {
+					return fmt.Errorf("have arch: %s node, but src package: %s is not exist", arch, path)
+				}
 			}
 		}
 

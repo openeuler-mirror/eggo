@@ -285,7 +285,7 @@ func generateCerts(savePath string, cg certs.CertGenerator, ccfg *api.ClusterCon
 }
 
 func prepareCAs(lcg certs.CertGenerator, savePath string) error {
-	if _, err := lcg.RunCommand(fmt.Sprintf("sudo mkdir -p -m 0700 %s", savePath)); err != nil {
+	if _, err := lcg.RunCommand(fmt.Sprintf("mkdir -p -m 0700 %s", savePath)); err != nil {
 		logrus.Errorf("prepare certificates store path failed: %v", err)
 		return err
 	}
