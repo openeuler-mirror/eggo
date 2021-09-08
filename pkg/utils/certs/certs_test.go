@@ -12,8 +12,8 @@ import (
 
 func TestNewLocalCertGenerator(t *testing.T) {
 	savePath := "/tmp/haozi"
-	cg := NewLocalCertGenerator()
-	err := cg.CreateServiceAccount(savePath)
+	lcg := NewLocalCertGenerator()
+	err := lcg.CreateServiceAccount(savePath)
 	if err != nil {
 		t.Fatalf("create service account failed: %v", err)
 	}
@@ -37,7 +37,7 @@ func TestNewLocalCertGenerator(t *testing.T) {
 		},
 		Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 	}
-	err = cg.CreateCA(apiserverConfig, savePath, "ca")
+	err = lcg.CreateCA(apiserverConfig, savePath, "ca")
 	if err != nil {
 		t.Fatalf("create apiserver ca failed: %v", err)
 	}
@@ -59,16 +59,16 @@ func TestNewLocalCertGenerator(t *testing.T) {
 	}
 	caCertPath := fmt.Sprintf("%s/ca.crt", savePath)
 	caKeyPath := fmt.Sprintf("%s/ca.key", savePath)
-	err = cg.CreateCertAndKey(caCertPath, caKeyPath, adminConfig, savePath, "admin")
+	err = lcg.CreateCertAndKey(caCertPath, caKeyPath, adminConfig, savePath, "admin")
 	if err != nil {
 		t.Fatalf("create cert and key for admin failed: %v", err)
 	}
-	err = cg.CreateKubeConfig(savePath, constants.KubeConfigFileNameAdmin, caCertPath, "default-cluster", "default-admin",
+	err = lcg.CreateKubeConfig(savePath, constants.KubeConfigFileNameAdmin, caCertPath, "default-cluster", "default-admin",
 		filepath.Join(savePath, "admin.crt"), filepath.Join(savePath, "admin.key"), "https://127.0.0.1:6443")
 	if err != nil {
 		t.Fatalf("create kubeconfig for admin failed: %v", err)
 	}
-	if err := cg.CleanAll(savePath); err != nil {
+	if err := lcg.CleanAll(savePath); err != nil {
 		t.Fatalf("clean all failed: %v", err)
 	}
 }

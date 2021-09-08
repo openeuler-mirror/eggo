@@ -89,21 +89,21 @@ func generateEtcdCerts(r runner.Runner, ccfg *api.ClusterConfig, hostConfig *api
 }
 
 // see: https://kubernetes.io/docs/setup/best-practices/certificates/
-func generateCaAndApiserverEtcdCerts(r runner.Runner, ccfg *api.ClusterConfig) error {
+func generateCaAndApiserverEtcdCerts(ccfg *api.ClusterConfig) error {
 	savePath := api.GetCertificateStorePath(ccfg.Name)
 	etcdCertsPath := filepath.Join(savePath, "etcd")
-	cg := certs.NewOpensshBinCertGenerator(r)
+	lcg := certs.NewLocalCertGenerator()
 
 	// generate etcd root ca
 	caConfig := &certs.CertConfig{
 		CommonName: "etcd-ca",
 	}
-	if err := cg.CreateCA(caConfig, etcdCertsPath, "ca"); err != nil {
+	if err := lcg.CreateCA(caConfig, etcdCertsPath, "ca"); err != nil {
 		return err
 	}
 
 	// generate apiserver-etcd-client certificates
-	if err := genApiserverEtcdClientCerts(savePath, cg, ccfg); err != nil {
+	if err := genApiserverEtcdClientCerts(savePath, lcg, ccfg); err != nil {
 		return err
 	}
 
