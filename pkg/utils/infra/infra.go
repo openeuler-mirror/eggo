@@ -110,6 +110,12 @@ var (
 	}
 
 	// coredns
+	DnsPackages = []*api.PackageConfig{
+		{
+			Name: "coredns",
+			Type: "repo",
+		},
+	}
 	CorednsPorts = []*api.OpenPorts{
 		{
 			Port:     53,
