@@ -90,11 +90,11 @@ func defaultDeployConfigPath() string {
 }
 
 func eggoPlaceHolderPath(ClusterID string) string {
-	return filepath.Join(api.EggoHomePath, ClusterID, ".eggo.pid")
+	return filepath.Join(api.GetEggoClusterPath(), ClusterID, ".eggo.pid")
 }
 
 func savedDeployConfigPath(ClusterID string) string {
-	return filepath.Join(api.EggoHomePath, ClusterID, "deploy.yaml")
+	return filepath.Join(api.GetEggoClusterPath(), ClusterID, "deploy.yaml")
 }
 
 func saveDeployConfig(cc *DeployConfig, filePath string) error {
@@ -104,7 +104,7 @@ func saveDeployConfig(cc *DeployConfig, filePath string) error {
 	}
 
 	cleanPath := filepath.Clean(filePath)
-	if !strings.HasPrefix(cleanPath, api.EggoHomePath) {
+	if !strings.HasPrefix(cleanPath, api.GetEggoClusterPath()) {
 		return fmt.Errorf("invalid config file path %v", filePath)
 	}
 
