@@ -99,6 +99,7 @@ func NewEggoCmd() *cobra.Command {
 	eggoCmd.AddCommand(NewTemplateCmd())
 	eggoCmd.AddCommand(NewJoinCmd())
 	eggoCmd.AddCommand(NewDeleteCmd())
+	eggoCmd.AddCommand(NewListCmd())
 
 	return eggoCmd
 }
