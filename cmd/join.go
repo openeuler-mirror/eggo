@@ -117,8 +117,13 @@ func getMergedAndDiffConfigs(conf *DeployConfig, joinConf *DeployConfig) (*Deplo
 		if getHostConfigByIp(mergedConfig.Workers, host.Ip) != nil {
 			continue
 		}
-		h := createHostConfig(getHostConfigByIp(allHostConfigs, host.Ip), host,
-			defaultHostName(conf.ClusterID, "worker", len(conf.Workers)+i))
+
+		h := getHostConfigByIp(diffConfig.Masters, host.Ip)
+		if h == nil {
+			h = createHostConfig(getHostConfigByIp(allHostConfigs, host.Ip), host,
+				defaultHostName(conf.ClusterID, "worker", len(conf.Workers)+i))
+		}
+
 		mergedConfig.Workers = append(mergedConfig.Workers, h)
 		diffConfig.Workers = append(diffConfig.Workers, h)
 	}
