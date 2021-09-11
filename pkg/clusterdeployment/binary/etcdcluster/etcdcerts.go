@@ -17,6 +17,7 @@ package etcdcluster
 
 import (
 	"crypto/x509"
+	"fmt"
 	"path/filepath"
 
 	"isula.org/eggo/pkg/api"
@@ -98,6 +99,18 @@ func generateCaAndApiserverEtcdCerts(ccfg *api.ClusterConfig) error {
 	caConfig := &certs.CertConfig{
 		CommonName: "etcd-ca",
 	}
+
+	if ccfg.Certificate.ExternalCA {
+		_, err := lcg.RunCommand(fmt.Sprintf("mkdir -p -m 0700 %s && cp -f %s/etcd/%s %s", etcdCertsPath, ccfg.Certificate.ExternalCAPath, certs.GetCertName("ca"), etcdCertsPath))
+		if err != nil {
+			return err
+		}
+		_, err = lcg.RunCommand(fmt.Sprintf("cp -f %s/etcd/%s %s", ccfg.Certificate.ExternalCAPath, certs.GetKeyName("ca"), etcdCertsPath))
+		if err != nil {
+			return err
+		}
+	}
+
 	if err := lcg.CreateCA(caConfig, etcdCertsPath, "ca"); err != nil {
 		return err
 	}
