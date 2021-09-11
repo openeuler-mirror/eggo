@@ -123,7 +123,7 @@ func (o *OpensshBinCertGenerator) CreateCA(config *CertConfig, savePath string, 
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	sb.WriteString(fmt.Sprintf("mkdir -p %s && cd %s", savePath, savePath))
 	sb.WriteString(fmt.Sprintf(" && openssl genrsa -out %s.key 4096", name))
-	sb.WriteString(fmt.Sprintf(" && openssl req -x509 -new -nodes -key %s.key -subj \"%s\" -days 10000 -out %s.crt", name, getSubject(config), name))
+	sb.WriteString(fmt.Sprintf(" && openssl req -x509 -new -nodes -key %s.key -subj \"%s\" -days 36500 -out %s.crt", name, getSubject(config), name))
 	sb.WriteString("\"")
 
 	_, err := o.r.RunCommand(sb.String())
@@ -184,7 +184,7 @@ func (o *OpensshBinCertGenerator) CreateCertAndKey(caCertPath, caKeyPath string,
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	sb.WriteString(fmt.Sprintf("cd %s && openssl genrsa -out %s.key 4096", savePath, name))
 	sb.WriteString(fmt.Sprintf(" && openssl req -new -key %s.key -out %s.csr -config %s/%s-csr.conf", name, name, savePath, name))
-	sb.WriteString(fmt.Sprintf(" && openssl x509 -req -in %s.csr -CA %s -CAkey %s -CAcreateserial -out %s.crt -days 10000 -extensions v3_ext -extfile %s-csr.conf", name, caCertPath, caKeyPath, name, name))
+	sb.WriteString(fmt.Sprintf(" && openssl x509 -req -in %s.csr -CA %s -CAkey %s -CAcreateserial -out %s.crt -days 36500 -extensions v3_ext -extfile %s-csr.conf", name, caCertPath, caKeyPath, name, name))
 	sb.WriteString(fmt.Sprintf(" && rm -f %s/%s-csr.conf", savePath, name))
 	sb.WriteString(fmt.Sprintf(" && rm -f %s.csr", name))
 	sb.WriteString("\"")

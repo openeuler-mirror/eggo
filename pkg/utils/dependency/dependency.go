@@ -247,6 +247,10 @@ func (dy *dependencyYaml) Install(r runner.Runner) error {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("sudo -E /bin/sh -c \"export KUBECONFIG=%s ", dy.kubeconfig))
 	for _, y := range dy.yaml {
+		if strings.HasPrefix(y.Name, "http://") || strings.HasPrefix(y.Name, "https://") {
+			sb.WriteString(fmt.Sprintf("&& kubectl apply -f %s ", y.Name))
+			continue
+		}
 		sb.WriteString(fmt.Sprintf("&& kubectl apply -f %s/%s ", dy.srcPath, y.Name))
 	}
 	sb.WriteString("\"")
@@ -262,6 +266,10 @@ func (dy *dependencyYaml) Remove(r runner.Runner) error {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("sudo -E /bin/sh -c \"export KUBECONFIG=%s ", dy.kubeconfig))
 	for _, y := range dy.yaml {
+		if strings.HasPrefix(y.Name, "http://") || strings.HasPrefix(y.Name, "https://") {
+			sb.WriteString(fmt.Sprintf("&& kubectl delete -f %s ", y.Name))
+			continue
+		}
 		sb.WriteString(fmt.Sprintf("&& kubectl delete -f %s/%s ", dy.srcPath, y.Name))
 	}
 	sb.WriteString("\"")

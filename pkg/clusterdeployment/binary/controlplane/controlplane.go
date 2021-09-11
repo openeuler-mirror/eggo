@@ -284,7 +284,7 @@ func generateCerts(savePath string, cg certs.CertGenerator, ccfg *api.ClusterCon
 	return generateFrontProxyClientCertificate(savePath, cg)
 }
 
-func prepareCAs(lcg certs.CertGenerator, savePath string) error {
+func prepareCAs(lcg certs.CertGenerator, savePath string, ccfg *api.ClusterConfig) error {
 	if _, err := lcg.RunCommand(fmt.Sprintf("mkdir -p -m 0700 %s", savePath)); err != nil {
 		logrus.Errorf("prepare certificates store path failed: %v", err)
 		return err
@@ -293,6 +293,22 @@ func prepareCAs(lcg certs.CertGenerator, savePath string) error {
 	if err := lcg.CreateServiceAccount(savePath); err != nil {
 		return err
 	}
+
+	if ccfg.Certificate.ExternalCA {
+		getStrCmd := func(name string) string {
+			return fmt.Sprintf("cp -f %s/%s %s/%s %s", ccfg.Certificate.ExternalCAPath, certs.GetKeyName(name),
+				ccfg.Certificate.ExternalCAPath, certs.GetCertName(name), savePath)
+		}
+
+		if _, err := lcg.RunCommand(getStrCmd(RootCAName)); err != nil {
+			return err
+		}
+
+		if _, err := lcg.RunCommand(getStrCmd(FrontProxyCAName)); err != nil {
+			return err
+		}
+	}
+
 	// create root ca
 	caConfig := &certs.CertConfig{
 		CommonName: "kubernetes",
@@ -342,7 +358,7 @@ func createAdminKubeConfigForEggo(lcg certs.CertGenerator, caPath string, savePa
 func prepareCredentials(clusterName string, ccfg *api.ClusterConfig) error {
 	lcg := certs.NewLocalCertGenerator()
 	caPath := api.GetCertificateStorePath(clusterName)
-	if err := prepareCAs(lcg, caPath); err != nil {
+	if err := prepareCAs(lcg, caPath, ccfg); err != nil {
 		return err
 	}
 	return createAdminKubeConfigForEggo(lcg, caPath, api.GetClusterHomePath(clusterName), ccfg)
