@@ -28,6 +28,7 @@ type InstallConfig struct {
 	LoadBalance      []*PackageConfig            `yaml:"loadbalance"`
 	Container        []*PackageConfig            `yaml:"container"`
 	Image            []*PackageConfig            `yaml:"image"`
+	Dns              []*PackageConfig            `yaml:"dns"`
 	Addition         map[string][]*PackageConfig `yaml:"addition"` // key: master, worker, etcd, loadbalance
 }
 

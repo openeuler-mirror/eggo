@@ -44,6 +44,15 @@ func TestRunChecker(t *testing.T) {
 		t.Fatalf("load deploy config file failed: %v", err)
 	}
 
+	if err = RunChecker(conf); err == nil {
+		t.Fatalf("test invalid cluster config failed: %v", err)
+	}
+
+	for _, fn := range conf.InstallConfig.PackageSrc.SrcPath {
+		os.MkdirAll(fn, 0755)
+		defer os.RemoveAll(fn)
+	}
+
 	// test check success
 	if err = RunChecker(conf); err != nil {
 		t.Fatalf("test checker success failed: %v", err)

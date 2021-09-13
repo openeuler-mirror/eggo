@@ -63,6 +63,10 @@ func GetCertificateStorePath(cluster string) string {
 	return filepath.Join(EggoHomePath, cluster, "pki")
 }
 
+func GetEggoClusterPath() string {
+	return EggoHomePath
+}
+
 func GetEtcdServers(ecc *EtcdClusterConfig) string {
 	//etcd_servers="https://${MASTER_IPS[$i]}:2379"
 	//etcd_servers="$etcd_servers,https://${MASTER_IPS[$i]}:2379"

@@ -229,7 +229,7 @@ func prepareEtcdConfigs(ccfg *api.ClusterConfig, r runner.Runner, hostConfig *ap
 
 func Init(conf *api.ClusterConfig) error {
 	// generate ca certificates and kube-apiserver-etcd-client certificates
-	if err := generateCaAndApiserverEtcdCerts(&runner.LocalRunner{}, conf); err != nil {
+	if err := generateCaAndApiserverEtcdCerts(conf); err != nil {
 		return err
 	}
 

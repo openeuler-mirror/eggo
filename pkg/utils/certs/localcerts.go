@@ -151,7 +151,7 @@ func (l *LocalCertGenerator) CreateCertAndKey(caCertPath, caKeyPath string, conf
 		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:  config.Usages,
 		NotBefore:    caCert.NotBefore,
-		NotAfter:     time.Now().Add(time.Hour * 24 * 365).UTC(),
+		NotAfter:     time.Now().Add(time.Hour * 24 * 36500).UTC(),
 	}
 
 	certBytes, err := x509.CreateCertificate(rand.Reader, &certConf, caCert, signer.Public(), caKey)

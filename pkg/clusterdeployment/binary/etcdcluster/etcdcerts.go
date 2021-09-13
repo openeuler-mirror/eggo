@@ -17,6 +17,7 @@ package etcdcluster
 
 import (
 	"crypto/x509"
+	"fmt"
 	"path/filepath"
 
 	"isula.org/eggo/pkg/api"
@@ -89,21 +90,33 @@ func generateEtcdCerts(r runner.Runner, ccfg *api.ClusterConfig, hostConfig *api
 }
 
 // see: https://kubernetes.io/docs/setup/best-practices/certificates/
-func generateCaAndApiserverEtcdCerts(r runner.Runner, ccfg *api.ClusterConfig) error {
+func generateCaAndApiserverEtcdCerts(ccfg *api.ClusterConfig) error {
 	savePath := api.GetCertificateStorePath(ccfg.Name)
 	etcdCertsPath := filepath.Join(savePath, "etcd")
-	cg := certs.NewOpensshBinCertGenerator(r)
+	lcg := certs.NewLocalCertGenerator()
 
 	// generate etcd root ca
 	caConfig := &certs.CertConfig{
 		CommonName: "etcd-ca",
 	}
-	if err := cg.CreateCA(caConfig, etcdCertsPath, "ca"); err != nil {
+
+	if ccfg.Certificate.ExternalCA {
+		_, err := lcg.RunCommand(fmt.Sprintf("mkdir -p -m 0700 %s && cp -f %s/etcd/%s %s", etcdCertsPath, ccfg.Certificate.ExternalCAPath, certs.GetCertName("ca"), etcdCertsPath))
+		if err != nil {
+			return err
+		}
+		_, err = lcg.RunCommand(fmt.Sprintf("cp -f %s/etcd/%s %s", ccfg.Certificate.ExternalCAPath, certs.GetKeyName("ca"), etcdCertsPath))
+		if err != nil {
+			return err
+		}
+	}
+
+	if err := lcg.CreateCA(caConfig, etcdCertsPath, "ca"); err != nil {
 		return err
 	}
 
 	// generate apiserver-etcd-client certificates
-	if err := genApiserverEtcdClientCerts(savePath, cg, ccfg); err != nil {
+	if err := genApiserverEtcdClientCerts(savePath, lcg, ccfg); err != nil {
 		return err
 	}
 
