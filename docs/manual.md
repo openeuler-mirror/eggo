@@ -18,6 +18,14 @@
 
 3) 通过GitOps使用元集群部署新的集群。该功能还在开发中。
 
+## eggo使用方法
+
+### 全在线部署
+
+例如openEuler21.09已经存在集群部署依赖的所有组件，因此可以通过在线部署的方式部署。详细配置文件见[config/all_online_install](../config/all_online_install.config)
+
+![](./imgs/all_inline_cluster.gif)
+
 
 
 ## 部署集群
@@ -255,7 +263,7 @@ open-ports:                                 // 配置需要额外打开的端口
   - port: 179
     protocol: tcp
 install:                                    // 配置各种类型节点上需要安装的安装包或者二进制文件的详细信息，注意将对应文件放到在tar.gz安装包中
-  package-src:                              // 配置安装包的详细信息
+  package-source:                           // 配置安装包的详细信息
     type: tar.gz                            // 安装包的压缩类型，目前只支持tar.gz类型的安装包
     dstpath: ""                             // 安装包在对端机器上的路径，必须是合法绝对路径
     srcpath:                                // 不同架构安装包的存放路径，架构必须与机器架构相对应，必须是合法绝对路径
@@ -396,3 +404,20 @@ kubelet启动不了，详细报错可以参考[issue](https://gitee.com/openeule
 #### 解决方法
 
 创建/etc/resolv.conf文件，并且设置合理的配置。
+
+### 容器引擎下载pause镜像失败
+
+报错信息：`SSL certificate problem: unable to get local issuer certificate`
+
+#### 原因
+
+由于机器没有安装相关证书，可以获取curl官网提供了ca证书。
+
+#### 解决方法
+
+```
+$ wget https://curl.se/ca/cacert.pem
+$ mv cacert.pem /etc/pki/ca-trust/source/anchors/
+$ update-ca-trust
+```
+
