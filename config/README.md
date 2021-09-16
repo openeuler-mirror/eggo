@@ -8,6 +8,7 @@ config目录存放了多个集群config模板，方便用户快速配置集群
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | centos.config | CentOS7 | amd64 | 1 | 2 | No | docker | bin |
 | openEuler.config | openEuler 21.03 | arm64 | 1 | 2 | No | iSulad | repo + rpm |
+| all_online_install.config | openEuler21.09 | arm64 | 1 | 2 | No | iSulad | repo |
 
 ## 使用方法
 
