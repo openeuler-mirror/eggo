@@ -1,0 +1,144 @@
+---
+# namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: eggo-system
+
+---
+# secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret-example
+  namespace: eggo-system
+type: kubernetes.io/basic-auth
+stringData:
+  username: root
+  password: 123456
+
+---
+# persistentvolume.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: nfs-pv-example
+  namespace: eggo-system
+  labels:
+    type: nfs
+spec:
+  capacity:
+    storage: 500Mi
+  accessModes:
+    - ReadOnlyMany
+  nfs:
+    server: 192.168.0.123
+    path: "/data"
+  persistentVolumeReclaimPolicy: Retain
+
+---
+# persistentvolumeclaim.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nfs-pvc-example
+  namespace: eggo-system
+spec:
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      storage: 500Mi
+  selector:
+    matchLabels:
+      type: "nfs"
+
+---
+# machine1.yaml
+apiVersion: eggo.isula.org/v1
+kind: Machine
+metadata:
+  name: machine1-example
+  labels:
+    masterRole: allow
+    workerRole: allow
+spec:
+  hostname: machine1
+  arch: arm64
+  ip: 192.168.0.1
+  port: 22
+
+---
+# machine2.yaml
+apiVersion: eggo.isula.org/v1
+kind: Machine
+metadata:
+  name: machine2-example
+  labels:
+    masterRole: allow
+    workerRole: allow
+spec:
+  hostname: machine1
+  arch: amd64
+  ip: 192.168.0.2
+  port: 22
+
+---
+# infrastructure.yaml
+apiVersion: eggo.isula.org/v1
+kind: Infrastructure
+metadata:
+  name: infrastructure-example
+  namespace: eggo-system
+spec:
+  # 用于将package包挂载到容器中，部署集群时使用
+  packagePersistentVolumeClain:
+    name: nfs-pvc-example
+  # 暴露端口
+  open-ports:
+    worker:
+    - port: 111
+      protocol: tcp
+    - port: 179
+      protocol: tcp
+  # 指定所需的安装包
+  install:
+    package-source:
+      type: tar.gz
+      srcPackages:
+        # package包在nfs下的路径
+        arm64: packages/packages-arm.tar.gz
+        amd64: packages/packages-amd.tar.gz
+    image:
+    - name: images.tar
+      type: image
+    dns:
+    - name: coredns
+      type: pkg
+    addition:
+      master:
+      - name: calico.yaml
+        type: yaml
+
+---
+# cluster.yaml
+apiVersion: eggo.isula.org/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+  namespace: eggo-system
+spec:
+  masterRequire:
+    number: 1
+    features: 
+      masterRole: allow
+  workerRequire:
+    number: 1
+    features:
+      workerRole: allow
+  machineLoginSecret:
+    name: secret-example
+  infrastructure:
+    name: infrastructure-example
+  # 启用kubelet serving证书
+  enableKubeletServing: true
