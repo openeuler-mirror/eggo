@@ -24,7 +24,13 @@
 
 例如openEuler21.09已经存在集群部署依赖的所有组件，因此可以通过在线部署的方式部署。详细配置文件见[config/all_online_install](../config/all_online_install.config)
 
-![](./imgs/all_inline_cluster.gif)
+![online部署](./imgs/all_inline_cluster.gif)
+
+### 全离线部署
+
+例如openEuler21.09已经存在集群部署依赖的所有组件，因此可以通过在线部署的方式部署。详细配置文件见[config/all_offline_install](../config/all_offline_install.config)
+
+![offline部署](./imgs/all_offline_cluster.gif)
 
 
 
