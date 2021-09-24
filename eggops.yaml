@@ -392,6 +392,9 @@ spec:
                         type: array
                     type: object
                 type: object
+              eggoImageVersion:
+                description: eggo image
+                type: string
               enableKubeletServing:
                 type: boolean
               infrastructure:

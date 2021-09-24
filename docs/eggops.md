@@ -239,7 +239,7 @@ spec:
   # 用于将package包挂载到容器中，部署集群时使用
   packagePersistentVolumeClain:
     name: nfs-pvc-example
-  # 暴露端口
+  # 暴露端口，可选项
   open-ports:
     worker:
     - port: 111
@@ -291,14 +291,14 @@ spec:
     number: 1
     features:
       workerRole: allow
-  # 所需loadbalance节点的描述
+  # 所需loadbalance节点的描述，可选项
   loadbalanceRequires:
     number: 1
     features:
       lbRole: allow
-  # loadbalance服务监听端口
+  # loadbalance服务监听端口，可选项
   loadbalance-bindport: 8443
-  # Pod亲和性调度
+  # Pod亲和性调度，可选项
   eggoAffinity:
     nodeAffinity:
       requiredDuringSchedulingRequiredDuringExecution:
@@ -317,6 +317,7 @@ spec:
     runtime-endpoint: unix:///var/run/isulad.sock
   # 启用kubelet serving证书
   enableKubeletServing: true
+  # 集群网络配置，可选项
   network:
     # k8s创建的service的IP地址网段
     service-cidr: 10.32.0.0/16
@@ -331,6 +332,8 @@ spec:
     # k8s集群网络的网络插件的配置
     pod-plugin-args:
       NetworkYamlPath: /etc/kubernetes/addons/calico.yaml
+  # eggo镜像版本，可选项，默认为eggo:<version>
+  eggoImageVersion: "eggo:latest"
 ```
 
 masterRequire、workerRequire与loadbalanceRequires中的features字段，可以在选择machine时通过LabelSelector筛选出合适的机器。eggoAffinity，设置亲和性调度，可以将执行eggo命令的Pod调度到某些特定机器上运行。
