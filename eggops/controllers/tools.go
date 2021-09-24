@@ -227,3 +227,11 @@ func ConvertClusterToEggoConfig(cluster *eggov1.Cluster, mb *eggov1.MachineBindi
 func ReferenceToNamespacedName(ref *v1.ObjectReference) types.NamespacedName {
 	return types.NamespacedName{Name: ref.Name, Namespace: ref.Namespace}
 }
+
+func GetEggoImageVersion(cluster *eggov1.Cluster) string {
+	if cluster.Spec.EggoImageVersion != "" {
+		return cluster.Spec.EggoImageVersion
+	}
+
+	return "eggo:" + eggov1.ImageVersion
+}

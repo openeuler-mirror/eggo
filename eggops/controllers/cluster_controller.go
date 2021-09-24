@@ -165,7 +165,7 @@ func (r *ClusterReconciler) prepareDeleteClusterJob(ctx context.Context, cluster
 
 	configPath := fmt.Sprintf(eggov1.EggoConfigVolumeFormat, cluster.Name)
 	Command := []string{"eggo", "-d", "cleanup", "-f", filepath.Join(configPath, eggov1.ClusterConfigMapBinaryConfKey)}
-	job = createEggoJobConfig(jobName, "eggo-create-cluster", "eggo:"+eggov1.ImageVersion, configPath, cmName,
+	job = createEggoJobConfig(jobName, "eggo-create-cluster", GetEggoImageVersion(cluster), configPath, cmName,
 		fmt.Sprintf(eggov1.PackageVolumeFormat, cluster.Name), packagePVC.Name, Command)
 
 	err = fillEggoJobConfig(r, ctx, cluster, job)
@@ -783,7 +783,7 @@ func (r *ClusterReconciler) prepareCreateClusterJob(ctx context.Context, cluster
 
 	configPath := fmt.Sprintf(eggov1.EggoConfigVolumeFormat, cluster.Name)
 	Command := []string{"eggo", "-d", "deploy", "-f", filepath.Join(configPath, eggov1.ClusterConfigMapBinaryConfKey)}
-	job = createEggoJobConfig(jobName, "eggo-create-cluster", "eggo:"+eggov1.ImageVersion, configPath, cmName,
+	job = createEggoJobConfig(jobName, "eggo-create-cluster", GetEggoImageVersion(cluster), configPath, cmName,
 		fmt.Sprintf(eggov1.PackageVolumeFormat, cluster.Name), packagePVC.Name, Command)
 
 	err = fillEggoJobConfig(r, ctx, cluster, job)

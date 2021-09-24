@@ -10,7 +10,7 @@ const (
 )
 
 const (
-	ImageVersion string = "0.9.1"
+	ImageVersion string = "0.9.3"
 
 	ClusterConfigMapNameFormat    string = "eggo-cluster-%s-%s"
 	ClusterConfigMapBinaryConfKey string = "eggo-binary-config"
