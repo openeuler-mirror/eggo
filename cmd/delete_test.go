@@ -22,10 +22,10 @@ import (
 func TestSplitDeletedConfigs(t *testing.T) {
 	// test delete name
 	diff, deleted := splitDeletedConfigs([]*HostConfig{
-		&HostConfig{
+		{
 			Name: "test1",
 		},
-		&HostConfig{
+		{
 			Name: "test2",
 		},
 	}, []string{"test1"})
@@ -35,10 +35,10 @@ func TestSplitDeletedConfigs(t *testing.T) {
 
 	// test delete ip
 	diff, deleted = splitDeletedConfigs([]*HostConfig{
-		&HostConfig{
+		{
 			Ip: "192.168.0.2",
 		},
-		&HostConfig{
+		{
 			Ip: "192.168.0.3",
 		},
 	}, []string{"192.168.0.2"})
@@ -49,10 +49,10 @@ func TestSplitDeletedConfigs(t *testing.T) {
 
 	// test not found
 	diff, deleted = splitDeletedConfigs([]*HostConfig{
-		&HostConfig{
+		{
 			Ip: "192.168.0.2",
 		},
-		&HostConfig{
+		{
 			Ip: "192.168.0.3",
 		},
 	}, []string{"192.168.0.4"})
@@ -65,26 +65,26 @@ func TestSplitDeletedConfigs(t *testing.T) {
 func TestGetDeletedAndDiffConfigs(t *testing.T) {
 	deployConfig := &DeployConfig{
 		Masters: []*HostConfig{
-			&HostConfig{
+			{
 				Name: "test1",
 			},
-			&HostConfig{
+			{
 				Name: "test2",
 			},
 		},
 		Workers: []*HostConfig{
-			&HostConfig{
+			{
 				Name: "test1",
 			},
-			&HostConfig{
+			{
 				Name: "test2",
 			},
 		},
 		Etcds: []*HostConfig{
-			&HostConfig{
+			{
 				Name: "test1",
 			},
-			&HostConfig{
+			{
 				Name: "test2",
 			},
 		},

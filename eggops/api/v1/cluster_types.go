@@ -94,6 +94,10 @@ type ClusterSpec struct {
 	// network config of cluster
 	Network ClusterNetworkConfig `json:"network,omitempty"`
 
+	// eggo image
+	// +optional
+	EggoImageVersion string `json:"eggoImageVersion"`
+
 	Addons []string `json:"addons,omitempty"`
 }
 

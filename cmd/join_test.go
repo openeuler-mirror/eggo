@@ -68,7 +68,7 @@ func TestParseJoinInput(t *testing.T) {
 func TestGetMergedAndDiffConfigs(t *testing.T) {
 	deployConfig := &DeployConfig{
 		Masters: []*HostConfig{
-			&HostConfig{
+			{
 				Name: "test1",
 				Ip:   "192.168.0.2",
 				Arch: "arm64",
@@ -76,7 +76,7 @@ func TestGetMergedAndDiffConfigs(t *testing.T) {
 			},
 		},
 		Workers: []*HostConfig{
-			&HostConfig{
+			{
 				Name: "test1",
 				Ip:   "192.168.0.2",
 				Arch: "arm64",
@@ -84,7 +84,7 @@ func TestGetMergedAndDiffConfigs(t *testing.T) {
 			},
 		},
 		Etcds: []*HostConfig{
-			&HostConfig{
+			{
 				Name: "test1",
 				Ip:   "192.168.0.2",
 				Arch: "arm64",
@@ -95,7 +95,7 @@ func TestGetMergedAndDiffConfigs(t *testing.T) {
 
 	joinConf := &DeployConfig{
 		Masters: []*HostConfig{
-			&HostConfig{
+			{
 				Name: "test2",
 				Ip:   "192.168.0.3",
 				Arch: "arm64",
@@ -103,13 +103,13 @@ func TestGetMergedAndDiffConfigs(t *testing.T) {
 			},
 		},
 		Workers: []*HostConfig{
-			&HostConfig{
+			{
 				Name: "test2",
 				Ip:   "192.168.0.3",
 				Arch: "arm64",
 				Port: 22,
 			},
-			&HostConfig{
+			{
 				Name: "test3",
 				Ip:   "192.168.0.4",
 				Arch: "arm64",
