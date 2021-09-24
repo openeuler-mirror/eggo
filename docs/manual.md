@@ -85,6 +85,9 @@ $ tree
 
   ```
   $ docker save -o images.tar calico/node:v3.19.1 calico/cni:v3.19.1 calico/kube-controllers:v3.19.1 calico/pod2daemon-flexvol:v3.19.1 k8s.gcr.io/pause:3.2
+  ```
+
+  > 注：containerd cri不支持加载本地镜像，如果使用containerd容器引擎，需要保证镜像能够正常下载。
 
 - pkg目录下存放需要安装的rpm/deb包，对应package类型pkg
 
@@ -255,14 +258,17 @@ dns-domain: cluster.local                     // DNS域名后缀
 pause-image: k8s.gcr.io/pause:3.2             // 容器运行时的pause容器的容器镜像名称
 network-plugin: cni                           // 网络插件类型
 cni-bin-dir: /usr/libexec/cni,/opt/cni/bin    // 网络插件地址，使用","分隔多个地址
-runtime: docker                               // 使用哪种容器运行时，目前支持docker和iSulad
+runtime: docker                               // 使用哪种容器运行时，目前支持docker、iSulad以及containerd
 runtime-endpoint: unix:///var/run/docker.sock // 容器运行时endpoint，docker可以不指定
 registry-mirrors: []                          // 下载容器镜像时使用的镜像仓库的mirror站点地址
 insecure-registries: []                       // 下载容器镜像时运行使用http协议下载镜像的镜像仓库地址
 config-extra-args:                            // 各个组件(kube-apiserver/etcd等)服务启动配置的额外参数
-  - name: kubelet                             // name支持："etcd","kube-apiserver","kube-controller-manager","kube-scheduler","kube-proxy","kubelet"
+  - name: kubelet                             // name支持："etcd","kube-apiserver","kube-controller-manager","kube-scheduler","kube-proxy","kubelet","container-engine"
     extra-args:
       "--cgroup-driver": systemd              // 注意key对应的组件的参数，需要带上"-"或者"--"
+  - name: container-engine
+    extra-args:
+      "--data-root": /apps/docker-data
 open-ports:                                   // 配置需要额外打开的端口，k8s自身所需端口不需要进行配置，额外的插件的端口需要进行额外配置
   worker:                                     // 指定在那种类型的节点上打开端口，可以是master/worker/etcd/loadbalance
   - port: 111                                 // 端口地址
