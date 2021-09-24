@@ -170,6 +170,13 @@ func WithKubeProxyExtrArgs(eargs map[string]string) ClusterConfigOption {
 	}
 }
 
+func WithContainerEngineExtrArgs(eargs map[string]string) ClusterConfigOption {
+	return func(conf *ClusterConfig) *ClusterConfig {
+		conf.WorkerConfig.ContainerEngineConf.ExtraArgs = eargs
+		return conf
+	}
+}
+
 func ParseScheduleType(schedule string) (ScheduleType, error) {
 	switch schedule {
 	case string(SchedulePreJoin):
