@@ -29,8 +29,8 @@ $ make test
 
 3) 如果是**在线部署**，直接将[config/all_online_install](/config/all_online_install.config)配置为与自己所使用机器信息相符的内容，再按照“**部署集群**”章节中列出的过程进行部署即可。
 
-4) 如果是**离线部署**，则需要准备k8s以及相关的离线包，以openeuler20.09为例，离线包的存放格式如下：
-
+4) 如果是离线部署，则需要准备`K8S`以及相关的离线包，以`openeuler20.09`为例，可以从对应的软件源或者ISO提取依赖的软件包文件，然后打包到离线包中；离线包的存放格式如下：
+5) 
 ```
 $ tree
 .
@@ -60,7 +60,6 @@ $ tree
 5 directories, 16 files
 ```
 
-
 - 离线部署包的目录结构与集群配置config中的package的类型对应，package类型共有pkg/repo/bin/file/dir/image/yaml/shell八种
 
 -  bin目录存放二进制文件，对应package类型 bin
@@ -70,9 +69,9 @@ $ tree
 -  file目录存放file、yaml、shell三种类型的文件。其中file类型代表需要copy到目标机器的文件，同时需要配置dst目的地路径；yaml类型代表用户自定义的yaml文件，会在集群部署完成后apply该文件；shell类型代表用户想要执行的脚本，同时需要配置schedule执行时机，执行时机包括prejoin节点加入前、postjoin节点加入后、precleanup节点退出前、postcleanup节点退出后四个阶段
 
 - image目录存放需要导入的容器镜像，例如网络插件镜像以及pause镜像。对应package类型image。**如果是在线安装，则由容器运行时自动从镜像仓库下载，不需要准备images.tar包**。以calico插件依赖的容器镜像为例，可以根据calico.yaml里面定义的镜像全名进行下载导出。该tar包包含的镜像必须是使用docker或者isula-build等兼容docker的tar包格式的命令，使用`docker save -o images.tar images1:tag images2:tag ...... ` 或类似命令将所有镜像一次性导出到images.tar包中，需要确保执行load镜像时能一次将images.tar导入成功。以上述calico镜像为例，镜像导出命令为：
-
-  ```
-  $ docker save -o images.tar calico/node:v3.19.1 calico/cni:v3.19.1 calico/kube-controllers:v3.19.1 calico/pod2daemon-flexvol:v3.19.1 k8s.gcr.io/pause:3.2
+```
+$ docker save -o images.tar calico/node:v3.19.1 calico/cni:v3.19.1 calico/kube-controllers:v3.19.1 calico/pod2daemon-flexvol:v3.19.1 k8s.gcr.io/pause:3.2
+```
 
 - pkg目录下存放需要安装的rpm/deb包，对应package类型pkg
 
@@ -190,7 +189,7 @@ $ eggo -d join --id k8s-cluster --file join.yaml
     arch: arm64
   workers:                          // 配置worker节点的列表
   - name: test0                     // 该节点的名称，为k8s集群看到的该节点的名称
-    ip: 192.168.0.4                 // 该节点的ip地址
+    ip: 192.168.0.2                 // 该节点的ip地址
     port: 22                        // ssh登录的端口
     arch: arm64                     // 机器架构，x86_64的填amd64
   - name: test2
@@ -199,7 +198,15 @@ $ eggo -d join --id k8s-cluster --file join.yaml
     arch: arm64
   ```
 
+## 查看集群信息
 
+```bash
+$  eggo list
+Name            Masters Workers Status
+k8s-cluster     2       2       success
+```
+
+查看eggo管理的集群信息，第一列表示集群的名称，第二列表示集群有多少个`master`节点，第三列表示集群有多少个`worker`节点，第四列表示集群的状态信息。
 
 ## 清理拆除集群
 

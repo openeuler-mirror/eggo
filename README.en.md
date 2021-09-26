@@ -10,17 +10,16 @@ The Eggo project was designed to automate the deployment of K8S clusters in mass
 
 Currently, eggo implements the deployment using the command. The following are three deployment modes that are supported by eggo:
 
+
 - Online deployment. Only need to write the `yaml` configuration file for the deployment. The required rpm package/binary file/plug-in/docker image are downloaded during the installation and deployment phase according to the internet. Online deployment Currently, plug-ins cannot be downloaded and installed online. Plug-ins will be deployed online in the future. Details see [eggo operation manual](/docs/manual.md).
 - Offline deployment. Package all rpm packages/binary files/plug-in/docker images into a `tar.gz` file in a certain format. Then write the corresponding `yaml` configuration file (details see [eggo operation manual](/docs/manual.md)), the cluster will be deployed by executing commands.  
 - Using cluster deploy new cluster by Gitops (to be implemented).
 
-
-
 ### Software Architecture
-detailed [Software architecture description](./docs/design.md)
+detailed [Software architecture description](./docs/general_design.md)
 
 ### Detailed usage
-detailed [eggo operation manual](./docs/manual.md)
+detailed [eggo operation manual](https://docs.openeuler.org/zh/docs/21.09/docs/Kubernetes/eggo%E8%87%AA%E5%8A%A8%E5%8C%96%E9%83%A8%E7%BD%B2.html)
 
 
 ### Releases

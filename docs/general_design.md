@@ -1,5 +1,18 @@
 # Eggo方案设计
 
+## 整体架构
+
+![](./imgs/eggo_general_design_overall.png)
+
+组件说明：
+
+- GitOps：负责集群配置信息的管理，如更新、创建、删除等；
+- eggops：自定义CRD和controller用于抽象K8S集群，并且通过eggo管理集群生命周期；
+- InitCluster：元集群，eggops运行的K8S集群，作为中心集群管理其他业务集群；
+- master：K8S的master节点，承载集群的控制面；
+- worker：K8S的负载节点，承载用户业务；
+- Cluster A, B, C：业务集群，承载用户业务；
+
 ## 整体方案
 
 ![eggo_general_design_overall1](./imgs/eggo_general_design_overall1.png)
