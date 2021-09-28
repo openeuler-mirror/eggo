@@ -458,6 +458,17 @@ func (in *InstallConfig) DeepCopyInto(out *InstallConfig) {
 			}
 		}
 	}
+	if in.Dns != nil {
+		in, out := &in.Dns, &out.Dns
+		*out = make([]*PackageConfig, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(PackageConfig)
+				**out = **in
+			}
+		}
+	}
 	in.Addition.DeepCopyInto(&out.Addition)
 }
 

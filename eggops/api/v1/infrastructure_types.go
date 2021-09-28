@@ -85,6 +85,9 @@ type InstallConfig struct {
 	Image []*PackageConfig `json:"image,omitempty"`
 
 	// +optional
+	Dns []*PackageConfig `json:"dns,omitempty"`
+
+	// +optional
 	Addition AdditionConfig `json:"addition,omitempty"`
 }
 
