@@ -8,6 +8,7 @@ CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
 ARCH ?= amd64
 ifeq ($(shell uname -p),aarch64)
 ARCH ?= arm64
+export ETCD_UNSUPPORTED_ARCH=arm64
 endif
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)

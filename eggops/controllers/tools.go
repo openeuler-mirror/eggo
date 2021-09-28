@@ -86,6 +86,7 @@ func fillInstallConfig(installConfig eggov1.InstallConfig, packagePath string) (
 		{installConfig.LoadBalance, &config.LoadBalance},
 		{installConfig.Container, &config.Container},
 		{installConfig.Image, &config.Image},
+		{installConfig.Dns, &config.Dns},
 	}
 	for _, p := range packageConfigs {
 		if len(p.src) != 0 {
