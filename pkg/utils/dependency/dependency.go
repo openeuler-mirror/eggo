@@ -198,13 +198,15 @@ func (df *dependencyFD) Remove(r runner.Runner) error {
 type dependencyImage struct {
 	srcPath string
 	client  string
+	command string
 	image   []*api.PackageConfig
 }
 
-func NewDependencyImage(srcPath, client string, image []*api.PackageConfig) *dependencyImage {
+func NewDependencyImage(srcPath, client, command string, image []*api.PackageConfig) *dependencyImage {
 	return &dependencyImage{
 		srcPath: srcPath,
 		client:  client,
+		command: command,
 		image:   image,
 	}
 }
@@ -213,7 +215,7 @@ func (di *dependencyImage) Install(r runner.Runner) error {
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	for _, i := range di.image {
-		sb.WriteString(fmt.Sprintf("%s load -i %s/%s && ", di.client, di.srcPath, i.Name))
+		sb.WriteString(fmt.Sprintf("%s %s/%s && ", di.command, di.srcPath, i.Name))
 	}
 	sb.WriteString("echo success\"")
 

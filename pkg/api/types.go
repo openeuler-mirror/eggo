@@ -118,10 +118,11 @@ type KubeProxy struct {
 }
 
 type ContainerEngine struct {
-	Runtime            string   `json:"runtime"`
-	RuntimeEndpoint    string   `json:"runtime-endpoint"`
-	RegistryMirrors    []string `json:"registry-mirrors"`
-	InsecureRegistries []string `json:"insecure-registries"`
+	Runtime            string            `json:"runtime"`
+	RuntimeEndpoint    string            `json:"runtime-endpoint"`
+	RegistryMirrors    []string          `json:"registry-mirrors"`
+	InsecureRegistries []string          `json:"insecure-registries"`
+	ExtraArgs          map[string]string `json:"extra-args"`
 }
 
 type APIEndpoint struct {
