@@ -84,6 +84,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 		}
 		return ctrl.Result{}, client.IgnoreNotFound(terr)
 	}
+
+	// skip Update, because Update maybe failed if cluster deleted
+	if cluster.Status.Deleted {
+		return ctrl.Result{}, nil
+	}
+
 	// update cluster after Reconcile
 	defer func() {
 		if err != nil {
