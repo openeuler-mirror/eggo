@@ -11,7 +11,7 @@
 # Create: 2021-06-28
 # Description: Dockerfile for eggo
 
-FROM euleros
+FROM hub.oepkgs.net/openeuler/openeuler:20.03-lts-sp2
 
 ADD eggo /bin/
 
