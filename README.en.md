@@ -1,17 +1,17 @@
 # eggo
 
 ### Description
-The Eggo project was designed to automate deployment of K8S clusters in mass production environments, track deployment processes, and provide a high degree of flexibility. By combining GitOps management and deployment configuration tracking, cluster deployment is implemented in cloud native mode, enabling cluster management.
+The Eggo project was designed to automate the deployment of K8S clusters in mass production environments, track deployment processes, and provide a high degree of flexibility. By combining GitOps management and deployment configuration tracking, cluster deployment is implemented in cloud native mode, enabling cluster management.
 
-- Support multi-release version of linux: such as openeuler/centos/ubuntu；
+- Support multi-release version of Linux: such as openeuler/CentOs/ubuntu；
 - Support multi-architecture (amd64/arm64) deployment: a cluster supports nodes of multiple architectures;
 - Support for multiple deployments: binary and KUbeadm (to be implemented);
 - Support offline and online deployment;
 
-Currently, eggo implements the depolyment using the command. The following are three deployment modes which are supported by eggo:
+Currently, eggo implements the deployment using the command. The following are three deployment modes which are supported by eggo:
 
-- Online deployment. Only need to write the `yaml` configuration file for the deployment. The required rpm package/binary file/plug-in/docker image are downloaded during the installation and deployment phase according to the internet. Online deployment Currently, plug-ins cannot be downloaded and installed online. Plug-ins will be deployed online in the future. Details see [eggo operation manul](/docs/manual.md).
-- Offline deployment. Package all rpm packages/binary files/plug-in/docker images inro a `tar.gz` file in a certain format. Then write the corresponding `yaml` configuration file (details see [eggo operation manul](/docs/manual.md)), the cluster will be deployed by excuting commands.  
+- Online deployment. Only need to write the `yaml` configuration file for the deployment. The required rpm package/binary file/plug-in/docker image are downloaded during the installation and deployment phase according to the internet. Online deployment Currently, plug-ins cannot be downloaded and installed online. Plug-ins will be deployed online in the future. Details see [eggo operation manual](/docs/manual.md).
+- Offline deployment. Package all rpm packages/binary files/plug-in/docker images into a `tar.gz` file in a certain format. Then write the corresponding `yaml` configuration file (details see [eggo operation manual](/docs/manual.md)), the cluster will be deployed by executing commands.  
 - Using cluster deploy new cluster by Gitops (to be implemented).
 
 
