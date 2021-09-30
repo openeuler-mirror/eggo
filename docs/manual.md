@@ -1,48 +1,35 @@
-#                                                eggo操作手册
+# eggo操作手册
 
-
-
-## 介绍
-
-​    Eggo项目旨在解决大规模生产环境K8S集群自动化部署问题、部署流程跟踪以及提供高度的灵活性。通过结合GitOps管理、跟踪部署配置，通过云原生的方式实现集群的部署，实现集群部署集群的能力。
-
-​    eggo支持在多种常见的linux发行版上部署k8s集群，例如openeuler/centos/ubuntu。
-
-​    eggo支持在集群中混合部署不同架构(amd64/arm64等)机器。
-
-​    eggo已实现使用命令行的方式进行集群的一键部署，并提供了多种集群部署方式：
-
-1) 支持离线部署。将所有用到的rpm包/二进制文件/插件/容器镜像按照一定的格式打包到一个tar.gz文件中，再编写对应的yaml配置文件(后面有详细介绍)，即可执行命令一键部署。本文后面都以离线安装为例进行说明。
-
-2) 支持在线部署。只需要编写yaml配置文件即可执行命令一键部署，所需的rpm包/二进制文件/插件/容器镜像等都在安装部署阶段自动联网下载。在线部署目前还不支持插件的在线下载安装，后续会支持插件的在线部署。
-
-3) 通过GitOps使用元集群部署新的集群。该功能还在开发中。
-
-## eggo使用方法
-
-### 全在线部署
-
-例如openEuler21.09已经存在集群部署依赖的所有组件，因此可以通过在线部署的方式部署。详细配置文件见[config/all_online_install](../config/all_online_install.config)
-
-![online部署](./imgs/all_inline_cluster.gif)
-
-### 全离线部署
-
-例如openEuler21.09已经存在集群部署依赖的所有组件，因此可以通过在线部署的方式部署。详细配置文件见[config/all_offline_install](../config/all_offline_install.config)
-
-![offline部署](./imgs/all_offline_cluster.gif)
-
-
-
-## 部署集群
-
-### 1. 准备工作
+## 准备工作
 
 1) 待安装机器配置好机器的hostname并安装tar命令，确保能使用tar命令解压tar.gz格式的压缩包。配置ssh确保能远程访问，如果ssh登录的是普通用户，还需要确保该用户有免密执行sudo的权限。
+   
+2) 在任意一台能连接上述所有机器的机器上，根据以下编译安装的说明编译安装eggo，也可以拷贝编译好的eggo直接使用。
+#### 编译安装
+```bash
+# 使能go mod
+$ export GO111MODULE=on
+# 设置goproxy为国内代理，也可以设置为其他公司的代理
+$ go env -w GOPROXY=https://goproxy.cn,direct
+# 下载依赖库
+$ go mod tidy
+# 编译
+$ make
+# 使用vendor本地编译，前提需要之前下载过依赖的go库
+$ go mod vendor
+$ make local
+# 安装
+$ make install
+```
+#### 运行测试
 
-1) 在任意一台能连接上述所有机器的机器上，根据 https://gitee.com/openeuler/eggo/blob/master/README.md 的说明编译安装eggo，也可以拷贝编译好的eggo直接使用。
+```bash
+$ make test
+```
 
-2) 如果是离线部署，则需要准备k8s以及相关的离线包，以openeuler20.09为例，离线包的存放格式如下：
+3) 如果是**在线部署**，直接将[config/all_online_install](/config/all_online_install.config)配置为与自己所使用机器信息相符的内容，再按照“**部署集群**”章节中列出的过程进行部署即可。
+
+4) 如果是**离线部署**，则需要准备k8s以及相关的离线包，以openeuler20.09为例，离线包的存放格式如下：
 
 ```
 $ tree
@@ -73,6 +60,7 @@ $ tree
 5 directories, 16 files
 ```
 
+
 - 离线部署包的目录结构与集群配置config中的package的类型对应，package类型共有pkg/repo/bin/file/dir/image/yaml/shell八种
 
 -  bin目录存放二进制文件，对应package类型 bin
@@ -81,17 +69,62 @@ $ tree
 
 -  file目录存放file、yaml、shell三种类型的文件。其中file类型代表需要copy到目标机器的文件，同时需要配置dst目的地路径；yaml类型代表用户自定义的yaml文件，会在集群部署完成后apply该文件；shell类型代表用户想要执行的脚本，同时需要配置schedule执行时机，执行时机包括prejoin节点加入前、postjoin节点加入后、precleanup节点退出前、postcleanup节点退出后四个阶段
 
-- image目录存放需要导入的容器镜像，例如网络插件镜像以及pause镜像。对应package类型image。如果是在线安装，则由容器运行时自动从镜像仓库下载，不需要准备images.tar包。以calico插件依赖的容器镜像为例，可以根据calico.yaml里面定义的镜像全名进行下载导出。该tar包包含的镜像必须是使用docker或者isula-build等兼容docker的tar包格式的命令，使用docker save -o images.tar images1:tag images2:tag ......  或类似命令将所有镜像一次性导出到images.tar包中，需要确保执行load镜像时能一次将images.tar导入成功。以上述calico镜像为例，镜像导出命令为：
+- image目录存放需要导入的容器镜像，例如网络插件镜像以及pause镜像。对应package类型image。**如果是在线安装，则由容器运行时自动从镜像仓库下载，不需要准备images.tar包**。以calico插件依赖的容器镜像为例，可以根据calico.yaml里面定义的镜像全名进行下载导出。该tar包包含的镜像必须是使用docker或者isula-build等兼容docker的tar包格式的命令，使用`docker save -o images.tar images1:tag images2:tag ...... ` 或类似命令将所有镜像一次性导出到images.tar包中，需要确保执行load镜像时能一次将images.tar导入成功。以上述calico镜像为例，镜像导出命令为：
 
   ```
   $ docker save -o images.tar calico/node:v3.19.1 calico/cni:v3.19.1 calico/kube-controllers:v3.19.1 calico/pod2daemon-flexvol:v3.19.1 k8s.gcr.io/pause:3.2
-  ```
-
-  > 注：containerd cri不支持加载本地镜像，如果使用containerd容器引擎，需要保证镜像能够正常下载。
 
 - pkg目录下存放需要安装的rpm/deb包，对应package类型pkg
 
-3)  准备eggo部署时使用的yaml配置文件。可以使用下面的命令生成一个模板配置，并打开yaml文件对其进行增删改来满足不同的部署需求。
+
+## 基本用法
+这里列出eggo的基本执行指令，后续“部署集群”章节中，有部署集群的具体过程。
+
+```bash
+# 生成默认配置模板
+$ eggo template -f test.yaml
+# 生成指定master节点IP列表的模板
+$ eggo template  --masters=192.168.0.1  --masters=192.168.0.2 -f test.yaml
+# template当前支持多个参数覆盖默认值
+$ ./eggo template --help
+      --etcds stringArray          set etcd node ips
+  -l, --loadbalancer stringArray   set loadbalancer node (default [192.168.0.1])
+      --masters stringArray        set master ips (default [192.168.0.2])
+  -n, --name string                set cluster name (default "k8s-cluster")
+      --nodes stringArray          set worker ips (default [192.168.0.3,192.168.0.4])
+  -p, --password string            password to login all node (default "123456")
+  -u, --user string                user to login all node (default "root")
+
+# 使用上面template命令生成的配置文件，创建集群
+$ eggo deploy -f test.yaml
+
+# 使用上面的配置清理集群
+$ eggo cleanup -f test.yaml
+```
+
+
+
+## 部署过程展示
+
+### 全在线部署
+
+例如openEuler21.09已经存在集群部署依赖的所有组件，因此可以通过在线部署的方式部署。详细配置文件见[config/all_online_install](../config/all_online_install.config)
+
+![online部署](./imgs/all_inline_cluster.gif)
+
+### 全离线部署
+
+例如openEuler21.09已经准备好集群部署依赖的所有组件，因此可以通过离线部署的方式部署。详细配置文件见[config/all_offline_install](../config/all_offline_install.config)
+
+![offline部署](./imgs/all_offline_cluster.gif)
+
+
+
+## 部署集群
+
+### 1. 生成模版配置
+
+准备eggo部署时使用的yaml配置文件。可以使用下面的命令生成一个模板配置，并打开yaml文件对其进行增删改来满足不同的部署需求。
 
 ```
 $ eggo template -f template.yaml
@@ -103,7 +136,7 @@ $ eggo template -f template.yaml
 $ eggo template -f template.yaml -n k8s-cluster -u username -p password --masters 192.168.0.1 --masters 192.168.0.2 --workers 192.168.0.3 --etcds 192.168.0.4 --loadbalancer 192.168.0.5
 ```
 
-具体的deploy.yaml的配置见最后的"配置文件说明"章节
+具体的deploy.yaml的配置见[配置文件说明](/docs/configuration_file_description.md)
 
 
 
@@ -170,7 +203,7 @@ $ eggo -d join --id k8s-cluster --file join.yaml
 
 ## 清理拆除集群
 
-#### 1. 拆除整个集群
+### 1. 拆除整个集群
 
 ```
 $ eggo -d cleanup --id k8s-cluster -f deploy.yaml
@@ -186,7 +219,7 @@ $ eggo -d cleanup --id k8s-cluster -f deploy.yaml
 
 
 
-####  2. 也可以只拆除指定节点
+###  2. 也可以只拆除指定节点
 
 ```
 $ eggo -d delete --id k8s-cluster 192.168.0.5 192.168.0.6
@@ -196,241 +229,3 @@ $ eggo -d delete --id k8s-cluster 192.168.0.5 192.168.0.6
 * --id集群的id
 * --type可以为master或者worker，默认worker
 * 192.168.0.5 需要删除的机器的IP地址列表或者名称列表，注意第1个master节点不能删除
-
-
-
-## 配置文件说明
-
-下面的配置中，不同节点类型的节点可以同时部署在同一台机器(注意配置必须一致)。
-
-```
-cluster-id: k8s-cluster           // 集群名称
-username: root                    // 需要部署k8s集群的机器的ssh登录用户名，所有机器都需要使用同一个用户名
-password: 123456                  // 需要部署k8s集群的机器的ssh登录密码，所有机器都需要使用同一个密码
-masters:                          // 配置master节点的列表，建议每个master节点同时作为worker节点，否则master节点可以无法直接访问pod
-- name: test0                     // 该节点的名称，为k8s集群看到的该节点的名称
-  ip: 192.168.0.1                 // 该节点的ip地址
-  port: 22                        // ssh登录的端口
-  arch: arm64                     // 机器架构，x86_64的填amd64
-workers:                          // 配置worker节点的列表
-- name: test0                     // 该节点的名称，为k8s集群看到的该节点的名称
-  ip: 192.168.0.2                 // 该节点的ip地址
-  port: 22                        // ssh登录的端口
-  arch: arm64                     // 机器架构，x86_64的填amd64
-- name: test1
-  ip: 192.168.0.3
-  port: 22
-  arch: arm64
-etcds:                            // 配置etcd节点的列表，如果该项为空，则将会为每个master节点部署一个etcd，否则只会部署配置的etcd节点
-- name: etcd-0                    // 该节点的名称，为k8s集群看到的该节点的名称
-  ip: 192.168.0.4                 // 该节点的ip地址
-  port: 22                        // ssh登录的端口
-  arch: amd64                     // 机器架构，x86_64的填amd64
-loadbalance:                      // 配置loadbalance节点
-  name: k8s-loadbalance           // 该节点的名称，为k8s集群看到的该节点的名称
-  ip: 192.168.0.5                 // 该节点的ip地址
-  port: 22                        // ssh登录的端口
-  arch: amd64                     // 机器架构，x86_64的填amd64
-  bind-port: 8443                 // 负载均衡服务监听的端口 
-external-ca: false                // 是否使用外部ca证书，该功能还未实现
-external-ca-path: /opt/externalca // 外部ca证书文件的路径
-service:                          // k8s创建的service的配置
-  cidr: 10.32.0.0/16              // k8s创建的service的IP地址网段
-  dnsaddr: 10.32.0.10             // k8s创建的service的DNS地址
-  gateway: 10.32.0.1              // k8s创建的service的网关地址
-  dns:                            // k8s创建的coredns的配置
-    corednstype: pod              // k8s创建的coredns的部署类型，支持pod和binary
-    imageversion: 1.8.4           // pod部署类型的coredns镜像版本
-    replicas: 2                   // pod部署类型的coredns副本数量
-network:                          // k8s集群网络配置
-  podcidr: 10.244.0.0/16          // k8s集群网络的IP地址网段
-  plugin: calico                  // k8s集群部署的网络插件
-  plugin-args: {"NetworkYamlPath": "/etc/kubernetes/addons/calico.yaml"}   // k8s集群网络的网络插件的配置
-apiserver-endpoint: 192.168.122.222:6443      // 对外暴露的APISERVER服务的地址或域名，如果配置了loadbalances则填loadbalance地址，否则填写第1个master节点地址
-apiserver-cert-sans:                          // apiserver相关的证书中需要额外配置的ip和域名
-  dnsnames: []                                // apiserver相关的证书中需要额外配置的域名列表
-  ips: []                                     // apiserver相关的证书中需要额外配置的ip地址列表
-apiserver-timeout: 120s                       // apiserver响应超时时间
-etcd-external: false                          // 使用外部etcd，该功能还未实现
-etcd-token: etcd-cluster                      // etcd集群名称
-dns-vip: 10.32.0.10                           // dns的虚拟ip地址
-dns-domain: cluster.local                     // DNS域名后缀
-pause-image: k8s.gcr.io/pause:3.2             // 容器运行时的pause容器的容器镜像名称
-network-plugin: cni                           // 网络插件类型
-cni-bin-dir: /usr/libexec/cni,/opt/cni/bin    // 网络插件地址，使用","分隔多个地址
-runtime: docker                               // 使用哪种容器运行时，目前支持docker、iSulad以及containerd
-runtime-endpoint: unix:///var/run/docker.sock // 容器运行时endpoint，docker可以不指定
-registry-mirrors: []                          // 下载容器镜像时使用的镜像仓库的mirror站点地址
-insecure-registries: []                       // 下载容器镜像时运行使用http协议下载镜像的镜像仓库地址
-config-extra-args:                            // 各个组件(kube-apiserver/etcd等)服务启动配置的额外参数
-  - name: kubelet                             // name支持："etcd","kube-apiserver","kube-controller-manager","kube-scheduler","kube-proxy","kubelet","container-engine"
-    extra-args:
-      "--cgroup-driver": systemd              // 注意key对应的组件的参数，需要带上"-"或者"--"
-  - name: container-engine
-    extra-args:
-      "--data-root": /apps/docker-data
-open-ports:                                   // 配置需要额外打开的端口，k8s自身所需端口不需要进行配置，额外的插件的端口需要进行额外配置
-  worker:                                     // 指定在那种类型的节点上打开端口，可以是master/worker/etcd/loadbalance
-  - port: 111                                 // 端口地址
-    protocol: tcp                             // 端口类型，tcp/udp
-  - port: 179
-    protocol: tcp
-install:                                      // 配置各种类型节点上需要安装的安装包或者二进制文件的详细信息，注意将对应文件放到在tar.gz安装包中
-  package-source:                                // 配置安装包的详细信息
-    type: tar.gz                              // 安装包的压缩类型，目前只支持tar.gz类型的安装包
-    dstpath: ""                               // 安装包在对端机器上的路径，必须是合法绝对路径
-    srcpath:                                  // 不同架构安装包的存放路径，架构必须与机器架构相对应，必须是合法绝对路径
-      arm64: /root/rpms/packages-arm64.tar.gz // arm64架构安装包的路径，配置的机器中存在arm64机器场景下需要配置，必须是合法绝对路径
-      amd64: /root/rpms/packages-x86.tar.gz   // amd64类型安装包的路径，配置的机器中存在amd64机器场景下需要配置，必须是合法绝对路径                                 
-  etcd:                                       // etcd类型节点需要安装的包或二进制文件列表
-  - name: etcd                                // 需要安装的包或二进制文件的名称，如果是安装包则只写名称，不填写具体的版本号，安装时会使用`$name*`来识别
-    type: pkg                                 // package的类型，pkg/repo/bin/file/dir/image/yaml七种类型，如果配置为repo请在对应节点上配置好repo源
-    dst: ""                                   // 目的文件夹路径，bin/file/dir类型下需要配置，表示将文件(夹)放到节点的哪个目录下，为了防止用户误配置路径，导致cleanup时删除重要文件，此配置必须符合白名单，参见下一小节
-  kubernetes-master:                          // k8s master类型节点需要安装的包或二进制文件列表
-  - name: kubernetes-client,kubernetes-master
-    type: pkg
-  kubernetes-worker:                          // k8s worker类型节点需要安装的包或二进制文件列表
-  - name: docker-engine,kubernetes-client,kubernetes-node,kubernetes-kubelet
-    type: pkg
-    dst: ""
-  - name: conntrack-tools,socat
-    type: pkg
-    dst: ""
-  network:                                    // 网络需要安装的包或二进制文件列表
-  - name: containernetworking-plugins
-    type: pkg
-    dst: ""
-  loadbalance:                                // loadbalance类型节点需要安装的包或二进制文件列表
-  - name: gd,gperftools-libs,libunwind,libwebp,libxslt
-    type: pkg
-    dst: ""
-  - name: nginx,nginx-all-modules,nginx-filesystem,nginx-mod-http-image-filter,nginx-mod-http-perl,nginx-mod-http-xslt-filter,nginx-mod-mail,nginx-mod-stream
-    type: pkg
-    dst: ""
-  container:                                  // 容器需要安装的包或二进制文件列表
-  - name: emacs-filesystem,gflags,gpm-libs,re2,rsync,vim-filesystem,vim-common,vim-enhanced,zlib-devel
-    type: pkg
-    dst: ""
-  - name: libwebsockets,protobuf,protobuf-devel,grpc,libcgroup
-    type: pkg
-    dst: ""
-  - name: yajl,lxc,lxc-libs,lcr,clibcni,iSulad
-    type: pkg
-    dst: ""
-  image:                                      // 容器镜像tar包
-  - name: pause.tar
-    type: image
-    dst: ""
-  dns:                                        // k8s coredns安装包。如果corednstype配置为pod，此处无需配置
-  - name: coredns
-    type: pkg
-    dst: ""
-  addition:                                   // 额外的安装包或二进制文件列表
-    master:
-    - name: prejoin.sh
-      type: shell                             // shell脚本
-      schedule: "prejoin"                     // 执行时间master节点加入集群前
-      TimeOut:  "30s"                         // 脚本执行时间，超时则被杀死，未配置默认30s
-    - name: calico.yaml
-      type: yaml
-      dst: ""
-    worker:
-    - name: docker.service
-      type: file
-      dst: /usr/lib/systemd/system/
-    - name: postjoin.sh
-      type: shell                             // shell脚本
-      schedule: "postjoin"                    // 执行时间worker节点加入集群后
-```
-
-### dst 白名单
-dst可以配置为白名单中的目录，或者其子目录
-```
-"/usr/bin", "/usr/local/bin", "/opt/cni/bin", "/usr/libexec/cni",
-"/etc/kubernetes",
-"/usr/lib/systemd/system", "/etc/systemd/system",
-"/tmp",
-```
-
-## 部署相关问题汇总
-
-### calico网络CIDR配置问题
-
-下载[calico官网的配置](https://docs.projectcalico.org/manifests/calico.yaml)，然后直接部署calico网络，会发现pod的网络区间不是我们eggo配置的`podcidr`。而如果通过kubeadm部署集群，然后使用同样的calico配置部署calico网络，会发现pod的网络区间为kubeadm设置的`pod-network-cidr`。
-
-#### 原因
-
-由于`calico/node`容器镜像对kubeadm做了适配，会自动读取kubeadm设置的kubeadm-config的configmaps的值，然后自动更新cidr。
-
-#### 解决方法
-
-eggo的二进制部署方式没办法修改`calico/node`进行配置，因此，建议直接修改`calico.yaml`配置。使能`CALICO_IPV4POOL_CIDR`项，并且设置为k8s集群的`podcidr`相同的值。
-
-`calico.yaml`默认值如下：
-```bash
-containers:
-  # Runs calico-node container on each Kubernetes node. This
-  # container programs network policy and routes on each
-  # host.
-  - name: calico-node
-    image: docker.io/calico/node:v3.19.1
-    envFrom:
-    - configMapRef:
-        # Allow KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT to be overridden for eBPF mode.
-        name: kubernetes-services-endpoint
-        optional: true
-    env:
-      # The default IPv4 pool to create on startup if none exists. Pod IPs will be
-      # chosen from this range. Changing this value after installation will have
-      # no effect. This should fall within `--cluster-cidr`.
-      # - name: CALICO_IPV4POOL_CIDR
-      #   value: "192.168.0.0/16"
-```
-
-按照集群cidr（例如为"10.244.0.0/16"），那么修改`calico.yaml`如下：
-```bash
-containers:
-  # Runs calico-node container on each Kubernetes node. This
-  # container programs network policy and routes on each
-  # host.
-  - name: calico-node
-    image: docker.io/calico/node:v3.19.1
-    envFrom:
-    - configMapRef:
-        # Allow KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT to be overridden for eBPF mode.
-        name: kubernetes-services-endpoint
-        optional: true
-    env:
-      # The default IPv4 pool to create on startup if none exists. Pod IPs will be
-      # chosen from this range. Changing this value after installation will have
-      # no effect. This should fall within `--cluster-cidr`.
-      - name: CALICO_IPV4POOL_CIDR
-         value: "10.244.0.0/16"
-```
-
-### resolv.conf缺失导致kubelet启动失败
-
-#### 现象
-
-kubelet启动不了，详细报错可以参考[issue](https://gitee.com/openeuler/eggo/issues/I457S5?from=project-issue)。
-
-#### 解决方法
-
-创建/etc/resolv.conf文件，并且设置合理的配置。
-
-### 容器引擎下载pause镜像失败
-
-报错信息：`SSL certificate problem: unable to get local issuer certificate`
-
-#### 原因
-
-由于机器没有安装相关证书，可以获取curl官网提供了ca证书。
-
-#### 解决方法
-
-```
-$ wget https://curl.se/ca/cacert.pem
-$ mv cacert.pem /etc/pki/ca-trust/source/anchors/
-$ update-ca-trust
-```
-
