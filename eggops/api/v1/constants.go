@@ -1,8 +1,6 @@
 package v1
 
 const (
-	EggoNamespaceName = "eggo-system"
-
 	MachineUsageMaster = "master machine"
 	MachineUsageWorker = "worker machine"
 	MachineUsageEtcd   = "etcd machine"

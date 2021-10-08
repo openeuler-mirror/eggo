@@ -234,6 +234,11 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 		*out = new(corev1.ObjectReference)
 		**out = **in
 	}
+	if in.InfrastructureRef != nil {
+		in, out := &in.InfrastructureRef, &out.InfrastructureRef
+		*out = new(corev1.ObjectReference)
+		**out = **in
+	}
 	if in.PackagePersistentVolumeClaimRef != nil {
 		in, out := &in.PackagePersistentVolumeClaimRef, &out.PackagePersistentVolumeClaimRef
 		*out = new(corev1.ObjectReference)
