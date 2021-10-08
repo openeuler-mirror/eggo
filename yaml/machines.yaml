@@ -1,0 +1,29 @@
+---
+# machine1.yaml
+apiVersion: eggo.isula.org/v1
+kind: Machine
+metadata:
+  name: machine1-example
+  labels:
+    masterRole: allow
+    workerRole: allow
+spec:
+  hostname: machine1
+  arch: arm64
+  ip: 192.168.0.1
+  port: 22
+
+---
+# machine2.yaml
+apiVersion: eggo.isula.org/v1
+kind: Machine
+metadata:
+  name: machine2-example
+  labels:
+    masterRole: allow
+    workerRole: allow
+spec:
+  hostname: machine1
+  arch: amd64
+  ip: 192.168.0.2
+  port: 22

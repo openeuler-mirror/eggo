@@ -62,6 +62,7 @@ runtime: docker                               // 使用哪种容器运行时，�
 runtime-endpoint: unix:///var/run/docker.sock // 容器运行时endpoint，docker可以不指定
 registry-mirrors: []                          // 下载容器镜像时使用的镜像仓库的mirror站点地址
 insecure-registries: []                       // 下载容器镜像时运行使用http协议下载镜像的镜像仓库地址
+enable-kubelet-serving: true                  // 开启kubelet serving证书，默认为false
 config-extra-args:                            // 各个组件(kube-apiserver/etcd等)服务启动配置的额外参数
   - name: kubelet                             // name支持："etcd","kube-apiserver","kube-controller-manager","kube-scheduler","kube-proxy","kubelet"
     extra-args:

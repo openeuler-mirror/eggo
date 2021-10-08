@@ -97,24 +97,3 @@ packages/packages-x86.tar.gz
 packages/packages-arm.tar.gz
 notes
 ```
-
-# eggops Configuration
-
-eggops_cluster.yaml stores some resource configurations for cluster deployment by eggops. It help users configure their own eggops_cluster.yaml.
-
-## Instructions
-
-### Modify eggops_cluster.yaml
-
-Users modify eggops_cluster.yaml according to actual requirements. The following modifications will be considered:
-- Machine, configure a Machine resource for each available machine, which include IP, architecture, ssh login port, etc.
-- Secret, configure the username/password required for machine ssh login
-- PV and PVC, mount the package to the container through the shared data volume
-- Infrastructure, the infrastructure configuration of the cluster, including package PVC, exposed ports, installation packages, etc.
-- Cluster, the number of masters, workers, login keys, infrastructure and other information required by the cluster
-
-For detailed configuration of eggops_cluster.yaml, please refer to docs/eggops.md
-
-### Prepare compressed packages
-
-The user prepares the offline installation package. The steps are the same as the steps for preparing compressed package in the eggo configuration. Don't repeat them here.
