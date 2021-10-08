@@ -1,0 +1,20 @@
+apiVersion: eggo.isula.org/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+  namespace: eggo-system
+spec:
+  masterRequire:
+    number: 1
+    features: 
+      masterRole: allow
+  workerRequire:
+    number: 1
+    features:
+      workerRole: allow
+  machineLoginSecret:
+    name: secret-example
+  infrastructure:
+    name: infrastructure-example
+  # 启用kubelet serving证书
+  enableKubeletServing: true

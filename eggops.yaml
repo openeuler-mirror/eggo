@@ -825,6 +825,25 @@ spec:
                       - type
                       type: object
                     type: array
+                  dns:
+                    items:
+                      properties:
+                        dst:
+                          type: string
+                        name:
+                          type: string
+                        schedule:
+                          type: string
+                        timeout:
+                          type: string
+                        type:
+                          description: repo bin file dir image json shell
+                          type: string
+                      required:
+                      - name
+                      - type
+                      type: object
+                    type: array
                   etcd:
                     items:
                       properties:
@@ -1584,7 +1603,7 @@ spec:
         - --leader-elect
         command:
         - /manager
-        image: kylinn/eggops-arm64:v0.9.3
+        image: hub.oepkgs.net/haozi007/eggops:latest
         livenessProbe:
           httpGet:
             path: /healthz

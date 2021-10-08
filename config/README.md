@@ -97,23 +97,3 @@ packages/packages-x86.tar.gz
 packages/packages-arm.tar.gz
 notes
 ```
-
-# eggops集群配置
-
-eggops_cluster.yaml存放了通过eggops启动集群的一些资源配置，方便用户使用。
-
-## 使用方法
-
-### 修改eggops_cluster.yaml
-用户根据实际使用需求进行修改，主要修改的内容包括：
-- Machine，每一个可用的机器配置一个Machine资源，修改IP、架构、ssh登录端口等
-- Secret，配置机器ssh登录所需的账号/密码
-- PV与PVC，通过共享数据卷将package包挂载到容器中
-- Infrastructure，集群的基础设施配置，包括package PVC、暴露端口、install安装包等等
-- Cluster，集群所需的master数量、worker数量、登录密钥、基础设施等信息
-
-eggops_cluster.yaml的详细配置可以参考docs/eggops.md文档
-
-### 准备packages压缩包
-
-用户准备离线安装包，步骤与eggo配置中准备packages压缩包的步骤一致，此处不再赘述。

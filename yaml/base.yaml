@@ -54,36 +54,6 @@ spec:
       type: "nfs"
 
 ---
-# machine1.yaml
-apiVersion: eggo.isula.org/v1
-kind: Machine
-metadata:
-  name: machine1-example
-  labels:
-    masterRole: allow
-    workerRole: allow
-spec:
-  hostname: machine1
-  arch: arm64
-  ip: 192.168.0.1
-  port: 22
-
----
-# machine2.yaml
-apiVersion: eggo.isula.org/v1
-kind: Machine
-metadata:
-  name: machine2-example
-  labels:
-    masterRole: allow
-    workerRole: allow
-spec:
-  hostname: machine1
-  arch: amd64
-  ip: 192.168.0.2
-  port: 22
-
----
 # infrastructure.yaml
 apiVersion: eggo.isula.org/v1
 kind: Infrastructure
@@ -119,26 +89,3 @@ spec:
       master:
       - name: calico.yaml
         type: yaml
-
----
-# cluster.yaml
-apiVersion: eggo.isula.org/v1
-kind: Cluster
-metadata:
-  name: cluster-example
-  namespace: eggo-system
-spec:
-  masterRequire:
-    number: 1
-    features: 
-      masterRole: allow
-  workerRequire:
-    number: 1
-    features:
-      workerRole: allow
-  machineLoginSecret:
-    name: secret-example
-  infrastructure:
-    name: infrastructure-example
-  # 启用kubelet serving证书
-  enableKubeletServing: true
