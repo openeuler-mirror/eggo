@@ -6,6 +6,7 @@
 cluster-id: k8s-cluster           // 集群名称
 username: root                    // 需要部署k8s集群的机器的ssh登录用户名，所有机器都需要使用同一个用户名
 password: 123456                  // 需要部署k8s集群的机器的ssh登录密码，所有机器都需要使用同一个密码
+private-key-path: ~/.ssh/pri.key  // ssh免密登录的密钥，可以替代password防止密码泄露
 masters:                          // 配置master节点的列表，建议每个master节点同时作为worker节点，否则master节点可以无法直接访问pod
 - name: test0                     // 该节点的名称，为k8s集群看到的该节点的名称
   ip: 192.168.0.1                 // 该节点的ip地址
@@ -13,7 +14,7 @@ masters:                          // 配置master节点的列表，建议每个m
   arch: arm64                     // 机器架构，x86_64的填amd64
 workers:                          // 配置worker节点的列表
 - name: test0                     // 该节点的名称，为k8s集群看到的该节点的名称
-  ip: 192.168.0.2                 // 该节点的ip地址
+  ip: 192.168.0.1                 // 该节点的ip地址
   port: 22                        // ssh登录的端口
   arch: arm64                     // 机器架构，x86_64的填amd64
 - name: test1
@@ -31,7 +32,7 @@ loadbalance:                      // 配置loadbalance节点
   port: 22                        // ssh登录的端口
   arch: amd64                     // 机器架构，x86_64的填amd64
   bind-port: 8443                 // 负载均衡服务监听的端口 
-external-ca: false                // 是否使用外部ca证书，该功能还未实现
+external-ca: false                // 是否使用外部ca证书
 external-ca-path: /opt/externalca // 外部ca证书文件的路径
 service:                          // k8s创建的service的配置
   cidr: 10.32.0.0/16              // k8s创建的service的IP地址网段

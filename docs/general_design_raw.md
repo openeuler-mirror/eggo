@@ -1,5 +1,61 @@
 # Eggo方案设计
 
+## 整体架构
+
+```mermaid
+flowchart LR
+	subgraph InitCluster
+		OO(eggops)
+		OA(master)
+		OB[worker1]
+		OC[worker...]
+		OD[workerN]
+		OA --- OB
+		OA --- OC
+		OA --- OD
+		OO -. run on .-> OB
+	end
+	subgraph GitOps
+		A[配置库]
+    	B[镜像仓库]
+    	C(Operator)
+    	C -->|监控| A
+    	C -->|监控| B
+	end
+	C -->|部署| OO
+	subgraph ClusterA
+		AA(节点1)
+		AB(节点2)
+		AC(节点N)
+	end
+	subgraph ClusterB
+		BA(节点1)
+		BB(节点2)
+		BC(节点N)
+	end
+	subgraph ClusterC
+		CA(节点1)
+		CB(节点2)
+		CC(节点N)
+	end
+	OB -. 点火 .-> ClusterA
+	OD -. 点火 .-> ClusterB
+	OD -. 点火 .-> ClusterC
+	classDef sameCls fill:#f9f,stroke:#333,stroke-width:1px;
+	classDef masterNode fill:#aef,stroke:#333,stroke-width:2px;
+	class CA,CB,CC,BA,BB,BC sameCls
+	class OAC,OO masterNode
+```
+
+组件说明：
+
+- GitOps：负责集群配置信息的管理，如更新、创建、删除等；
+- eggops：自定义CRD和controller用于抽象K8S集群，并且通过eggo管理集群生命周期；
+- InitCluster：元集群，eggops运行的K8S集群，作为中心集群管理其他业务集群；
+- master：K8S的master节点，承载集群的控制面；
+- worker：K8S的负载节点，承载用户业务；
+- Cluster A, B, C：业务集群，承载用户业务；
+
 ## 概要方案
 
 ```mermaid
