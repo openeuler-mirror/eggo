@@ -20,14 +20,16 @@ $ kubectl apply -f eggops.yaml
 
 - namespace.yaml
 
-创建`eggo-system` namespace，集群部署过程中用户创建的所有资源的namespace都设置为`eggo-system`
-
+创建`namespace`，后续的`secret`、`persistentvolume`、`persistentvolumeclaim`、`infrastructure`、`machine`、`cluster`均在该命名空间中创建，此处以`eggo-system` namespace为例。
+ 
 ```yaml
 apiVersion: v1
 kind: Namespace
 metadata:
   name: eggo-system
 ```
+
+> 用户可以跳过`namespace`的创建，并且在创建`secret`、`persistentvolume`等资源时不指定`namespace`字段，此时这些资源将会在默认命名空间`default`中创建。
 
 namespace参考资料：https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
 

@@ -115,6 +115,8 @@ type ClusterStatus struct {
 
 	MachineLoginSecretRef *v1.ObjectReference `json:"machineLoginSecretRef,omitempty"`
 
+	InfrastructureRef *v1.ObjectReference `json:"infrastructureRef,omitempty"`
+
 	PackagePersistentVolumeClaimRef *v1.ObjectReference `json:"packagePersistentVolumeClaimRef,omitempty"`
 
 	MachineBindingRef *v1.ObjectReference `json:"machineBindingRef,omitempty"`
