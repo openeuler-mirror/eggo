@@ -506,7 +506,7 @@ func fillAPIEndPoint(APIEndpoint *api.APIEndpoint, conf *DeployConfig) {
 	}
 
 	if host == "" || port == "" {
-		host, port = conf.LoadBalance.Ip, strconv.Itoa(conf.LoadBalance.Port)
+		host, port = conf.LoadBalance.Ip, strconv.Itoa(conf.LoadBalance.BindPort)
 	}
 	if (host == "" || port == "") && len(conf.Masters) != 0 {
 		host = conf.Masters[0].Ip
