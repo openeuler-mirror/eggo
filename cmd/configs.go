@@ -792,11 +792,6 @@ func createDeployConfigTemplate(file string) error {
 				},
 				"worker": {
 					{
-						Name: "docker.service",
-						Type: "file",
-						Dst:  "/usr/lib/systemd/system/",
-					},
-					{
 						Name:     "postjoin.sh",
 						Type:     "shell",
 						Schedule: string(api.SchedulePostJoin),
