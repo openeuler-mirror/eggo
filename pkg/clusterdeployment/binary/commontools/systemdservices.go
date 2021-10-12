@@ -20,7 +20,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
-	"isula.org/eggo/pkg/clusterdeployment/runtime"
+	"isula.org/eggo/pkg/utils"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/template"
 )
@@ -221,7 +221,7 @@ func SetupMasterServices(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.Host
 		return err
 	}
 
-	_, err := r.RunCommand("sudo systemctl start kube-apiserver kube-controller-manager kube-scheduler")
+	_, err := r.RunCommand("sudo systemctl restart kube-apiserver kube-controller-manager kube-scheduler")
 	if err != nil {
 		logrus.Errorf("start k8s master services failed: %v", err)
 	}
@@ -246,7 +246,7 @@ func SetupKubeletService(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.Host
 		"--cni-conf-dir":              ccfg.WorkerConfig.KubeletConf.CniConfDir,
 		"--pod-infra-container-image": ccfg.WorkerConfig.KubeletConf.PauseImage,
 	}
-	if !runtime.IsDocker(ccfg.WorkerConfig.ContainerEngineConf.Runtime) {
+	if !utils.IsDocker(ccfg.WorkerConfig.ContainerEngineConf.Runtime) {
 		configArgs["--container-runtime"] = "remote"
 		configArgs["--container-runtime-endpoint"] = ccfg.WorkerConfig.ContainerEngineConf.RuntimeEndpoint
 	}
@@ -349,7 +349,7 @@ func SetupWorkerServices(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.Host
 		return err
 	}
 
-	_, err := r.RunCommand("sudo -E /bin/sh -c \"systemctl start kubelet kube-proxy\"")
+	_, err := r.RunCommand("sudo -E /bin/sh -c \"systemctl restart kubelet kube-proxy\"")
 	if err != nil {
 		logrus.Errorf("start k8s worker services failed: %v", err)
 	}
@@ -366,6 +366,7 @@ Wants=network-online.target
 
 [Service]
 Type=forking
+ExecStartPre=setenforce 0
 ExecStartPre={{ .command }} -c /etc/kubernetes/kube-nginx.conf -t
 ExecStart={{ .command }} -c /etc/kubernetes/kube-nginx.conf
 ExecReload={{ .command }} -c /etc/kubernetes/kube-nginx.conf -s reload
@@ -401,7 +402,7 @@ WantedBy=multi-user.target
 	return nil
 }
 
-func GetSystemdServiceShell(name string, base64Data string, needStart bool) (string, error) {
+func GetSystemdServiceShell(name string, base64Data string, needRestart bool) (string, error) {
 	shell := `
 #!/bin/bash
 {{- if .content }}
@@ -424,8 +425,8 @@ systemctl enable {{ .name }}
 
 systemctl daemon-reload
 
-{{- if .start }}
-systemctl start {{ .name }}
+{{- if .restart }}
+systemctl restart {{ .name }}
 if [[ $? -ne 0 ]]; then
 	systemctl status {{ .name }} | tail -100
 	exit 1
@@ -440,8 +441,8 @@ exit 0
 		datastore["content"] = base64Data
 	}
 	datastore["name"] = name
-	if needStart {
-		datastore["start"] = true
+	if needRestart {
+		datastore["restart"] = true
 	}
 
 	return template.TemplateRender(shell, datastore)

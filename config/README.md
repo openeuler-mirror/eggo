@@ -1,4 +1,4 @@
-# 集群配置
+# eggo集群配置
 
 config目录存放了多个集群config模板，方便用户快速配置集群
 
@@ -8,6 +8,7 @@ config目录存放了多个集群config模板，方便用户快速配置集群
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | centos.config | CentOS7 | amd64 | 1 | 2 | No | docker | bin |
 | openEuler.config | openEuler 21.03 | arm64 | 1 | 2 | No | iSulad | repo + rpm |
+| all_online_install.config | openEuler21.09 | arm64 | 1 | 2 | No | iSulad | repo |
 
 ## 使用方法
 
@@ -18,7 +19,7 @@ config目录存放了多个集群config模板，方便用户快速配置集群
 - apiserver-endpoint,如果设置了loadbalance则为loadbalance的IP:bind-port，如果没有则为第一个master的IP:6443
 - 安装软件与压缩包 packages与packages-src
 
-config其他详细的配置请参见eggo操作手册
+config其他详细的配置请参见[配置说明](../docs/configuration_file_description.md)
 
 ### 准备packages压缩包
 
@@ -96,4 +97,3 @@ packages/packages-x86.tar.gz
 packages/packages-arm.tar.gz
 notes
 ```
-

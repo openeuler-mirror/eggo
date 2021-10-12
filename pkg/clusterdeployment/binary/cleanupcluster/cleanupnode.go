@@ -88,6 +88,13 @@ func getWorkerPathes(r runner.Runner, ccfg *api.ClusterConfig) []string {
 		"/usr/lib/systemd/system/kubelet.service",
 		"/usr/lib/systemd/system/kube-proxy.service",
 	}
+	runtime := runtime.GetRuntime(ccfg.WorkerConfig.ContainerEngineConf.Runtime)
+	if runtime != nil {
+		pathes = append(pathes, runtime.GetRemovedPath()...)
+	} else {
+		logrus.Errorf("invalid container engine %s", ccfg.WorkerConfig.ContainerEngineConf.Runtime)
+	}
+
 	if err := umountKubeletSubDirs(r, "/var/lib/kubelet"); err == nil {
 		pathes = append(pathes, "/var/lib/kubelet")
 	}

@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"strings"
 
 	"isula.org/eggo/pkg/api"
 )
@@ -91,4 +92,18 @@ func CheckPathExist(path string) (bool, error) {
 		return false, nil
 	}
 	return false, err
+}
+
+// container engine
+func IsISulad(engine string) bool {
+	return strings.ToLower(engine) == "isulad"
+}
+
+func IsDocker(engine string) bool {
+	// default container engine
+	return engine == "" || strings.ToLower(engine) == "docker"
+}
+
+func IsContainerd(engine string) bool {
+	return strings.ToLower(engine) == "containerd"
 }

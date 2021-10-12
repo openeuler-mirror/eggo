@@ -1,64 +1,26 @@
 # eggo
 
 ### Description
-The Eggo project was designed to automate deployment of K8S clusters in mass production environments, track deployment processes, and provide a high degree of flexibility. By combining GitOps management and deployment configuration tracking, cluster deployment is implemented in cloud native mode, enabling cluster management.
+The Eggo project was designed to automate the deployment of K8S clusters in mass production environments, track deployment processes, and provide a high degree of flexibility. By combining GitOps management and deployment configuration tracking, cluster deployment is implemented in cloud native mode, enabling cluster management.
 
+- Support multi-release version of Linux: such as openEuler/CentOS/Ubuntu；
+- Support multi-architecture (amd64/arm64) deployment: a cluster supports nodes of multiple architectures;
 - Support for multiple deployments: binary and KUbeadm (to be implemented);
-- Supports multi-architecture deployment: a cluster supports nodes of multiple architectures;
-- Supports offline and online deployment;
+- Support offline and online deployment;
+
+Currently, eggo implements the deployment using the command. The following are three deployment modes that are supported by eggo:
+
+
+- Online deployment. Only need to write the `yaml` configuration file for the deployment. The required rpm package/binary file/plug-in/docker image are downloaded during the installation and deployment phase according to the internet. Online deployment Currently, plug-ins cannot be downloaded and installed online. Plug-ins will be deployed online in the future. Details see [eggo operation manual](/docs/manual.md).
+- Offline deployment. Package all rpm packages/binary files/plug-in/docker images into a `tar.gz` file in a certain format. Then write the corresponding `yaml` configuration file (details see [eggo operation manual](/docs/manual.md)), the cluster will be deployed by executing commands.  
+- Using cluster deploy new cluster by Gitops (to be implemented).
 
 ### Software Architecture
-[Software architecture description](./docs/design.md)
+detailed [Software architecture description](./docs/general_design.md)
 
-### Build and install
+### Detailed usage
+detailed [eggo operation manual](https://docs.openeuler.org/zh/docs/21.09/docs/Kubernetes/eggo%E8%87%AA%E5%8A%A8%E5%8C%96%E9%83%A8%E7%BD%B2.html)
 
-```bash
-# enable go mod
-$ export GO111MODULE=on
-# set goproxy
-$ go env -w GOPROXY=https://goproxy.cn,direct
-# download dependences
-$ go mod tidy
-# compile
-$ make
-# use vendor to compile, must download dependences go library at first
-$ go mod vendor
-$ make local
-# install
-$ make install
-```
-
-### Unit test
-
-```bash
-$ make test
-```
-
-### Usages
-
-```bash
-# generate default template for cluster
-$ eggo template -f test.yaml
-# use special master ips to generate template
-$ eggo template  --masters=192.168.0.1  --masters=192.168.0.2 -f test.yaml
-# current support arguments for subcommand template
-$ ./eggo template --help
-      --etcds stringArray          set etcd node ips
-  -l, --loadbalancer stringArray   set loadbalancer node (default [192.168.0.1])
-      --masters stringArray        set master ips (default [192.168.0.2])
-  -n, --name string                set cluster name (default "k8s-cluster")
-      --nodes stringArray          set worker ips (default [192.168.0.3,192.168.0.4])
-  -p, --password string            password to login all node (default "123456")
-  -u, --user string                user to login all node (default "root")
-
-# use generated config to deploy cluster
-$ eggo deploy -f test.yaml
-
-# use generated config to cleanup cluster
-$ eggo cleanup -f test.yaml
-```
-
-see https://gitee.com/openeuler/eggo/blob/master/docs/manual.md for detail usage.
 
 ### Releases
 

@@ -177,6 +177,7 @@ func getDefaultClusterdeploymentConfig() *api.ClusterConfig {
 			ContainerEngineConf: &api.ContainerEngine{
 				RegistryMirrors:    []string{},
 				InsecureRegistries: []string{},
+				ExtraArgs:          make(map[string]string),
 			},
 		},
 		PackageSrc: api.PackageSrcConfig{},
@@ -505,7 +506,7 @@ func fillAPIEndPoint(APIEndpoint *api.APIEndpoint, conf *DeployConfig) {
 	}
 
 	if host == "" || port == "" {
-		host, port = conf.LoadBalance.Ip, strconv.Itoa(conf.LoadBalance.Port)
+		host, port = conf.LoadBalance.Ip, strconv.Itoa(conf.LoadBalance.BindPort)
 	}
 	if (host == "" || port == "") && len(conf.Masters) != 0 {
 		host = conf.Masters[0].Ip
@@ -541,6 +542,8 @@ func fillExtrArgs(ccfg *api.ClusterConfig, eargs []*ConfigExtraArgs) {
 			api.WithKubeProxyExtrArgs(ea.ExtraArgs)(ccfg)
 		case "kubelet":
 			api.WithKubeletExtrArgs(ea.ExtraArgs)(ccfg)
+		case "container-engine":
+			api.WithContainerEngineExtrArgs(ea.ExtraArgs)(ccfg)
 		default:
 			logrus.Warnf("unknow extra args key: %s", ea.Name)
 		}
