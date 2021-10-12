@@ -133,9 +133,6 @@ install:                                      // 配置各种类型节点上需�
       type: yaml
       dst: ""
     worker:
-    - name: docker.service
-      type: file
-      dst: /usr/lib/systemd/system/
     - name: postjoin.sh
       type: shell                             // shell脚本
       schedule: "postjoin"                    // 执行时间worker节点加入集群后
