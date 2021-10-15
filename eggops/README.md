@@ -64,6 +64,13 @@ $ make undeploy
 
 详细的用法见 https://gitee.com/openeuler/eggo/blob/master/docs/eggops.md
 
+### 开发注意事项
+
+1. 每次eggops修改完成之后，需要更新仓库eggops.yaml文件，更新方法`cd eggops && make yaml IMG=<registry>/<project-name>:<tag> && cp eggops.yaml ../`
+2. 使用eggops.yaml部署eggops-controller，默认情况下，关闭`eggops-controller leader-elect`能力，恢复可修改文件`eggops/config/manager/manager.yaml`
+3. 使用eggops.yaml部署eggops-controller，默认情况下，关闭`kube-rbac-proxy`组件，恢复可修改文件`eggops/config/default/kustomization.yaml`
+4. 每次eggops修改完成之后，需要更新eggops镜像，更新方法` make docker-build docker-push ARCH=<arch> IMG=hub.oepkgs.net/haozi007/eggops-amd64:<tag>`
+
 ### 常见问题
 
 1. 直接运行时，eggops会监听当前机器的8080端口。如果当前机器开启了coredns服务，则可能8080端口已被其占用，`make run ENABLE_WEBHOOKS=false`失败。  
@@ -75,4 +82,4 @@ $ make undeploy
 
 4. 开发过程中，如果重新build以及push `controller`镜像，但镜像name:tag未改变，则在部署控制器到集群时，需要在worker节点上`rmi`旧的镜像，保证部署时重新拉取`controller`镜像。
 
-5. 在默认情况下，`kubebuilder`部署`controller`时，同时会部署一个`gcr.io/kubebuilder/kube-rbac-proxy`容器。k8s集群中Pod可以向集群中的任何Pod发送request，而该容器可以通过RBAC认证或者TLS证书来严格控制外部请求访问Pod。这是一个可选的组件，eggops controller默认将其关闭，通过在eggops/config/default/kustomization.yaml文件中添加`- manager_auth_proxy_patch.yaml`，可以将该组件开启。
+5. `kubebuilder`部署`controller`时，同时会部署一个`gcr.io/kubebuilder/kube-rbac-proxy`容器。k8s集群中Pod可以向集群中的任何Pod发送request，而该容器可以通过RBAC认证或者TLS证书来严格控制外部请求访问Pod。这是一个可选的组件，eggops controller默认将其关闭，通过在eggops/config/default/kustomization.yaml文件中添加`- manager_auth_proxy_patch.yaml`，可以将该组件开启。
