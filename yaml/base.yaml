@@ -62,7 +62,7 @@ metadata:
   namespace: eggo-system
 spec:
   # 用于将package包挂载到容器中，部署集群时使用
-  packagePersistentVolumeClain:
+  packagePersistentVolumeClaim:
     name: nfs-pvc-example
   # 暴露端口
   open-ports:
