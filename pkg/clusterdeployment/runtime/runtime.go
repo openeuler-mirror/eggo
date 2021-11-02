@@ -177,7 +177,7 @@ Type=notify
 EnvironmentFile=-/etc/sysconfig/docker
 ExecStart=/usr/bin/dockerd \
 {{- range $i, $v := .registry }}
-        --registry-mirrors {{ $v }} \
+        --registry-mirror {{ $v }} \
 {{- end }}
 {{- range $i, $v := .insecure }}
         --insecure-registry {{ $v }} \
