@@ -25,6 +25,47 @@ import (
 	"isula.org/eggo/pkg/utils"
 )
 
+func removeFailedNodes(cstatus *api.ClusterStatus, conf *DeployConfig) {
+	// if partial success, just update config of cluster, remove failed nodes
+	if cstatus.FailureCnt == 0 {
+		return
+	}
+
+	var tmp []*HostConfig
+	for _, n := range conf.Masters {
+		if success, ok := cstatus.StatusOfNodes[n.Ip]; ok && !success {
+			continue
+		}
+		tmp = append(tmp, n)
+	}
+	conf.Masters = tmp
+
+	tmp = nil
+	for _, n := range conf.Workers {
+		if success, ok := cstatus.StatusOfNodes[n.Ip]; ok && !success {
+			continue
+		}
+		tmp = append(tmp, n)
+	}
+	conf.Workers = tmp
+
+	tmp = nil
+	for _, n := range conf.Etcds {
+		if success, ok := cstatus.StatusOfNodes[n.Ip]; ok && !success {
+			continue
+		}
+		tmp = append(tmp, n)
+	}
+	conf.Etcds = tmp
+
+	if err := saveDeployConfig(conf, savedDeployConfigPath(conf.ClusterID)); err != nil {
+		fmt.Printf("Warn: failed to save config!!!\n")
+		fmt.Printf("	you can call \"eggo delete --id %s [failed nodes id]\" to remove failed node from your cluster.\n", conf.ClusterID)
+		return
+	}
+	fmt.Printf("update config of cluster: %s", conf.ClusterID)
+}
+
 func deploy(conf *DeployConfig) error {
 	if err := saveDeployConfig(conf, savedDeployConfigPath(conf.ClusterID)); err != nil {
 		return fmt.Errorf("save deploy config failed: %v", err)
@@ -32,47 +73,18 @@ func deploy(conf *DeployConfig) error {
 
 	ccfg := toClusterdeploymentConfig(conf)
 
-	cstatus, err := clusterdeployment.CreateCluster(ccfg)
+	cstatus, err := clusterdeployment.CreateCluster(ccfg, opts.deployEnableRollback)
 	if err != nil {
 		return err
 	}
 
-	if cstatus.FailureCnt > 0 {
-		// if partial success, just update config of cluster, remove failed nodes
-		var tmp []*HostConfig
-		for _, n := range conf.Masters {
-			if success, ok := cstatus.StatusOfNodes[n.Ip]; ok && !success {
-				continue
-			}
-			tmp = append(tmp, n)
+	// if disable rollback, just ignore error, and wait user to cleanup
+	if opts.deployEnableRollback {
+		removeFailedNodes(&cstatus, conf)
+	} else {
+		if cstatus.FailureCnt > 0 {
+			fmt.Printf("Warn: you can call \"eggo delete --id %s [failed nodes id]\" to remove failed node from your cluster.\n", conf.ClusterID)
 		}
-		conf.Masters = tmp
-
-		tmp = nil
-		for _, n := range conf.Workers {
-			if success, ok := cstatus.StatusOfNodes[n.Ip]; ok && !success {
-				continue
-			}
-			tmp = append(tmp, n)
-		}
-		conf.Workers = tmp
-
-		tmp = nil
-		for _, n := range conf.Etcds {
-			if success, ok := cstatus.StatusOfNodes[n.Ip]; ok && !success {
-				continue
-			}
-			tmp = append(tmp, n)
-		}
-		conf.Etcds = tmp
-
-		err = saveDeployConfig(conf, savedDeployConfigPath(conf.ClusterID))
-		if err != nil {
-			fmt.Printf("")
-			clusterdeployment.RemoveCluster(ccfg)
-			return fmt.Errorf("update config of cluster failed: %v", err)
-		}
-		fmt.Printf("update config of cluster: %s", conf.ClusterID)
 	}
 
 	fmt.Print(cstatus.Show())

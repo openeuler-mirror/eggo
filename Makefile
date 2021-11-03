@@ -2,9 +2,11 @@ GIT_COMMIT ?= $(if $(shell git rev-parse --short HEAD),$(shell git rev-parse --s
 SOURCE_DATE_EPOCH ?= $(if $(shell date +%s),$(shell date +%s),$(error "date failed"))
 VERSION := $(shell cat ./VERSION)
 # eggo arch amd64/arm64
-ARCH ?= amd64
-ifeq ($(shell uname -p),aarch64)
-ARCH ?= arm64
+ifndef ARCH
+ARCH = amd64
+ifeq ($(shell uname -p), aarch64)
+ARCH = arm64
+endif
 endif
 
 EXTRALDFLAGS :=
@@ -21,7 +23,7 @@ GO_BUILD := CGO_ENABLED=0 GOARCH=$(ARCH) $(GO)
 
 .PHONY: eggo
 eggo:
-	@echo "build eggo starting..."
+	@echo "build eggo of $(ARCH) starting..."
 	@$(GO_BUILD) build -ldflags '$(LDFLAGS) $(STATIC_LDFLAGS)' -o bin/eggo .
 	@echo "build eggo done!"
 local:
