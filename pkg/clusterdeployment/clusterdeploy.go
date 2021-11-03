@@ -225,7 +225,7 @@ func rollbackFailedNoeds(handler api.ClusterDeploymentAPI, nodes []*api.HostConf
 	}
 }
 
-func CreateCluster(cc *api.ClusterConfig) (api.ClusterStatus, error) {
+func CreateCluster(cc *api.ClusterConfig, deployEnableRollback bool) (api.ClusterStatus, error) {
 	cstatus := api.ClusterStatus{
 		StatusOfNodes: make(map[string]bool),
 	}
@@ -262,7 +262,9 @@ func CreateCluster(cc *api.ClusterConfig) (api.ClusterStatus, error) {
 		return cstatus, err
 	}
 	// rollback failed nodes
-	rollbackFailedNoeds(handler, failedNodes)
+	if deployEnableRollback {
+		rollbackFailedNoeds(handler, failedNodes)
+	}
 	// update status of cluster
 	if failedNodes != nil {
 		var failureIDs []string
