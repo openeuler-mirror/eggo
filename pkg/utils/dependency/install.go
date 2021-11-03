@@ -125,23 +125,26 @@ func installFD(r runner.Runner, bin, file, dir []*api.PackageConfig, hcf *api.Ho
 	dp := []dependency{}
 
 	if len(bin) != 0 {
-		dp = append(dp, &dependencyFD{
-			srcPath:  path.Join(packagePath, constants.DefaultBinPath),
-			software: bin,
+		dp = append(dp, &dependencyFileDir{
+			srcPath:    path.Join(packagePath, constants.DefaultBinPath),
+			software:   bin,
+			executable: true,
 		})
 	}
 
 	if len(file) != 0 {
-		dp = append(dp, &dependencyFD{
-			srcPath:  path.Join(packagePath, constants.DefaultFilePath),
-			software: file,
+		dp = append(dp, &dependencyFileDir{
+			srcPath:    path.Join(packagePath, constants.DefaultFilePath),
+			software:   file,
+			executable: false,
 		})
 	}
 
 	if len(dir) != 0 {
-		dp = append(dp, &dependencyFD{
-			srcPath:  path.Join(packagePath, constants.DefaultDirPath),
-			software: dir,
+		dp = append(dp, &dependencyFileDir{
+			srcPath:    path.Join(packagePath, constants.DefaultDirPath),
+			software:   dir,
+			executable: false,
 		})
 	}
 
@@ -233,19 +236,19 @@ func uninstallFD(r runner.Runner, bin, file, dir []*api.PackageConfig, hcf *api.
 	dp := []dependency{}
 
 	if len(bin) != 0 {
-		dp = append(dp, &dependencyFD{
+		dp = append(dp, &dependencyFileDir{
 			software: bin,
 		})
 	}
 
 	if len(file) != 0 {
-		dp = append(dp, &dependencyFD{
+		dp = append(dp, &dependencyFileDir{
 			software: file,
 		})
 	}
 
 	if len(dir) != 0 {
-		dp = append(dp, &dependencyFD{
+		dp = append(dp, &dependencyFileDir{
 			software: dir,
 		})
 	}
