@@ -43,7 +43,7 @@ func PostCleanup(r runner.Runner) {
 
 func stopServices(r runner.Runner, services []string) error {
 	join := strings.Join(services, " ")
-	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"systemctl stop %s\"", join)); err != nil {
+	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"systemctl stop %s && systemctl disable %s\"", join, join)); err != nil {
 		logrus.Errorf("stop services failed: %v", err)
 		return err
 	}

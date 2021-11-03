@@ -1626,7 +1626,7 @@ spec:
       containers:
       - command:
         - /manager
-        image: hub.oepkgs.net/haozi007/eggops:v1.0.0-alpha
+        image: hub.oepkgs.net/haozi007/eggops:1.0.0-alpha
         livenessProbe:
           httpGet:
             path: /healthz
