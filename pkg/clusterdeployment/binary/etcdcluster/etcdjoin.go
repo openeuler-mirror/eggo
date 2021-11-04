@@ -48,7 +48,7 @@ func AddMember(conf *api.ClusterConfig, hostconfig *api.HostConfig) error {
 		return fmt.Errorf("run task on nodes failed: %v", err)
 	}
 
-	if err := nodemanager.WaitNodesFinish([]string{hostconfig.Address}, time.Minute); err != nil {
+	if err := nodemanager.WaitNodesFinish([]string{hostconfig.Address}, 5*time.Minute); err != nil {
 		return fmt.Errorf("wait for post deploy etcds task finish failed: %v", err)
 	}
 
