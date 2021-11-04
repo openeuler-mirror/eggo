@@ -82,7 +82,7 @@ $ tree /data
 
 1 directory, 2 files
 
-# 安装 nfs 与 rpc 相关软件包：
+# 在nfs server机器上安装 nfs 与 rpc 相关软件包：
 $ yum install nfs-utils rpcbind -y
 
 # NFS默认的配置文件是 /etc/exports，修改配置文件
@@ -97,6 +97,9 @@ $ firewall-cmd --permanent --add-service=nfs
 success   
 $ firewall-cmd  --reload 
 success
+
+# 在所有的worker节点上安装nfs-utils，详情见常见问题1
+$ yum install nfs-utils -y
 
 # 查看NFS分享的资源
 $ showmount -e <nfs ip>
@@ -214,6 +217,7 @@ apiVersion: eggo.isula.org/v1
 kind: Machine
 metadata:
   name: machine1-example
+  namespace: eggo-system
   labels:
     masterRole: allow
     workerRole: allow
@@ -376,3 +380,15 @@ kubectl delete -f cluster.yaml --wait=false
 $ export KUBECONFIG=/etc/kubernetes/admin.conf
 $ kubectl delete -f eggops.yaml
 ```
+
+### 常见问题
+
+1. pod一直ContainerCreating
+
+创建cluster时，发现cluster-example-create-job的pod一直处于ContainerCreating状态，describe该pod状态，发现报错
+```
+Mounting arguments: -t nfs -o ro 192.168.223.236:/data /var/lib/kubelet/pods/8becdc2f-a31a-4cab-8a3b-2f3e705cac92/volumes/kubernetes.io~nfs/nfs-pv-example
+Output: mount: /var/lib/kubelet/pods/8becdc2f-a31a-4cab-8a3b-2f3e705cac92/volumes/kubernetes.io~nfs/nfs-pv-example: bad option; for several filesystems (e.g. nfs, cifs) you might need a /sbin/mount.<type> helper program.
+```
+
+原因是因为pod所在的host机器上没有nfs-utils软件包，将该软件包在pod所在的宿主机上安装即可解决此问题

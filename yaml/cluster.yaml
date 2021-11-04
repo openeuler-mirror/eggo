@@ -18,3 +18,4 @@ spec:
     name: infrastructure-example
   # 启用kubelet serving证书
   enableKubeletServing: true
+  eggoImageVersion: "hub.oepkgs.net/haozi007/eggo:1.0.0-alpha"
