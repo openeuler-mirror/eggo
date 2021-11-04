@@ -126,6 +126,12 @@ func checkHostconfig(h *HostConfig) error {
 	if h == nil {
 		return fmt.Errorf("empty hostconfig")
 	}
+	if h.Name == "" {
+		return fmt.Errorf("empty host name")
+	}
+	if errs := validation.IsDNS1123Subdomain(h.Name); len(errs) > 0 {
+		return fmt.Errorf("invalid host name: %v", errs)
+	}
 	if h.Ip == "" {
 		return fmt.Errorf("host: %s ip is null", h.Name)
 	}

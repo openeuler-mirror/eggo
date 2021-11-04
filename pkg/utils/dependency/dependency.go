@@ -143,15 +143,23 @@ func (dd *dependencyDeb) Remove(r runner.Runner) error {
 }
 
 // install file and dir
-type dependencyFD struct {
-	srcPath  string
-	software []*api.PackageConfig
+type dependencyFileDir struct {
+	executable bool
+	srcPath    string
+	software   []*api.PackageConfig
 }
 
-func (df *dependencyFD) Install(r runner.Runner) error {
+func (df *dependencyFileDir) Install(r runner.Runner) error {
 	shell := `
 #!/bin/bash
 cd {{ .srcPath }}
+
+{{- if .executable }}
+{{- range $i, $v := .software }}
+chmod +x {{ $v.Name }}
+{{- end }}
+{{- end }}
+
 {{- range $i, $v := .software }}
 if [ ! -e {{ JoinPath $v.Dst $v.Name }} ]; then
     mkdir -p {{ $v.Dst }} && cp -r {{ $v.Name }} {{ $v.Dst }}
@@ -161,6 +169,7 @@ fi
 	datastore := make(map[string]interface{})
 	datastore["srcPath"] = df.srcPath
 	datastore["software"] = df.software
+	datastore["executable"] = df.executable
 
 	shellStr, err := template.TemplateRender(shell, datastore)
 	if err != nil {
@@ -175,7 +184,7 @@ fi
 	return nil
 }
 
-func (df *dependencyFD) Remove(r runner.Runner) error {
+func (df *dependencyFileDir) Remove(r runner.Runner) error {
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	for _, s := range df.software {
