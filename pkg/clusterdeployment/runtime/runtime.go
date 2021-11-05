@@ -425,6 +425,11 @@ func (ct *DeployRuntimeTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 		return err
 	}
 
+	if _, err := r.RunCommand("sudo -E /bin/sh -c \"rm -rf /etc/docker/daemon.json\""); err != nil {
+		logrus.Errorf("rm docker daemon.json failed: %v", err)
+		return err
+	}
+
 	if err := ct.runtime.PrepareRuntimeService(r, ct.workerConfig); err != nil {
 		logrus.Errorf("prepare container engine service failed: %v", err)
 		return err
