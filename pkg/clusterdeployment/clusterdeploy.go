@@ -191,7 +191,7 @@ func doCreateCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, cs
 	approveServingCsr(cc, append(joinedNodes, controlPlaneNode))
 
 	// Step9: run postcreate cluster hooks
-	if err = handler.PostCreateClusterHooks(joinedNodes); err != nil {
+	if err = handler.PostCreateClusterHooks(cc.Nodes); err != nil {
 		return nil, err
 	}
 

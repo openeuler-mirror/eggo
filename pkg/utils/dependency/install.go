@@ -354,6 +354,7 @@ func ExecuteShell(roleInfra *api.RoleInfra, packagePath string, hcf *api.HostCon
 	if len(shell) == 0 {
 		return nil
 	}
+	logrus.Debugf("run %s shell %v on %v\n", string(schedule), shell, hcf.Address)
 
 	dp := &dependencyShell{
 		srcPath: path.Join(packagePath, constants.DefaultFilePath),
