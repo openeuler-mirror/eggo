@@ -179,7 +179,8 @@ func prepareUserTempDir(conn ssh.Connection, host *kkv1alpha1.HostCfg) error {
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	sb.WriteString(fmt.Sprintf("mkdir -p %s", dir))
-	sb.WriteString(fmt.Sprintf(" && chown -R %s:%s %s", host.User, host.User, dir))
+	// chown .eggo dir
+	sb.WriteString(fmt.Sprintf(" && chown -R %s:%s %s", host.User, host.User, filepath.Dir(dir)))
 	sb.WriteString("\"")
 	_, err := conn.Exec(sb.String(), host)
 	if err != nil {
