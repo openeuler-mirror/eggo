@@ -236,3 +236,9 @@ $ eggo -d delete --id k8s-cluster 192.168.0.5 192.168.0.6
 * --id集群的id
 * --type可以为master或者worker，默认worker
 * 192.168.0.5 需要删除的机器的IP地址列表或者名称列表，注意第1个master节点不能删除
+
+## 规范说明
+
+### hook规范
+
+详情见[hooks spec](./hooks_of_eggo.md)
