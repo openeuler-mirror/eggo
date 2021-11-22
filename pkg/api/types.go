@@ -35,6 +35,37 @@ const (
 	SchedulePostCleanup ScheduleType = "postcleanup"
 )
 
+type HookOperator string
+
+const (
+	HookOpDeploy  HookOperator = "deploy"
+	HookOpCleanup HookOperator = "cleanup"
+	HookOpJoin    HookOperator = "join"
+	HookOpDelete  HookOperator = "delete"
+)
+
+type HookType string
+
+const (
+	PreHookType  HookType = "prehook"
+	PostHookType HookType = "posthook"
+)
+
+type HookRunConfig struct {
+	ClusterID          string
+	ClusterApiEndpoint string
+	ClusterConfigDir   string
+
+	HookType HookType
+	Operator HookOperator
+
+	Node      *HostConfig
+	Scheduler ScheduleType
+
+	HookDir string
+	Hooks   []*PackageConfig
+}
+
 type RoleInfra struct {
 	OpenPorts []*OpenPorts     `json:"open-ports"`
 	Softwares []*PackageConfig `json:"softwares"`
@@ -201,6 +232,14 @@ type AddonConfig struct {
 	Filename string `json:"filename"`
 }
 
+type ClusterHookConf struct {
+	Type      HookType
+	Operator  HookOperator
+	Target    uint16
+	HookDir   string
+	HookFiles []string
+}
+
 type ClusterConfig struct {
 	Name            string                  `json:"name"`
 	DeployDriver    string                  `json:"deploy-driver"` // default is binary
@@ -217,6 +256,9 @@ type ClusterConfig struct {
 	LoadBalancer    LoadBalancer            `json:"loadBalancer"`
 	WorkerConfig    WorkerConfig            `json:"workerconfig"`
 	RoleInfra       map[uint16]*RoleInfra   `json:"role-infra"`
+
+	// do not encode hooks, just set before use it
+	HooksConf *ClusterHookConf `json:"-"`
 
 	// TODO: add other configurations at here
 }

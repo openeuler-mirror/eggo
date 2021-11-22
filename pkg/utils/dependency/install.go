@@ -349,31 +349,75 @@ func getShell(roleInfra *api.RoleInfra, schedule api.ScheduleType) []*api.Packag
 	return shell
 }
 
-func ExecuteShell(roleInfra *api.RoleInfra, packagePath string, hcf *api.HostConfig, schedule api.ScheduleType) error {
-	shell := getShell(roleInfra, schedule)
-	if len(shell) == 0 {
+func ExecuteHooks(hookConf *api.HookRunConfig) error {
+	if hookConf == nil || len(hookConf.Hooks) == 0 {
 		return nil
 	}
-	logrus.Debugf("run %s shell %v on %v\n", string(schedule), shell, hcf.Address)
+
+	var hookStr []string
+	for _, h := range hookConf.Hooks {
+		hookStr = append(hookStr, h.Name)
+	}
+	logrus.Debugf("run %s shell %v on %v\n", string(hookConf.Scheduler), hookStr, hookConf.Node.Address)
 
 	dp := &dependencyShell{
-		srcPath: path.Join(packagePath, constants.DefaultFilePath),
-		shell:   shell,
+		srcPath: hookConf.HookDir,
+		shell:   hookConf.Hooks,
 	}
+	envs := make([]string, 9)
+	envs[0] = fmt.Sprintf("EGGO_CLUSTER_ID=%s", hookConf.ClusterID)
+	envs[1] = fmt.Sprintf("EGGO_CLUSTER_API_ENDPOINT=%s", hookConf.ClusterApiEndpoint)
+	envs[2] = fmt.Sprintf("EGGO_CLUSTER_CONFIG_DIR=%s", hookConf.ClusterConfigDir)
+	envs[3] = fmt.Sprintf("EGGO_NODE_IP=%s", hookConf.Node.Address)
+	envs[4] = fmt.Sprintf("EGGO_NODE_NAME=%s", hookConf.Node.Name)
+	envs[5] = fmt.Sprintf("EGGO_NODE_ARCH=%s", hookConf.Node.Arch)
+	envs[6] = fmt.Sprintf("EGGO_NODE_ROLE=%s", strings.Join(api.GetRoleString(hookConf.Node.Type), ","))
+	envs[7] = fmt.Sprintf("EGGO_HOOK_TYPE=%s", hookConf.HookType)
+	envs[8] = fmt.Sprintf("EGGO_OPERATOR=%s", hookConf.Operator)
+	dp.envs = envs
 
 	dependencyTask := task.NewTaskInstance(&DependencyTask{
 		dp: dp,
 	})
 
-	if api.IsCleanupSchedule(schedule) {
+	if api.IsCleanupSchedule(hookConf.Scheduler) {
 		task.SetIgnoreErrorFlag(dependencyTask)
 	}
-	if err := nodemanager.RunTaskOnNodes(dependencyTask, []string{hcf.Address}); err != nil {
-		logrus.Errorf("Hook %s failed for %s: %v", string(api.SchedulePreJoin), hcf.Address, err)
+	if err := nodemanager.RunTaskOnNodes(dependencyTask, []string{hookConf.Node.Address}); err != nil {
+		logrus.Errorf("Hook %s failed for %s: %v", string(api.SchedulePreJoin), hookConf.Node.Address, err)
 		return err
 	}
 
 	return nil
+}
+
+func executeShell(ccfg *api.ClusterConfig, role uint16, hcf *api.HostConfig, schedule api.ScheduleType) error {
+	shell := getShell(ccfg.RoleInfra[role], schedule)
+	if len(shell) == 0 {
+		return nil
+	}
+
+	htype := api.PreHookType
+	if strings.HasPrefix(string(schedule), "post") {
+		htype = api.PostHookType
+	}
+	oper := api.HookOpJoin
+	if strings.HasSuffix(string(schedule), "cleanup") {
+		oper = api.HookOpCleanup
+	}
+
+	hookConf := &api.HookRunConfig{
+		ClusterID:          ccfg.Name,
+		ClusterApiEndpoint: ccfg.APIEndpoint.GetUrl(),
+		ClusterConfigDir:   ccfg.ConfigDir,
+		HookType:           htype,
+		Operator:           oper,
+		Node:               hcf,
+		HookDir:            path.Join(ccfg.PackageSrc.GetPkgDstPath(), constants.DefaultFilePath),
+		Hooks:              shell,
+	}
+
+	return ExecuteHooks(hookConf)
 }
 
 func HookSchedule(ccfg *api.ClusterConfig, nodes []*api.HostConfig, role []uint16, schedule api.ScheduleType) error {
@@ -383,7 +427,7 @@ func HookSchedule(ccfg *api.ClusterConfig, nodes []*api.HostConfig, role []uint1
 				continue
 			}
 
-			if err := ExecuteShell(ccfg.RoleInfra[r], ccfg.PackageSrc.GetPkgDstPath(), n, schedule); err != nil {
+			if err := executeShell(ccfg, r, n, schedule); err != nil {
 				if api.IsCleanupSchedule(schedule) {
 					logrus.Errorf("execute shell failed for %s at %s: %v", n.Address, string(schedule), err)
 				} else {

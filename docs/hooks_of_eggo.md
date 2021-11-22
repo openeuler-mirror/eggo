@@ -22,6 +22,7 @@
 
 - 脚本目录下的所有脚本都会被执行，而子目录中的脚本不会被执行；
 - 每个脚本的超时时间为60s；
+- role可以为master,worker,etcd或者loadbalance；
 
 ### 配置文件参数方式
 
@@ -60,4 +61,3 @@ eggo会在hook执行时，通过环境变量传递部分信息，用于脚本执
 | EGGO_NODE_ROLE            | hook执行的节点角色                          |
 | EGGO_HOOK_TYPE            | hook的类型，prehook或者posthook             |
 | EGGO_OPERATOR             | 当前的操作，deploy，cleanup，join，delete。 |
-
