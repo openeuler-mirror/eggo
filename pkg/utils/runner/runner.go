@@ -30,7 +30,6 @@ import (
 	"github.com/kubesphere/kubekey/pkg/util/ssh"
 	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
-	"isula.org/eggo/pkg/constants"
 )
 
 const (
@@ -164,7 +163,7 @@ func (ssh *SSHRunner) Reconnect() error {
 func clearUserTempDir(conn ssh.Connection, host *kkv1alpha1.HostCfg) {
 	tmpShell := "/tmp/" + RunnerShellPrefix + "*"
 	// scp to tmp file
-	dir := getCopyDefaultDir(host.User)
+	dir := api.GetUserTempDir(host.User)
 	_, err := conn.Exec(fmt.Sprintf("sudo -E /bin/sh -c \"rm -rf %s; rm -rf %s\"", dir, tmpShell), host)
 	if err != nil {
 		logrus.Warnf("[%s] remove temp dir: %s failed: %v", host.Name, dir, err)
@@ -175,11 +174,12 @@ func clearUserTempDir(conn ssh.Connection, host *kkv1alpha1.HostCfg) {
 
 func prepareUserTempDir(conn ssh.Connection, host *kkv1alpha1.HostCfg) error {
 	// scp to tmp file
-	dir := getCopyDefaultDir(host.User)
+	dir := api.GetUserTempDir(host.User)
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	sb.WriteString(fmt.Sprintf("mkdir -p %s", dir))
-	sb.WriteString(fmt.Sprintf(" && chown -R %s:%s %s", host.User, host.User, dir))
+	// chown .eggo dir
+	sb.WriteString(fmt.Sprintf(" && chown -R %s:%s %s", host.User, host.User, filepath.Dir(dir)))
 	sb.WriteString("\"")
 	_, err := conn.Exec(sb.String(), host)
 	if err != nil {
@@ -190,18 +190,11 @@ func prepareUserTempDir(conn ssh.Connection, host *kkv1alpha1.HostCfg) error {
 	return nil
 }
 
-func getCopyDefaultDir(user string) string {
-	if user == "root" {
-		return constants.DefaultRootCopyTempDirHome + "/temp"
-	}
-	return fmt.Sprintf(constants.DefaultUserCopyTempHomeFormat, user) + "/temp"
-}
-
 func (ssh *SSHRunner) copyFile(src, dst string) error {
 	if ssh.Conn == nil {
 		return fmt.Errorf("[%s] SSH runner is not connected", ssh.Host.Name)
 	}
-	tempDir := getCopyDefaultDir(ssh.Host.User)
+	tempDir := api.GetUserTempDir(ssh.Host.User)
 	// scp to tmp file
 	tempCpyFile := filepath.Join(tempDir, filepath.Base(src))
 	err := ssh.Conn.Scp(src, tempCpyFile)
@@ -247,7 +240,7 @@ func (ssh *SSHRunner) copyDir(srcDir, dstDir string) error {
 		logrus.Errorf("[%s] create cert tmp tar failed: %v", ssh.Host.Name, err)
 		return err
 	}
-	tmpCpyDir := getCopyDefaultDir(ssh.Host.User)
+	tmpCpyDir := api.GetUserTempDir(ssh.Host.User)
 	tmpPkiFile := filepath.Join(tmpCpyDir, "pkg.tar")
 	// scp to user home directory
 	err = ssh.Copy(tmpPkgFile, tmpPkiFile)

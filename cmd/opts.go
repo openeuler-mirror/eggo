@@ -24,24 +24,25 @@ import (
 )
 
 type eggoOptions struct {
-	name             string
-	templateConfig   string
-	masters          []string
-	nodes            []string
-	etcds            []string
-	loadbalance      string
-	username         string
-	password         string
-	deployConfig     string
-	cleanupConfig    string
-	cleanupClusterID string
-	debug            bool
-	version          bool
-	joinType         string
-	joinClusterID    string
-	joinYaml         string
-	joinHost         HostConfig
-	delClusterID     string
+	name                 string
+	templateConfig       string
+	masters              []string
+	nodes                []string
+	etcds                []string
+	loadbalance          string
+	username             string
+	password             string
+	deployConfig         string
+	deployEnableRollback bool
+	cleanupConfig        string
+	cleanupClusterID     string
+	debug                bool
+	version              bool
+	joinType             string
+	joinClusterID        string
+	joinYaml             string
+	joinHost             HostConfig
+	delClusterID         string
 }
 
 var opts eggoOptions
@@ -64,6 +65,7 @@ func setupEggoCmdOpts(eggoCmd *cobra.Command) {
 func setupDeployCmdOpts(deployCmd *cobra.Command) {
 	flags := deployCmd.Flags()
 	flags.StringVarP(&opts.deployConfig, "file", "f", defaultDeployConfigPath(), "location of cluster deploy config file, default $HOME/.eggo/deploy.yaml")
+	flags.BoolVarP(&opts.deployEnableRollback, "rollback", "", true, "rollback failed node to cleanup")
 }
 
 func setupCleanupCmdOpts(cleanupCmd *cobra.Command) {

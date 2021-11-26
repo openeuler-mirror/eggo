@@ -408,6 +408,9 @@ func GetSystemdServiceShell(name string, base64Data string, needRestart bool) (s
 {{- if .content }}
 rm -f /usr/lib/systemd/system/{{ .name }}.service
 echo {{ .content }} | base64 -d > /usr/lib/systemd/system/{{ .name }}.service
+systemctl daemon-reload
+# disable success when service file exist
+systemctl disable {{ .name }}
 {{- end }}
 which chcon
 if [ $? -eq 0 ]; then

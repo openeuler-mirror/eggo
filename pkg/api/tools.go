@@ -55,6 +55,10 @@ func (p PackageSrcConfig) GetPkgDstPath() string {
 	return p.DstPath
 }
 
+func (ep APIEndpoint) GetUrl() string {
+	return fmt.Sprintf("%s/%v", ep.AdvertiseAddress, ep.BindPort)
+}
+
 func GetClusterHomePath(cluster string) string {
 	return filepath.Join(EggoHomePath, cluster)
 }
@@ -190,4 +194,29 @@ func ParseScheduleType(schedule string) (ScheduleType, error) {
 	default:
 		return SchedulePreJoin, fmt.Errorf("invalid schedule type: %s", schedule)
 	}
+}
+
+func GetRoleString(roles uint16) []string {
+	var roleStrs []string
+	if roles&Master != 0 {
+		roleStrs = append(roleStrs, "master")
+	}
+	if roles&Worker != 0 {
+		roleStrs = append(roleStrs, "worker")
+	}
+	if roles&ETCD != 0 {
+		roleStrs = append(roleStrs, "etcd")
+	}
+	if roles&LoadBalance != 0 {
+		roleStrs = append(roleStrs, "loadbalance")
+	}
+
+	return roleStrs
+}
+
+func GetUserTempDir(user string) string {
+	if user == "root" {
+		return constants.DefaultRootCopyTempDirHome
+	}
+	return fmt.Sprintf(constants.DefaultUserCopyTempHomeFormat, user)
 }

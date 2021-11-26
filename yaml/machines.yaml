@@ -4,6 +4,7 @@ apiVersion: eggo.isula.org/v1
 kind: Machine
 metadata:
   name: machine1-example
+  namespace: eggo-system
   labels:
     masterRole: allow
     workerRole: allow
@@ -19,6 +20,7 @@ apiVersion: eggo.isula.org/v1
 kind: Machine
 metadata:
   name: machine2-example
+  namespace: eggo-system
   labels:
     masterRole: allow
     workerRole: allow

@@ -79,3 +79,15 @@ $ wget https://curl.se/ca/cacert.pem
 $ mv cacert.pem /etc/pki/ca-trust/source/anchors/
 $ update-ca-trust
 ```
+
+### 证书校验失败
+
+在WaitNodeRegister阶段，报错Get "https://10.253.173.8:6443/api/v1/nodes/10.253.173.8": x509: certificate has expired or is not yet valid: current time 2021-11-24T17:12:19Z is before 2021-11-24T23:54:02Z 
+
+#### 原因
+
+机器时间未同步，生成证书的节点时间晚于worker节点的时间，导致证书校验失败
+
+#### 解决方法
+
+同步机器时间

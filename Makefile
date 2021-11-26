@@ -1,7 +1,13 @@
 GIT_COMMIT ?= $(if $(shell git rev-parse --short HEAD),$(shell git rev-parse --short HEAD),$(error "commit id failed"))
 SOURCE_DATE_EPOCH ?= $(if $(shell date +%s),$(shell date +%s),$(error "date failed"))
 VERSION := $(shell cat ./VERSION)
-ARCH := $(shell arch)
+# eggo arch amd64/arm64
+ifndef ARCH
+ARCH = amd64
+ifeq ($(shell uname -p), aarch64)
+ARCH = arm64
+endif
+endif
 
 EXTRALDFLAGS :=
 LDFLAGS := -X isula.org/eggo/cmd.Version=$(VERSION) \
@@ -13,11 +19,11 @@ STATIC_LDFLAGS := -extldflags=-static -linkmode=external
 SAFEBUILDFLAGS := -buildmode=pie -extldflags=-ftrapv -extldflags=-zrelro -extldflags=-znow -tmpdir=/tmp/xxeggo $(LDFLAGS)
 
 GO := go
-GO_BUILD := CGO_ENABLED=0 $(GO)
+GO_BUILD := CGO_ENABLED=0 GOARCH=$(ARCH) $(GO)
 
 .PHONY: eggo
 eggo:
-	@echo "build eggo starting..."
+	@echo "build eggo of $(ARCH) starting..."
 	@$(GO_BUILD) build -ldflags '$(LDFLAGS) $(STATIC_LDFLAGS)' -o bin/eggo .
 	@echo "build eggo done!"
 local:

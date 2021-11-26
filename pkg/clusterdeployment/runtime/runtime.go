@@ -177,7 +177,7 @@ Type=notify
 EnvironmentFile=-/etc/sysconfig/docker
 ExecStart=/usr/bin/dockerd \
 {{- range $i, $v := .registry }}
-        --registry-mirrors {{ $v }} \
+        --registry-mirror {{ $v }} \
 {{- end }}
 {{- range $i, $v := .insecure }}
         --insecure-registry {{ $v }} \
@@ -422,6 +422,11 @@ func (ct *DeployRuntimeTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 	// check container engine softwares
 	if err := ct.check(r); err != nil {
 		logrus.Errorf("check failed: %v", err)
+		return err
+	}
+
+	if _, err := r.RunCommand("sudo -E /bin/sh -c \"rm -rf /etc/docker/daemon.json\""); err != nil {
+		logrus.Errorf("rm docker daemon.json failed: %v", err)
 		return err
 	}
 

@@ -143,15 +143,23 @@ func (dd *dependencyDeb) Remove(r runner.Runner) error {
 }
 
 // install file and dir
-type dependencyFD struct {
-	srcPath  string
-	software []*api.PackageConfig
+type dependencyFileDir struct {
+	executable bool
+	srcPath    string
+	software   []*api.PackageConfig
 }
 
-func (df *dependencyFD) Install(r runner.Runner) error {
+func (df *dependencyFileDir) Install(r runner.Runner) error {
 	shell := `
 #!/bin/bash
 cd {{ .srcPath }}
+
+{{- if .executable }}
+{{- range $i, $v := .software }}
+chmod +x {{ $v.Name }}
+{{- end }}
+{{- end }}
+
 {{- range $i, $v := .software }}
 if [ ! -e {{ JoinPath $v.Dst $v.Name }} ]; then
     mkdir -p {{ $v.Dst }} && cp -r {{ $v.Name }} {{ $v.Dst }}
@@ -161,6 +169,7 @@ fi
 	datastore := make(map[string]interface{})
 	datastore["srcPath"] = df.srcPath
 	datastore["software"] = df.software
+	datastore["executable"] = df.executable
 
 	shellStr, err := template.TemplateRender(shell, datastore)
 	if err != nil {
@@ -175,7 +184,7 @@ fi
 	return nil
 }
 
-func (df *dependencyFD) Remove(r runner.Runner) error {
+func (df *dependencyFileDir) Remove(r runner.Runner) error {
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	for _, s := range df.software {
@@ -284,6 +293,7 @@ func (dy *dependencyYaml) Remove(r runner.Runner) error {
 }
 
 type dependencyShell struct {
+	envs    []string
 	srcPath string
 	shell   []*api.PackageConfig
 }
@@ -296,22 +306,45 @@ func NewDependencyShell(srcPath string, shell []*api.PackageConfig) *dependencyS
 }
 
 func (ds *dependencyShell) Install(r runner.Runner) error {
-	var sb strings.Builder
+	shellTemplate := `
+#!/bin/bash
+{{- range $i, $v := .Envs }}
+export {{ $v }}
+{{- end }}
 
-	sb.WriteString("sudo -E /bin/sh -c \"")
+{{- $tout := .Timeouts }}
+{{- range $i, $v := .Shells }}
+chmod +x {{ $v }} && timeout -s SIGKILL {{index $tout $i}} {{ $v }} > /dev/null
+if [ $? -ne 0 ]; then
+	echo "run {{ $v }} failed"
+	exit 1
+fi
+{{- end }}
+
+exit 0
+`
+	datastore := map[string]interface{}{}
+	datastore["Envs"] = ds.envs
+	var shells []string
+	var timeouts []string
 	for _, s := range ds.shell {
-		sb.WriteString(fmt.Sprintf("chmod +x %s/%s && ", ds.srcPath, s.Name))
-
+		shells = append(shells, fmt.Sprintf("%s/%s", ds.srcPath, s.Name))
 		timeout := s.TimeOut
 		if timeout == "" {
 			timeout = "30s"
 		}
-		sb.WriteString(fmt.Sprintf("timeout -s SIGKILL %s %s/%s > /dev/null ; ", timeout, ds.srcPath, s.Name))
+		timeouts = append(timeouts, timeout)
 	}
-	sb.WriteString("\"")
+	datastore["Shells"] = shells
+	datastore["Timeouts"] = timeouts
 
-	if _, err := r.RunCommand(sb.String()); err != nil {
-		return fmt.Errorf("shell execute failed: %v", err)
+	parsedShell, err := template.TemplateRender(shellTemplate, datastore)
+	if err != nil {
+		return err
+	}
+
+	if _, err := r.RunShell(parsedShell, "exechook"); err != nil {
+		return fmt.Errorf("hook execute failed: %v", err)
 	}
 
 	return nil
