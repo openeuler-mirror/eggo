@@ -563,3 +563,13 @@ func (bcp *BinaryClusterDeployment) PostNodeCleanupHooks(node *api.HostConfig) {
 		logrus.Warnf("Ignore: Delete Node PostHook failed: %v", err)
 	}
 }
+
+func (bcp *BinaryClusterDeployment) CleanupLastStep(nodeName string) error {
+	itask := task.NewTaskInstance(&cleanupcluster.CleanupTempDirTask{})
+
+	if err := nodemanager.RunTaskOnNodes(itask, []string{nodeName}); err != nil {
+		return fmt.Errorf("cleanup user temp dir failed: %v", err)
+	}
+
+	return nil
+}
