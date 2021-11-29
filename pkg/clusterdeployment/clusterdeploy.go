@@ -217,6 +217,7 @@ func rollbackFailedNoeds(handler api.ClusterDeploymentAPI, nodes []*api.HostConf
 		// do best to cleanup, if error, just ignore
 		handler.ClusterNodeCleanup(n, n.Type)
 		handler.MachineInfraDestroy(n)
+		handler.CleanupLastStep(n.Name)
 		rollIDs = append(rollIDs, n.Address)
 	}
 
@@ -457,6 +458,11 @@ func doDeleteNode(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, h *ap
 		return err
 	}
 
+	if err := handler.CleanupLastStep(h.Name); err != nil {
+		logrus.Warnf("cleanup user temp dir for node %s failed: %v", h.Name, err)
+		return err
+	}
+
 	if err := nodemanager.WaitNodesFinishWithProgress([]string{h.Address}, time.Minute*5); err != nil {
 		logrus.Warnf("wait cleanup finish failed: %v", err)
 	}
@@ -578,6 +584,14 @@ func doRemoveCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig) {
 		err = handler.MachineInfraDestroy(n)
 		if err != nil {
 			logrus.Warnf("[cluster] cleanup infrastructure for node: %s failed: %v", n.Name, err)
+		}
+	}
+
+	// Step9: cleanup user temp dir
+	for _, n := range cc.Nodes {
+		err = handler.CleanupLastStep(n.Name)
+		if err != nil {
+			logrus.Warnf("[cluster] cleanup user temp dir for node: %s failed: %v", n.Name, err)
 		}
 	}
 
