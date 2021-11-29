@@ -21,6 +21,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/utils"
 	"isula.org/eggo/pkg/utils/runner"
 )
@@ -47,5 +48,26 @@ func stopServices(r runner.Runner, services []string) error {
 		logrus.Errorf("stop services failed: %v", err)
 		return err
 	}
+	return nil
+}
+
+type CleanupTempDirTask struct {
+}
+
+func (c *CleanupTempDirTask) Name() string {
+	return "CleanupTempDirTask"
+}
+
+func (c *CleanupTempDirTask) Run(r runner.Runner, hostConfig *api.HostConfig) error {
+	if hostConfig == nil {
+		return fmt.Errorf("empty host config")
+	}
+
+	dir := api.GetUserTempDir(hostConfig.UserName)
+	_, err := r.RunCommand(utils.AddSudo("rm -rf " + dir))
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
