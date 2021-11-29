@@ -145,8 +145,6 @@ func NewSSHRunner(hcfg *api.HostConfig) (Runner, error) {
 }
 
 func (ssh *SSHRunner) Close() {
-	// cleanup resources
-	clearUserTempDir(ssh.Conn, ssh.Host)
 	// TODO: wait kubekey support close for Connection
 	logrus.Debugf("TODO: wait kubekey support close for Connection")
 }
@@ -158,18 +156,6 @@ func (ssh *SSHRunner) Reconnect() error {
 	}
 	ssh.Conn = conn
 	return nil
-}
-
-func clearUserTempDir(conn ssh.Connection, host *kkv1alpha1.HostCfg) {
-	tmpShell := "/tmp/" + RunnerShellPrefix + "*"
-	// scp to tmp file
-	dir := api.GetUserTempDir(host.User)
-	_, err := conn.Exec(fmt.Sprintf("sudo -E /bin/sh -c \"rm -rf %s; rm -rf %s\"", dir, tmpShell), host)
-	if err != nil {
-		logrus.Warnf("[%s] remove temp dir: %s failed: %v", host.Name, dir, err)
-		return
-	}
-	logrus.Debugf("[%s] remove temp dir: %s success", host.Name, dir)
 }
 
 func prepareUserTempDir(conn ssh.Connection, host *kkv1alpha1.HostCfg) error {

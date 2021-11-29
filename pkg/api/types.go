@@ -305,6 +305,8 @@ type ClusterManagerAPI interface {
 	ClusterStatus() (*ClusterStatus, error)
 	AddonsSetup() error
 	AddonsDestroy() error
+
+	CleanupLastStep(nodeName string) error
 }
 
 type LoadBalancerAPI interface {
