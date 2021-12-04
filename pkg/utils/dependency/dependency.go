@@ -19,124 +19,175 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/template"
 )
+
+const (
+	PrmTest = "if [ x != x$(which apt 2>/dev/null) ]; then echo apt ; elif [ x != x$(which yum 2>/dev/null) ]; then echo yum ; fi"
+	PmTest  = "if [ x != x$(which dpkg 2>/dev/null) ]; then echo dpkg ; elif [ x != x$(which rpm 2>/dev/null) ]; then echo rpm ; fi"
+)
+
+type managerCommand struct {
+	installCommand string
+	removeCommand  string
+}
+
+func getPackageRepoManager(r runner.Runner) (*managerCommand, error) {
+	packageRepoManagerCommand := map[string]*managerCommand{
+		"apt": {
+			installCommand: "apt install -y",
+			removeCommand:  "apt remove -y",
+		},
+		"yum": {
+			installCommand: "yum install -y",
+			removeCommand:  "yum remove -y",
+		},
+	}
+
+	output, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"%s\"", PrmTest))
+	if err != nil {
+		logrus.Errorf("package repo manager test failed: %v", err)
+		return nil, err
+	}
+
+	if strings.Contains(output, "apt") {
+		return packageRepoManagerCommand["apt"], nil
+	}
+	if strings.Contains(output, "yum") {
+		return packageRepoManagerCommand["yum"], nil
+	}
+
+	return nil, fmt.Errorf("invalid package repo manager %s", output)
+}
+
+func getPackageManager(r runner.Runner) (*managerCommand, error) {
+	packageManagerCommand := map[string]*managerCommand{
+		"dpkg": {
+			installCommand: "dpkg --force-all -i",
+			removeCommand:  "apt remove -y",
+		},
+		"rpm": {
+			installCommand: "rpm -ivh --force --nodeps",
+			removeCommand:  "yum remove -y",
+		},
+	}
+
+	output, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"%s\"", PmTest))
+	if err != nil {
+		logrus.Errorf("package manager test failed: %v", err)
+		return nil, err
+	}
+
+	if strings.Contains(output, "dpkg") {
+		return packageManagerCommand["dpkg"], nil
+	}
+	if strings.Contains(output, "rpm") {
+		return packageManagerCommand["rpm"], nil
+	}
+
+	return nil, fmt.Errorf("invalid package manager %s", output)
+}
 
 type dependency interface {
 	Install(r runner.Runner) error
 	Remove(r runner.Runner) error
 }
 
-// install dependency by repo
-func runRepoCommand(r runner.Runner, software []*api.PackageConfig, command string) error {
+type dependencyRepo struct {
+	software []*api.PackageConfig
+}
+
+func (dr *dependencyRepo) Install(r runner.Runner) error {
+	if len(dr.software) == 0 {
+		return nil
+	}
+
+	prManager, err := getPackageRepoManager(r)
+	if err != nil {
+		return err
+	}
+
 	join := ""
-	for _, s := range software {
+	for _, s := range dr.software {
 		join += s.Name + " "
 	}
-	_, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"%s -y %s\"", command, join))
-	return err
-}
-
-type dependencyApt struct {
-	software []*api.PackageConfig
-}
-
-func (da *dependencyApt) Install(r runner.Runner) error {
-	command := "apt install"
-	if err := runRepoCommand(r, da.software, command); err != nil {
-		return fmt.Errorf("apt install failed: %v", err)
+	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"%s %s\"", prManager.installCommand, join)); err != nil {
+		return fmt.Errorf("%s failed: %v", prManager.installCommand, err)
 	}
 
 	return nil
 }
 
-func (da *dependencyApt) Remove(r runner.Runner) error {
-	command := "apt remove"
-	if err := runRepoCommand(r, da.software, command); err != nil {
-		return fmt.Errorf("apt remove failed: %v", err)
+func (dr *dependencyRepo) Remove(r runner.Runner) error {
+	if len(dr.software) == 0 {
+		return nil
+	}
+
+	prManager, err := getPackageRepoManager(r)
+	if err != nil {
+		return err
+	}
+
+	join := ""
+	for _, s := range dr.software {
+		join += s.Name + " "
+	}
+	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"%s remove -y %s\"", prManager.removeCommand, join)); err != nil {
+		return fmt.Errorf("%s failed: %v", prManager.removeCommand, err)
 	}
 
 	return nil
 }
 
-type dependencyYum struct {
-	software []*api.PackageConfig
-}
-
-func (dy *dependencyYum) Install(r runner.Runner) error {
-	command := "yum install"
-	if err := runRepoCommand(r, dy.software, command); err != nil {
-		return fmt.Errorf("yum install by yum failed: %v", err)
-	}
-
-	return nil
-}
-
-func (dy *dependencyYum) Remove(r runner.Runner) error {
-	command := "yum remove"
-	if err := runRepoCommand(r, dy.software, command); err != nil {
-		return fmt.Errorf("yum remove failed: %v", err)
-	}
-
-	return nil
-}
-
-// install dependency by pkg
-func runPkgCommand(r runner.Runner, software []*api.PackageConfig, srcPath, command string) error {
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("sudo -E /bin/sh -c \"cd %s && %s ", srcPath, command))
-	for _, s := range software {
-		sb.WriteString(fmt.Sprintf("%s* ", s.Name))
-	}
-	sb.WriteString("\"")
-
-	_, err := r.RunCommand(sb.String())
-	return err
-}
-
-type dependencyRpm struct {
+type dependencyPkg struct {
 	srcPath  string
 	software []*api.PackageConfig
 }
 
-func (dr *dependencyRpm) Install(r runner.Runner) error {
-	command := "rpm -ivh --force --nodeps"
-	if err := runPkgCommand(r, dr.software, dr.srcPath, command); err != nil {
-		return fmt.Errorf("rpm install failed: %v", err)
+func (dp *dependencyPkg) Install(r runner.Runner) error {
+	if len(dp.software) == 0 {
+		return nil
+	}
+
+	pManager, err := getPackageManager(r)
+	if err != nil {
+		return err
+	}
+
+	join := ""
+	for _, s := range dp.software {
+		join += s.Name + "* "
+	}
+
+	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"cd %s && %s %s",
+		dp.srcPath, pManager.installCommand, join)); err != nil {
+		return fmt.Errorf("%s failed: %v", pManager.installCommand, err)
 	}
 
 	return nil
 }
 
-func (dr *dependencyRpm) Remove(r runner.Runner) error {
-	command := "yum remove -y"
-	if err := runPkgCommand(r, dr.software, dr.srcPath, command); err != nil {
-		return fmt.Errorf("yum remove rpm pkgs failed: %v", err)
+func (dp *dependencyPkg) Remove(r runner.Runner) error {
+	if len(dp.software) == 0 {
+		return nil
 	}
 
-	return nil
-}
-
-type dependencyDeb struct {
-	srcPath  string
-	software []*api.PackageConfig
-}
-
-func (dd *dependencyDeb) Install(r runner.Runner) error {
-	command := "dpkg --force-all -i"
-	if err := runPkgCommand(r, dd.software, dd.srcPath, command); err != nil {
-		return fmt.Errorf("dpkg install failed: %v", err)
+	pManager, err := getPackageManager(r)
+	if err != nil {
+		return err
 	}
 
-	return nil
-}
+	join := ""
+	for _, s := range dp.software {
+		join += s.Name + "* "
+	}
 
-func (dd *dependencyDeb) Remove(r runner.Runner) error {
-	command := "apt remove -y"
-	if err := runPkgCommand(r, dd.software, dd.srcPath, command); err != nil {
-		return fmt.Errorf("apt remove deb pkgs failed: %v", err)
+	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"cd %s && %s %s",
+		dp.srcPath, pManager.removeCommand, join)); err != nil {
+		return fmt.Errorf("%s remove failed: %v", pManager.removeCommand, err)
 	}
 
 	return nil
@@ -150,6 +201,10 @@ type dependencyFileDir struct {
 }
 
 func (df *dependencyFileDir) Install(r runner.Runner) error {
+	if len(df.software) == 0 {
+		return nil
+	}
+
 	shell := `
 #!/bin/bash
 cd {{ .srcPath }}
@@ -185,6 +240,10 @@ fi
 }
 
 func (df *dependencyFileDir) Remove(r runner.Runner) error {
+	if len(df.software) == 0 {
+		return nil
+	}
+
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	for _, s := range df.software {
@@ -211,16 +270,11 @@ type dependencyImage struct {
 	image   []*api.PackageConfig
 }
 
-func NewDependencyImage(srcPath, client, command string, image []*api.PackageConfig) *dependencyImage {
-	return &dependencyImage{
-		srcPath: srcPath,
-		client:  client,
-		command: command,
-		image:   image,
-	}
-}
-
 func (di *dependencyImage) Install(r runner.Runner) error {
+	if len(di.image) == 0 {
+		return nil
+	}
+
 	var sb strings.Builder
 	sb.WriteString("sudo -E /bin/sh -c \"")
 	for _, i := range di.image {
@@ -255,6 +309,10 @@ func NewDependencyYaml(srcPath, kubeconfig string, yaml []*api.PackageConfig) *d
 }
 
 func (dy *dependencyYaml) Install(r runner.Runner) error {
+	if len(dy.yaml) == 0 {
+		return nil
+	}
+
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("sudo -E /bin/sh -c \"export KUBECONFIG=%s ", dy.kubeconfig))
 	for _, y := range dy.yaml {
@@ -274,6 +332,10 @@ func (dy *dependencyYaml) Install(r runner.Runner) error {
 }
 
 func (dy *dependencyYaml) Remove(r runner.Runner) error {
+	if len(dy.yaml) == 0 {
+		return nil
+	}
+
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("sudo -E /bin/sh -c \"export KUBECONFIG=%s ", dy.kubeconfig))
 	for _, y := range dy.yaml {
@@ -306,6 +368,10 @@ func NewDependencyShell(srcPath string, shell []*api.PackageConfig) *dependencyS
 }
 
 func (ds *dependencyShell) Install(r runner.Runner) error {
+	if len(ds.shell) == 0 {
+		return nil
+	}
+
 	shellTemplate := `
 #!/bin/bash
 {{- range $i, $v := .Envs }}
@@ -352,5 +418,22 @@ exit 0
 
 func (ds *dependencyShell) Remove(r runner.Runner) error {
 	// nothing to do
+	return nil
+}
+
+type DependencyTask struct {
+	dp dependency
+}
+
+func (dt *DependencyTask) Name() string {
+	return "DependencyTask"
+}
+
+func (dt *DependencyTask) Run(r runner.Runner, hcf *api.HostConfig) error {
+	if err := dt.dp.Install(r); err != nil {
+		logrus.Errorf("install failed for %s: %v", hcf.Address, err)
+		return err
+	}
+
 	return nil
 }
