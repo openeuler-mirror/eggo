@@ -18,6 +18,7 @@ package dependency
 import (
 	"fmt"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -29,131 +30,55 @@ import (
 	"isula.org/eggo/pkg/utils/task"
 )
 
-const (
-	PrmTest = "if [ x != x$(which apt 2>/dev/null) ]; then echo apt ; elif [ x != x$(which yum 2>/dev/null) ]; then echo yum ; fi"
-	PmTest  = "if [ x != x$(which dpkg 2>/dev/null) ]; then echo dpkg ; elif [ x != x$(which rpm 2>/dev/null) ]; then echo rpm ; fi"
-)
-
-type DependencyTask struct {
-	dp dependency
-}
-
-func (dt *DependencyTask) Name() string {
-	return "DependencyTask"
-}
-
-func (dt *DependencyTask) Run(r runner.Runner, hcf *api.HostConfig) error {
-	if err := dt.dp.Install(r); err != nil {
-		logrus.Errorf("install failed for %s: %v", hcf.Address, err)
-		return err
+func newBaseDependency(roleInfra *api.RoleInfra, packagePath string) map[string]dependency {
+	packages := map[string][]*api.PackageConfig{
+		"repo": {},
+		"pkg":  {},
+		"bin":  {},
+		"file": {},
+		"dir":  {},
 	}
 
-	return nil
-}
-
-func installRepo(r runner.Runner, software []*api.PackageConfig, hcf *api.HostConfig) error {
-	if len(software) == 0 {
-		return nil
-	}
-
-	output, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"%s\"", PrmTest))
-	if err != nil {
-		logrus.Errorf("package repo manager test failed: %v", err)
-		return err
-	}
-
-	var dp dependency
-	if strings.Contains(output, "apt") {
-		dp = &dependencyApt{
-			software: software,
+	for _, p := range roleInfra.Softwares {
+		if _, exist := packages[p.Type]; !exist {
+			continue
 		}
-	} else if strings.Contains(output, "yum") {
-		dp = &dependencyYum{
-			software: software,
-		}
+		packages[p.Type] = append(packages[p.Type], p)
 	}
 
-	if dp == nil {
-		return fmt.Errorf("invalid package repo manager %s", output)
-	}
-
-	if err := dp.Install(r); err != nil {
-		logrus.Errorf("install failed for %s: %v", hcf.Address, err)
-		return err
-	}
-
-	return nil
-}
-
-func installPkg(r runner.Runner, software []*api.PackageConfig, hcf *api.HostConfig, packagePath string) error {
-	if len(software) == 0 {
-		return nil
-	}
-
-	output, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"%s\"", PmTest))
-	if err != nil {
-		logrus.Errorf("package manager test failed: %v", err)
-		return err
-	}
-
-	var dp dependency
-	if strings.Contains(output, "dpkg") {
-		dp = &dependencyDeb{
+	baseDependency := map[string]dependency{
+		"repo": &dependencyRepo{
+			software: packages["repo"],
+		},
+		"pkg": &dependencyPkg{
 			srcPath:  path.Join(packagePath, constants.DefaultPkgPath),
-			software: software,
-		}
-	} else if strings.Contains(output, "rpm") {
-		dp = &dependencyRpm{
-			srcPath:  path.Join(packagePath, constants.DefaultPkgPath),
-			software: software,
-		}
-	}
-
-	if dp == nil {
-		return fmt.Errorf("invalid package manager %s", output)
-	}
-
-	if err := dp.Install(r); err != nil {
-		logrus.Errorf("install failed for %s: %v", hcf.Address, err)
-		return err
-	}
-
-	return nil
-}
-
-func installFD(r runner.Runner, bin, file, dir []*api.PackageConfig, hcf *api.HostConfig, packagePath string) error {
-	dp := []dependency{}
-
-	if len(bin) != 0 {
-		dp = append(dp, &dependencyFileDir{
-			srcPath:    path.Join(packagePath, constants.DefaultBinPath),
-			software:   bin,
+			software: packages["pkg"],
+		},
+		"bin": &dependencyFileDir{
 			executable: true,
-		})
-	}
-
-	if len(file) != 0 {
-		dp = append(dp, &dependencyFileDir{
+			srcPath:    path.Join(packagePath, constants.DefaultBinPath),
+			software:   packages["bin"],
+		},
+		"file": &dependencyFileDir{
+			executable: false,
 			srcPath:    path.Join(packagePath, constants.DefaultFilePath),
-			software:   file,
+		},
+		"dir": &dependencyFileDir{
 			executable: false,
-		})
-	}
-
-	if len(dir) != 0 {
-		dp = append(dp, &dependencyFileDir{
 			srcPath:    path.Join(packagePath, constants.DefaultDirPath),
-			software:   dir,
-			executable: false,
-		})
+			software:   packages["dir"],
+		},
 	}
 
-	if len(dp) == 0 {
-		return nil
-	}
+	return baseDependency
+}
 
-	for _, d := range dp {
-		if err := d.Install(r); err != nil {
+// install base dependency, include repo, pkg, bin, file, dir
+func InstallBaseDependency(r runner.Runner, roleInfra *api.RoleInfra, hcf *api.HostConfig, packagePath string) error {
+	baseDependency := newBaseDependency(roleInfra, packagePath)
+
+	for _, dep := range baseDependency {
+		if err := dep.Install(r); err != nil {
 			logrus.Errorf("install failed for %s: %v", hcf.Address, err)
 			return err
 		}
@@ -162,168 +87,55 @@ func installFD(r runner.Runner, bin, file, dir []*api.PackageConfig, hcf *api.Ho
 	return nil
 }
 
-func uninstallRepo(r runner.Runner, software []*api.PackageConfig, hcf *api.HostConfig) error {
-	if len(software) == 0 {
-		return nil
-	}
+func RemoveBaseDependency(r runner.Runner, roleInfra *api.RoleInfra, hcf *api.HostConfig, packagePath string) {
+	baseDependency := newBaseDependency(roleInfra, packagePath)
 
-	output, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"%s\"", PrmTest))
-	if err != nil {
-		logrus.Errorf("package repo manager test failed: %v", err)
-		return err
-	}
-
-	var dp dependency
-	if strings.Contains(output, "apt") {
-		dp = &dependencyApt{
-			software: software,
-		}
-	} else if strings.Contains(output, "yum") {
-		dp = &dependencyYum{
-			software: software,
-		}
-	}
-
-	if dp == nil {
-		return fmt.Errorf("invalid package repo manager %s", output)
-	}
-
-	if err := dp.Remove(r); err != nil {
-		logrus.Errorf("uninstall failed for %s: %v", hcf.Address, err)
-		return err
-	}
-
-	return nil
-}
-
-func uninstallPkg(r runner.Runner, software []*api.PackageConfig, hcf *api.HostConfig, packagePath string) error {
-	if len(software) == 0 {
-		return nil
-	}
-
-	output, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"%s\"", PmTest))
-	if err != nil {
-		logrus.Errorf("package manager test failed: %v", err)
-		return err
-	}
-
-	var dp dependency
-	if strings.Contains(output, "dpkg") {
-		dp = &dependencyDeb{
-			srcPath:  path.Join(packagePath, constants.DefaultPkgPath),
-			software: software,
-		}
-	} else if strings.Contains(output, "rpm") {
-		dp = &dependencyRpm{
-			srcPath:  path.Join(packagePath, constants.DefaultPkgPath),
-			software: software,
-		}
-	}
-
-	if dp == nil {
-		return fmt.Errorf("invalid package manager %s", output)
-	}
-
-	if err := dp.Remove(r); err != nil {
-		logrus.Errorf("uninstall failed for %s: %v", hcf.Address, err)
-		return err
-	}
-
-	return nil
-}
-
-func uninstallFD(r runner.Runner, bin, file, dir []*api.PackageConfig, hcf *api.HostConfig) error {
-	dp := []dependency{}
-
-	if len(bin) != 0 {
-		dp = append(dp, &dependencyFileDir{
-			software: bin,
-		})
-	}
-
-	if len(file) != 0 {
-		dp = append(dp, &dependencyFileDir{
-			software: file,
-		})
-	}
-
-	if len(dir) != 0 {
-		dp = append(dp, &dependencyFileDir{
-			software: dir,
-		})
-	}
-
-	if len(dp) == 0 {
-		return nil
-	}
-
-	for _, d := range dp {
-		if err := d.Remove(r); err != nil {
+	for _, dep := range baseDependency {
+		if err := dep.Remove(r); err != nil {
 			logrus.Errorf("uninstall failed for %s: %v", hcf.Address, err)
-			return err
+		}
+	}
+}
+
+func getImages(workerInfra *api.RoleInfra) []*api.PackageConfig {
+	images := []*api.PackageConfig{}
+	for _, s := range workerInfra.Softwares {
+		if s.Type == "image" {
+			images = append(images, s)
 		}
 	}
 
-	return nil
+	return images
 }
 
-func separateSofeware(softwares []*api.PackageConfig) ([]*api.PackageConfig, []*api.PackageConfig, []*api.PackageConfig, []*api.PackageConfig, []*api.PackageConfig) {
-	repo := []*api.PackageConfig{}
-	pkg := []*api.PackageConfig{}
-	bin := []*api.PackageConfig{}
-	file := []*api.PackageConfig{}
-	dir := []*api.PackageConfig{}
+// install image dependency
+func InstallImageDependency(r runner.Runner, workerInfra *api.RoleInfra, packageSrc *api.PackageSrcConfig,
+	runtime, runtimeClient, runtimeCommand string) error {
+	images := getImages(workerInfra)
+	if len(images) == 0 {
+		logrus.Warn("no images load")
+		return nil
+	}
 
-	for _, p := range softwares {
-		switch p.Type {
-		case "repo":
-			repo = append(repo, p)
-		case "pkg":
-			pkg = append(pkg, p)
-		case "bin":
-			bin = append(bin, p)
-		case "file":
-			file = append(file, p)
-		case "dir":
-			dir = append(dir, p)
+	logrus.Info("do load images...")
+
+	imageDependency := &dependencyImage{
+		srcPath: filepath.Join(packageSrc.GetPkgDstPath(), constants.DefaultImagePath),
+		client:  runtimeClient,
+		command: runtimeCommand,
+		image:   images,
+	}
+
+	if err := imageDependency.Install(r); err != nil {
+		if utils.IsContainerd(runtime) {
+			logrus.Warnf("%s not support load images", runtime)
+			return nil
 		}
+		return err
 	}
 
-	return repo, pkg, bin, file, dir
-}
-
-func InstallDependency(r runner.Runner, roleInfra *api.RoleInfra, hcf *api.HostConfig, packagePath string) error {
-	repo, pkg, bin, file, dir := separateSofeware(roleInfra.Softwares)
-
-	if err := installRepo(r, repo, hcf); err != nil {
-		return fmt.Errorf("install repo failed: %v", err)
-	}
-
-	if err := installPkg(r, pkg, hcf, packagePath); err != nil {
-		return fmt.Errorf("install pkg failed: %v", err)
-	}
-
-	if err := installFD(r, bin, file, dir, hcf, packagePath); err != nil {
-		return fmt.Errorf("install file failed: %v", err)
-	}
-
+	logrus.Info("load images success")
 	return nil
-}
-
-func RemoveDependency(r runner.Runner, roleInfra *api.RoleInfra, hcf *api.HostConfig, packagePath string) {
-	repo, pkg, bin, file, dir := separateSofeware(roleInfra.Softwares)
-
-	if err := uninstallRepo(r, repo, hcf); err != nil {
-		logrus.Errorf("uninstall repo failed: %v", err)
-	}
-
-	if err := uninstallPkg(r, pkg, hcf, packagePath); err != nil {
-		logrus.Errorf("uninstall pkg failed: %v", err)
-	}
-
-	if err := uninstallFD(r, bin, file, dir, hcf); err != nil {
-		logrus.Errorf("uninstall file failed: %v", err)
-	}
 }
 
 func CheckDependency(r runner.Runner, softwares []string) error {
