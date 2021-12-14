@@ -54,8 +54,16 @@ func cleanupCluster(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("load deploy config file %v failed: %v", confPath, err)
 	}
 
+	if err = checkCmdHooksParameter(opts.clusterPrehook, opts.clusterPosthook); err != nil {
+		return err
+	}
 	if err = RunChecker(conf); err != nil {
 		return err
+	}
+
+	hooksConf, err := getClusterHookConf(api.HookOpCleanup)
+	if err != nil {
+		return fmt.Errorf("get cmd hooks config failed:%v", err)
 	}
 
 	holder, err := NewProcessPlaceHolder(eggoPlaceHolderPath(conf.ClusterID))
@@ -64,7 +72,7 @@ func cleanupCluster(cmd *cobra.Command, args []string) error {
 	}
 	defer holder.Remove()
 
-	if err = cleanup(toClusterdeploymentConfig(conf)); err != nil {
+	if err = cleanup(toClusterdeploymentConfig(conf, hooksConf)); err != nil {
 		return err
 	}
 

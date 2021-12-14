@@ -44,7 +44,7 @@ func TestCmdConfigs(t *testing.T) {
 		t.Fatalf("load deploy config file failed: %v", err)
 	}
 
-	ccfg := toClusterdeploymentConfig(conf)
+	ccfg := toClusterdeploymentConfig(conf, nil)
 	d, err := yaml.Marshal(ccfg)
 	if err != nil {
 		t.Fatalf("marshal cluster config failed: %v", err)

@@ -47,8 +47,10 @@ const (
 type HookType string
 
 const (
-	PreHookType  HookType = "prehook"
-	PostHookType HookType = "posthook"
+	ClusterPrehookType  HookType = "cluster-prehook"
+	ClusterPosthookType HookType = "cluster-posthook"
+	PreHookType         HookType = "prehook"
+	PostHookType        HookType = "posthook"
 )
 
 type HookRunConfig struct {
@@ -233,11 +235,11 @@ type AddonConfig struct {
 }
 
 type ClusterHookConf struct {
-	Type      HookType
-	Operator  HookOperator
-	Target    uint16
-	HookDir   string
-	HookFiles []string
+	Type       HookType
+	Operator   HookOperator
+	Target     uint16
+	HookSrcDir string
+	HookFiles  []string
 }
 
 type ClusterConfig struct {
@@ -258,7 +260,7 @@ type ClusterConfig struct {
 	RoleInfra       map[uint16]*RoleInfra   `json:"role-infra"`
 
 	// do not encode hooks, just set before use it
-	HooksConf *ClusterHookConf `json:"-"`
+	HooksConf []*ClusterHookConf `json:"-"`
 
 	// TODO: add other configurations at here
 }
