@@ -43,6 +43,10 @@ type eggoOptions struct {
 	joinYaml             string
 	joinHost             HostConfig
 	delClusterID         string
+	clusterPrehook       string
+	clusterPosthook      string
+	prehook              string
+	posthook             string
 }
 
 var opts eggoOptions
@@ -66,12 +70,16 @@ func setupDeployCmdOpts(deployCmd *cobra.Command) {
 	flags := deployCmd.Flags()
 	flags.StringVarP(&opts.deployConfig, "file", "f", defaultDeployConfigPath(), "location of cluster deploy config file, default $HOME/.eggo/deploy.yaml")
 	flags.BoolVarP(&opts.deployEnableRollback, "rollback", "", true, "rollback failed node to cleanup")
+	flags.StringVarP(&opts.clusterPrehook, "cluster-prehook", "", "", "cluser prehooks when deploy cluser")
+	flags.StringVarP(&opts.clusterPosthook, "cluster-posthook", "", "", "cluster posthook when deploy cluster")
 }
 
 func setupCleanupCmdOpts(cleanupCmd *cobra.Command) {
 	flags := cleanupCmd.Flags()
 	flags.StringVarP(&opts.cleanupConfig, "file", "f", "", "location of cluster deploy config file")
 	flags.StringVarP(&opts.cleanupClusterID, "id", "", "", "cluster id")
+	flags.StringVarP(&opts.clusterPrehook, "cluster-prehook", "", "", "cluser prehooks when clenaup cluser")
+	flags.StringVarP(&opts.clusterPosthook, "cluster-posthook", "", "", "cluster posthook when cleaup cluster")
 }
 
 func setupJoinCmdOpts(joinCmd *cobra.Command) {
@@ -82,11 +90,15 @@ func setupJoinCmdOpts(joinCmd *cobra.Command) {
 	flags.IntVarP(&opts.joinHost.Port, "port", "p", 0, "host's ssh port")
 	flags.StringVarP(&opts.joinClusterID, "id", "", "", "cluster id")
 	flags.StringVarP(&opts.joinYaml, "file", "f", "", "yaml file contain nodes infomation")
+	flags.StringVarP(&opts.prehook, "prehook", "", "", "prehook when join cluster")
+	flags.StringVarP(&opts.posthook, "posthook", "", "", "posthook when join cluster")
 }
 
 func setupDeleteCmdOpts(deleteCmd *cobra.Command) {
 	flags := deleteCmd.Flags()
 	flags.StringVarP(&opts.delClusterID, "id", "", "", "cluster id")
+	flags.StringVarP(&opts.prehook, "prehook", "", "", "prehook when delete cluster")
+	flags.StringVarP(&opts.posthook, "posthook", "", "", "posthook when delete cluster")
 }
 
 func setupTemplateCmdOpts(templateCmd *cobra.Command) {

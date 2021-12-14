@@ -419,6 +419,10 @@ func (bcp *BinaryClusterDeployment) Finish() {
 
 func (bcp *BinaryClusterDeployment) PreCreateClusterHooks() error {
 	role := []uint16{api.LoadBalance, api.ETCD, api.Master, api.Worker}
+	if err := dependency.ExecuteCmdHooks(bcp.config, bcp.config.Nodes, api.HookOpDeploy, api.ClusterPrehookType); err != nil {
+		return err
+	}
+
 	if err := dependency.HookSchedule(bcp.config, bcp.config.Nodes, role, api.SchedulePreJoin); err != nil {
 		return err
 	}
@@ -434,11 +438,17 @@ func (bcp *BinaryClusterDeployment) PostCreateClusterHooks(nodes []*api.HostConf
 	if err := checkK8sServices(nodes); err != nil {
 		return err
 	}
+	if err := dependency.ExecuteCmdHooks(bcp.config, bcp.config.Nodes, api.HookOpDeploy, api.ClusterPosthookType); err != nil {
+		return err
+	}
 	return nil
 }
 
 func (bcp *BinaryClusterDeployment) PreDeleteClusterHooks() {
 	role := []uint16{api.Worker, api.Master, api.ETCD, api.LoadBalance}
+	if err := dependency.ExecuteCmdHooks(bcp.config, bcp.config.Nodes, api.HookOpCleanup, api.ClusterPrehookType); err != nil {
+		logrus.Warnf("Ignore: Delete cluster prehook failed:%v", err)
+	}
 	if err := dependency.HookSchedule(bcp.config, bcp.config.Nodes, role, api.SchedulePreCleanup); err != nil {
 		logrus.Warnf("Ignore: Delete cluster PreHook failed: %v", err)
 	}
@@ -449,10 +459,16 @@ func (bcp *BinaryClusterDeployment) PostDeleteClusterHooks() {
 	if err := dependency.HookSchedule(bcp.config, bcp.config.Nodes, role, api.SchedulePostCleanup); err != nil {
 		logrus.Warnf("Ignore: Delete cluster PostHook failed: %v", err)
 	}
+	if err := dependency.ExecuteCmdHooks(bcp.config, bcp.config.Nodes, api.HookOpCleanup, api.ClusterPosthookType); err != nil {
+		logrus.Warnf("Ignore: Delete cluster posthook failed:%v", err)
+	}
 }
 
 func (bcp *BinaryClusterDeployment) PreNodeJoinHooks(node *api.HostConfig) error {
 	role := []uint16{api.Master, api.Worker, api.ETCD}
+	if err := dependency.ExecuteCmdHooks(bcp.config, []*api.HostConfig{node}, api.HookOpJoin, api.PreHookType); err != nil {
+		return err
+	}
 	if err := dependency.HookSchedule(bcp.config, []*api.HostConfig{node}, role, api.SchedulePreJoin); err != nil {
 		return err
 	}
@@ -525,6 +541,9 @@ func (bcp *BinaryClusterDeployment) PostNodeJoinHooks(node *api.HostConfig) erro
 	if err := dependency.HookSchedule(bcp.config, []*api.HostConfig{node}, role, api.SchedulePostJoin); err != nil {
 		return err
 	}
+	if err := dependency.ExecuteCmdHooks(bcp.config, []*api.HostConfig{node}, api.HookOpJoin, api.PostHookType); err != nil {
+		return err
+	}
 
 	// taint and label for master node
 	roles := node.Type
@@ -552,6 +571,9 @@ func (bcp *BinaryClusterDeployment) PostNodeJoinHooks(node *api.HostConfig) erro
 
 func (bcp *BinaryClusterDeployment) PreNodeCleanupHooks(node *api.HostConfig) {
 	role := []uint16{api.Worker, api.Master, api.ETCD}
+	if err := dependency.ExecuteCmdHooks(bcp.config, []*api.HostConfig{node}, api.HookOpDelete, api.PreHookType); err != nil {
+		logrus.Warnf("Ignore: Delete Node Cmd Prehook failed: %v", err)
+	}
 	if err := dependency.HookSchedule(bcp.config, []*api.HostConfig{node}, role, api.SchedulePreCleanup); err != nil {
 		logrus.Warnf("Ignore: Delete Node PreHook failed: %v", err)
 	}
@@ -561,6 +583,9 @@ func (bcp *BinaryClusterDeployment) PostNodeCleanupHooks(node *api.HostConfig) {
 	role := []uint16{api.Worker, api.Master, api.ETCD}
 	if err := dependency.HookSchedule(bcp.config, []*api.HostConfig{node}, role, api.SchedulePostCleanup); err != nil {
 		logrus.Warnf("Ignore: Delete Node PostHook failed: %v", err)
+	}
+	if err := dependency.ExecuteCmdHooks(bcp.config, []*api.HostConfig{node}, api.HookOpDelete, api.PostHookType); err != nil {
+		logrus.Warnf("Ignore: Delete Node Cmd Posthook failed: %v", err)
 	}
 }
 

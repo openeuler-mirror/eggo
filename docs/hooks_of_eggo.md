@@ -21,8 +21,9 @@
 说明：
 
 - 脚本目录下的所有脚本都会被执行，而子目录中的脚本不会被执行；
-- 每个脚本的超时时间为60s；
+- 每个脚本的超时时间为120s；
 - role可以为master,worker,etcd或者loadbalance；
+- 命令行参数指定的hooks脚本默认拷贝到目标机器的/root/.eggo/package/file/cmdhooks目录下,脚本大小限制1M字节;
 
 ### 配置文件参数方式
 

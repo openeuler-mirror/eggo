@@ -71,7 +71,11 @@ func deploy(conf *DeployConfig) error {
 		return fmt.Errorf("save deploy config failed: %v", err)
 	}
 
-	ccfg := toClusterdeploymentConfig(conf)
+	hooksConf, err := getClusterHookConf(api.HookOpDeploy)
+	if err != nil {
+		return fmt.Errorf("get cmd hooks config failed:%v", err)
+	}
+	ccfg := toClusterdeploymentConfig(conf, hooksConf)
 
 	cstatus, err := clusterdeployment.CreateCluster(ccfg, opts.deployEnableRollback)
 	if err != nil {
@@ -116,6 +120,9 @@ func deployCluster(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("load deploy config file failed: %v", err)
 	}
 
+	if err = checkCmdHooksParameter(opts.clusterPrehook, opts.clusterPosthook); err != nil {
+		return err
+	}
 	if err = RunChecker(conf); err != nil {
 		return err
 	}

@@ -16,10 +16,12 @@
 package utils
 
 import (
+	"fmt"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"isula.org/eggo/pkg/api"
 )
@@ -106,4 +108,17 @@ func IsDocker(engine string) bool {
 
 func IsContainerd(engine string) bool {
 	return strings.ToLower(engine) == "containerd"
+}
+
+func GetUserIDAndGroupID(file string) (int, int, error) {
+	fileInfo, err := os.Stat(file)
+	if err != nil {
+		return 0, 0, err
+	}
+	statInfo, ok := fileInfo.Sys().(*syscall.Stat_t)
+	if !ok {
+		return 0, 0, fmt.Errorf("Assert failed when stat %s", file)
+	}
+
+	return int(statInfo.Uid), int(statInfo.Gid), nil
 }

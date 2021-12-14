@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -559,7 +560,7 @@ func fillExtrArgs(ccfg *api.ClusterConfig, eargs []*ConfigExtraArgs) {
 	}
 }
 
-func toClusterdeploymentConfig(conf *DeployConfig) *api.ClusterConfig {
+func toClusterdeploymentConfig(conf *DeployConfig, hooks []*api.ClusterHookConf) *api.ClusterConfig {
 	ccfg := getDefaultClusterdeploymentConfig()
 
 	setIfStrConfigNotEmpty(&ccfg.Name, conf.ClusterID)
@@ -601,8 +602,130 @@ func toClusterdeploymentConfig(conf *DeployConfig) *api.ClusterConfig {
 	ccfg.WorkerConfig.KubeletConf.EnableServer = conf.EnableKubeletServing
 
 	fillExtrArgs(ccfg, conf.ConfigExtraArgs)
+	ccfg.HooksConf = hooks
 
 	return ccfg
+}
+
+func getClusterHookConf(op api.HookOperator) ([]*api.ClusterHookConf, error) {
+	var hooks []*api.ClusterHookConf
+
+	if opts.clusterPrehook != "" {
+		hook, err := getCmdHooks(opts.clusterPrehook, api.ClusterPrehookType, op)
+		if err != nil {
+			return nil, err
+		}
+		hooks = append(hooks, hook)
+	}
+
+	if opts.clusterPosthook != "" {
+		hook, err := getCmdHooks(opts.clusterPosthook, api.ClusterPosthookType, op)
+		if err != nil {
+			return nil, err
+		}
+		hooks = append(hooks, hook)
+	}
+
+	if opts.prehook != "" {
+		hook, err := getCmdHooks(opts.prehook, api.PreHookType, op)
+		if err != nil {
+			return nil, err
+		}
+		hooks = append(hooks, hook)
+	}
+
+	if opts.posthook != "" {
+		hook, err := getCmdHooks(opts.posthook, api.PostHookType, op)
+		if err != nil {
+			return nil, err
+		}
+		hooks = append(hooks, hook)
+	}
+	return hooks, nil
+}
+
+func getCmdHooks(hopts string, ty api.HookType, op api.HookOperator) (*api.ClusterHookConf, error) {
+	path, target, err := getHookPathAndTarget(hopts)
+	if err != nil {
+		return nil, err
+	}
+	hook, err := getResolvedHook(path, ty, op, target)
+	if err != nil {
+		return nil, err
+	}
+	return hook, nil
+}
+
+func getHookPathAndTarget(hook string) (string, uint16, error) {
+	pathAndTarget := strings.Split(hook, ",")
+	if len(pathAndTarget) == 1 {
+		pathAndTarget = append(pathAndTarget, "master")
+	}
+	target, ok := toTypeInt[pathAndTarget[1]]
+	if !ok {
+		return "", 0x0, fmt.Errorf("invalid role:%s", pathAndTarget[1])
+	}
+
+	return pathAndTarget[0], target, nil
+}
+
+func getResolvedHook(path string, ty api.HookType, op api.HookOperator, target uint16) (*api.ClusterHookConf, error) {
+
+	dir, shells, err := getDirAndShells(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return &api.ClusterHookConf{
+		Type:       ty,
+		Operator:   op,
+		Target:     target,
+		HookSrcDir: dir,
+		HookFiles:  shells,
+	}, nil
+}
+
+func getDirAndShells(path string) (string, []string, error) {
+	file, err := os.Stat(path)
+	if err != nil {
+		return "", nil, err
+	}
+
+	if !file.IsDir() {
+		return resolveFile(path)
+	}
+
+	return resolvePath(path)
+}
+
+func resolveFile(p string) (string, []string, error) {
+	dir := path.Dir(p)
+	fileName := path.Base(p)
+	if err := checkHookFile(p); err != nil {
+		return "", nil, err
+	}
+
+	return dir, []string{fileName}, nil
+}
+
+func resolvePath(p string) (string, []string, error) {
+	var files []string
+	rd, err := ioutil.ReadDir(p)
+	if err != nil {
+		return "", nil, err
+	}
+
+	for _, fi := range rd {
+		if err := checkHookFile(path.Join(p, fi.Name())); err == nil {
+			files = append(files, fi.Name())
+		} else {
+			logrus.Debugf("check hook file failed:%v", err)
+		}
+	}
+	if len(files) == 0 {
+		return "", nil, fmt.Errorf("empty folder:%s", p)
+	}
+	return p, files, nil
 }
 
 func getHostconfigs(format string, ips []string) []*HostConfig {
