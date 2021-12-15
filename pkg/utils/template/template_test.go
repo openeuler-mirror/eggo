@@ -156,7 +156,6 @@ func TestCreateSystemdServiceTemplate(t *testing.T) {
 			"--client-ca-file=/etc/kubernetes/pki/ca.crt",
 			"--kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt",
 			"--kubelet-client-key=/etc/kubernetes/pki/apiserver-kubelet-client.key",
-			"--kubelet-https=true",
 			"--proxy-client-cert-file=/etc/kubernetes/pki/front-proxy-client.crt",
 			"--proxy-client-key-file=/etc/kubernetes/pki/front-proxy-client.key",
 			"--tls-cert-file=/etc/kubernetes/pki/apiserver.crt",
@@ -195,7 +194,6 @@ ExecStart=/usr/bin/kube-apiserver \
 		--client-ca-file=/etc/kubernetes/pki/ca.crt \
 		--kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt \
 		--kubelet-client-key=/etc/kubernetes/pki/apiserver-kubelet-client.key \
-		--kubelet-https=true \
 		--proxy-client-cert-file=/etc/kubernetes/pki/front-proxy-client.crt \
 		--proxy-client-key-file=/etc/kubernetes/pki/front-proxy-client.key \
 		--tls-cert-file=/etc/kubernetes/pki/apiserver.crt \

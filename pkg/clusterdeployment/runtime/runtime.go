@@ -3,14 +3,11 @@ package runtime
 import (
 	"encoding/base64"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment/binary/commontools"
-	"isula.org/eggo/pkg/constants"
-	"isula.org/eggo/pkg/utils"
 	"isula.org/eggo/pkg/utils/dependency"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/template"
@@ -435,7 +432,8 @@ func (ct *DeployRuntimeTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 		return err
 	}
 
-	if err := loadImages(r, ct.workerInfra, ct.packageSrc, ct.runtime, ct.workerConfig.ContainerEngineConf.Runtime); err != nil {
+	if err := dependency.InstallImageDependency(r, ct.workerInfra, ct.packageSrc, ct.runtime.GetRuntimeService(),
+		ct.runtime.GetRuntimeClient(), ct.runtime.GetRuntimeLoadImageCommand()); err != nil {
 		logrus.Errorf("load images failed: %v", err)
 		return err
 	}
@@ -456,40 +454,6 @@ func (ct *DeployRuntimeTask) check(r runner.Runner) error {
 		return err
 	}
 
-	return nil
-}
-
-func getImages(workerInfra *api.RoleInfra) []*api.PackageConfig {
-	images := []*api.PackageConfig{}
-	for _, s := range workerInfra.Softwares {
-		if s.Type == "image" {
-			images = append(images, s)
-		}
-	}
-
-	return images
-}
-
-func loadImages(r runner.Runner, workerInfra *api.RoleInfra, packageSrc *api.PackageSrcConfig, runtime Runtime, rt string) error {
-	images := getImages(workerInfra)
-	if len(images) == 0 {
-		logrus.Warn("no images load")
-		return nil
-	}
-
-	logrus.Info("do load images...")
-
-	imagePath := filepath.Join(packageSrc.GetPkgDstPath(), constants.DefaultImagePath)
-	imageDep := dependency.NewDependencyImage(imagePath, runtime.GetRuntimeClient(), runtime.GetRuntimeLoadImageCommand(), images)
-	if err := imageDep.Install(r); err != nil {
-		if utils.IsContainerd(rt) {
-			logrus.Warnf("%s not support load images", rt)
-			return nil
-		}
-		return err
-	}
-
-	logrus.Info("load images success")
 	return nil
 }
 

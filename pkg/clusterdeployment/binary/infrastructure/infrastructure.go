@@ -68,7 +68,7 @@ func (it *SetupInfraTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 		return err
 	}
 
-	if err := dependency.InstallDependency(r, it.roleInfra, hcg, it.packageSrc.GetPkgDstPath()); err != nil {
+	if err := dependency.InstallBaseDependency(r, it.roleInfra, hcg, it.packageSrc.GetPkgDstPath()); err != nil {
 		logrus.Errorf("install dependency failed: %v", err)
 		return err
 	}
@@ -325,7 +325,7 @@ func (it *DestroyInfraTask) Run(r runner.Runner, hcg *api.HostConfig) error {
 		return fmt.Errorf("empty host config")
 	}
 
-	dependency.RemoveDependency(r, it.roleInfra, hcg, it.packageSrc.GetPkgDstPath())
+	dependency.RemoveBaseDependency(r, it.roleInfra, hcg, it.packageSrc.GetPkgDstPath())
 
 	if err := removeHostNameIP(r, hcg); err != nil {
 		logrus.Errorf("remove host name ip failed: %v", err)

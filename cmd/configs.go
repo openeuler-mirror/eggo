@@ -300,7 +300,7 @@ func fillPackageConfig(ccfg *api.ClusterConfig, icfg *InstallConfig) {
 	}
 }
 
-func fillOpenPort(ccfg *api.ClusterConfig, openports map[string][]*OpenPorts, dnsType string) {
+func fillOpenPort(ccfg *api.ClusterConfig, openports map[string][]*OpenPorts, dnsType string, lb LoadBalance) {
 	// key: master, worker, etcd, loadbalance
 	for t, p := range openports {
 		role, ok := toTypeInt[t]
@@ -315,6 +315,15 @@ func fillOpenPort(ccfg *api.ClusterConfig, openports map[string][]*OpenPorts, dn
 	if coredns.IsTypeBinary(dnsType) {
 		ccfg.RoleInfra[api.Master].OpenPorts =
 			append(ccfg.RoleInfra[api.Master].OpenPorts, infra.CorednsPorts...)
+	}
+
+	if lb.Ip != "" && lb.BindPort > 0 {
+		ccfg.RoleInfra[api.LoadBalance].OpenPorts =
+			append(ccfg.RoleInfra[api.LoadBalance].OpenPorts, &api.OpenPorts{
+				Port:     lb.BindPort,
+				Protocol: "tcp",
+			})
+		return
 	}
 }
 
@@ -588,7 +597,7 @@ func toClusterdeploymentConfig(conf *DeployConfig) *api.ClusterConfig {
 	fillLoadBalance(&ccfg.LoadBalancer, conf.LoadBalance)
 	fillAPIEndPoint(&ccfg.APIEndpoint, conf)
 	fillPackageConfig(ccfg, &conf.InstallConfig)
-	fillOpenPort(ccfg, conf.OpenPorts, conf.Service.DNS.CorednsType)
+	fillOpenPort(ccfg, conf.OpenPorts, conf.Service.DNS.CorednsType, conf.LoadBalance)
 	ccfg.WorkerConfig.KubeletConf.EnableServer = conf.EnableKubeletServing
 
 	fillExtrArgs(ccfg, conf.ConfigExtraArgs)
