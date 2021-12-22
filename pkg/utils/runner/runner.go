@@ -227,7 +227,7 @@ func (ssh *SSHRunner) copyDir(srcDir, dstDir string) error {
 		return err
 	}
 	tmpCpyDir := api.GetUserTempDir(ssh.Host.User)
-	tmpPkiFile := filepath.Join(tmpCpyDir, "pkg.tar")
+	tmpPkiFile := filepath.Join(tmpCpyDir, "remote-pkg.tar")
 	// scp to user home directory
 	err = ssh.Copy(tmpPkgFile, tmpPkiFile)
 	if err != nil {
@@ -235,7 +235,7 @@ func (ssh *SSHRunner) copyDir(srcDir, dstDir string) error {
 		return err
 	}
 	// untar tmp file
-	_, err = ssh.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"cd %s && mv %s . && tar -xf %s && rm -rf %s\"", dstDir, tmpPkiFile, "pki.tar", tmpPkiFile))
+	_, err = ssh.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"cd %s && mv %s . && tar -xf %s && rm -rf %s\"", dstDir, tmpPkiFile, "remote-pkg.tar", "remote-pkg.tar"))
 	if err != nil {
 		logrus.Errorf("[%s] untar tmp tar failed: %v", ssh.Host.Name, err)
 		return err

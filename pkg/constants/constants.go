@@ -17,6 +17,7 @@ const (
 	DefaultPkgPath     = "/pkg"
 	DefaultBinPath     = "/bin"
 	DefaultFilePath    = "/file"
+	DefaultHookPath    = "/file/cmdhook"
 	DefaultDirPath     = "/dir"
 	DefaultImagePath   = "/image"
 
@@ -27,4 +28,8 @@ const (
 
 	// network plugin arguments key
 	NetworkPluginArgKeyYamlPath = "NetworkYamlPath"
+
+	MaxHookFileSize = int64(1 << 20)
+	// 750: rwxr-x---
+	HookFileMode = uint32(0750)
 )

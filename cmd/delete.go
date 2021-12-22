@@ -63,7 +63,7 @@ func getDeletedAndDiffConfigs(conf *DeployConfig, delNames []string) (*DeployCon
 		return nil, nil, fmt.Errorf("forbidden to delete first master")
 	}
 
-	clusterConfig := toClusterdeploymentConfig(&diffConfig)
+	clusterConfig := toClusterdeploymentConfig(&diffConfig, nil)
 	if len(clusterConfig.Nodes) == 0 {
 		return nil, nil, fmt.Errorf("no valid ip or name found")
 	}
@@ -89,9 +89,17 @@ func deleteCluster(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("load saved deploy config failed: %v", err)
 	}
 
+	if err := checkCmdHooksParameter(opts.prehook, opts.posthook); err != nil {
+		return err
+	}
 	// check saved deploy config
 	if err = RunChecker(conf); err != nil {
 		return err
+	}
+
+	hooksConf, err := getClusterHookConf(api.HookOpDelete)
+	if err != nil {
+		return fmt.Errorf("get cmd hooks config failed:%v", err)
 	}
 
 	holder, err := NewProcessPlaceHolder(eggoPlaceHolderPath(conf.ClusterID))
@@ -110,7 +118,7 @@ func deleteCluster(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if err = clusterdeployment.DeleteNodes(toClusterdeploymentConfig(conf), diffHostconfigs); err != nil {
+	if err = clusterdeployment.DeleteNodes(toClusterdeploymentConfig(conf, hooksConf), diffHostconfigs); err != nil {
 		return err
 	}
 
