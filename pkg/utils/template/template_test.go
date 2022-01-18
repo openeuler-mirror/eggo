@@ -46,7 +46,7 @@ IP.3 = 127.0.0.1
 [ v3_ext ]
 authorityKeyIdentifier = keyid,issuer:always
 basicConstraints = CA:FALSE
-keyUsage = keyEncipherment,dataEncipherment
+keyUsage = digitalSignature,keyEncipherment,dataEncipherment
 extendedKeyUsage = serverAuth,clientAuth
 subjectAltName = @alt_names
 `
@@ -71,7 +71,7 @@ CN = kube-apiserver-kubelet-client
 [ v3_ext ]
 authorityKeyIdentifier=keyid,issuer:always
 basicConstraints=CA:FALSE
-keyUsage=keyEncipherment,dataEncipherment
+keyUsage=digitalSignature,keyEncipherment,dataEncipherment
 extendedKeyUsage=clientAuth
 `
 	kubelet_conf := &CsrConfig{
@@ -92,7 +92,7 @@ CN = front-proxy-client
 [ v3_ext ]
 authorityKeyIdentifier=keyid,issuer:always
 basicConstraints=CA:FALSE
-keyUsage=keyEncipherment,dataEncipherment
+keyUsage=digitalSignature,keyEncipherment,dataEncipherment
 extendedKeyUsage=clientAuth
 `
 	front_proxy_client_conf := &CsrConfig{
