@@ -148,7 +148,7 @@ func (l *LocalCertGenerator) CreateCertAndKey(caCertPath, caKeyPath string, conf
 		DNSNames:     config.AltNames.DNSNames,
 		IPAddresses:  ips,
 		SerialNumber: serial,
-		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment | x509.KeyUsageDataEncipherment,
 		ExtKeyUsage:  config.Usages,
 		NotBefore:    caCert.NotBefore,
 		NotAfter:     time.Now().Add(time.Hour * 24 * 36500).UTC(),

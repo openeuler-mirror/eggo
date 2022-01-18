@@ -69,7 +69,7 @@ func (cv1 *CertificateV1) check(csr certificatesv1.CertificateSigningRequest, wo
 
 	// 3. check csr is requested for serving certificates
 	// usageRequired: "server auth"
-	// usagesOptional: "digital signature", "key encipherment"
+	// usagesOptional: "digital signature", "key encipherment", "data encipherment"
 	required := false
 	for _, u := range csr.Spec.Usages {
 		if u == certificatesv1.UsageServerAuth {
@@ -77,7 +77,8 @@ func (cv1 *CertificateV1) check(csr certificatesv1.CertificateSigningRequest, wo
 			continue
 		}
 
-		if u != certificatesv1.UsageDigitalSignature && u != certificatesv1.UsageKeyEncipherment {
+		if u != certificatesv1.UsageDigitalSignature && u != certificatesv1.UsageKeyEncipherment &&
+			u != certificatesv1.UsageDataEncipherment {
 			logrus.Warnf("csr %s is not requested for serving certificates", csr.Name)
 			return false
 		}
@@ -166,7 +167,7 @@ func (cv1beta1 *CertificateV1beta1) check(csr certificatesv1beta1.CertificateSig
 
 	// 3. check csr is requested for serving certificates
 	// usageRequired: "server auth"
-	// usagesOptional: "digital signature", "key encipherment"
+	// usagesOptional: "digital signature", "key encipherment", "data encipherment"
 	required := false
 	for _, u := range csr.Spec.Usages {
 		if u == certificatesv1beta1.UsageServerAuth {
@@ -174,7 +175,8 @@ func (cv1beta1 *CertificateV1beta1) check(csr certificatesv1beta1.CertificateSig
 			continue
 		}
 
-		if u != certificatesv1beta1.UsageDigitalSignature && u != certificatesv1beta1.UsageKeyEncipherment {
+		if u != certificatesv1beta1.UsageDigitalSignature && u != certificatesv1beta1.UsageKeyEncipherment &&
+			u != certificatesv1beta1.UsageDataEncipherment {
 			logrus.Warnf("csr %s is not requested for serving certificates", csr.Name)
 			return false
 		}
