@@ -56,7 +56,9 @@ func New(conf *api.ClusterConfig) (api.ClusterDeploymentAPI, error) {
 		connections: make(map[string]runner.Runner),
 	}
 	// register and connect all nodes
-	bcd.registerNodes()
+	if err := bcd.registerNodes(); err != nil {
+		return nil, err
+	}
 
 	return bcd, nil
 }
@@ -177,7 +179,7 @@ func (bcp *BinaryClusterDeployment) MachineInfraSetup(hcf *api.HostConfig) error
 		return nil
 	}
 
-	logrus.Infof("do setup %s infrastrucure...", hcf.Address)
+	logrus.Infof("do setup %s infrastructure...", hcf.Address)
 
 	if err := bcp.registerNode(hcf); err != nil {
 		logrus.Errorf("register node failed: %v", err)
@@ -196,7 +198,7 @@ func (bcp *BinaryClusterDeployment) MachineInfraSetup(hcf *api.HostConfig) error
 		}
 	}
 
-	logrus.Infof("setup %s infrastrucure success", hcf.Address)
+	logrus.Infof("setup %s infrastructure success", hcf.Address)
 	return nil
 }
 
@@ -206,14 +208,14 @@ func (bcp *BinaryClusterDeployment) MachineInfraDestroy(hcf *api.HostConfig) err
 		return nil
 	}
 
-	logrus.Infof("do destroy %s infrastrucure...", hcf.Address)
+	logrus.Infof("do destroy %s infrastructure...", hcf.Address)
 
 	err := infrastructure.NodeInfrastructureDestroy(bcp.config, hcf)
 	if err != nil {
-		logrus.Errorf("role %d infrastructure destory failed: %v", hcf.Type, err)
+		logrus.Errorf("role %d infrastructure destroy failed: %v", hcf.Type, err)
 	}
 
-	logrus.Infof("destroy %s infrastrucure success", hcf.Address)
+	logrus.Infof("destroy %s infrastructure success", hcf.Address)
 	return nil
 }
 
@@ -404,7 +406,9 @@ func (bcp *BinaryClusterDeployment) LoadBalancerDestroy(lb *api.HostConfig) erro
 		return nil
 	}
 
-	cleanupcluster.CleanupLoadBalance(bcp.config, lb)
+	if terr := cleanupcluster.CleanupLoadBalance(bcp.config, lb); terr != nil {
+		logrus.Warnf("clean up loadbalance failed: %v", terr)
+	}
 	return nil
 }
 

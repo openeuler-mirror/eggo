@@ -446,7 +446,9 @@ func generateCertsAndKubeConfigs(r runner.Runner, ccfg *api.ClusterConfig, hcf *
 	defer func() {
 		if err != nil {
 			// TODO: dot not delete user configed directory, delete directories and files we addded only
-			cg.CleanAll(rootPath)
+			if terr := cg.CleanAll(rootPath); terr != nil {
+				logrus.Warnf("clean certs failed: %v", terr)
+			}
 		}
 	}()
 

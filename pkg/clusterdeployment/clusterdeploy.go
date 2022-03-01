@@ -215,9 +215,17 @@ func rollbackFailedNoeds(handler api.ClusterDeploymentAPI, nodes []*api.HostConf
 	var rollIDs []string
 	for _, n := range nodes {
 		// do best to cleanup, if error, just ignore
-		handler.ClusterNodeCleanup(n, n.Type)
-		handler.MachineInfraDestroy(n)
-		handler.CleanupLastStep(n.Name)
+		if terr := handler.ClusterNodeCleanup(n, n.Type); terr != nil {
+			logrus.Warnf("cluster node cleanup failed: %v", terr)
+		}
+
+		if terr := handler.MachineInfraDestroy(n); terr != nil {
+			logrus.Warnf("machine infrastructure destroy failed: %v", terr)
+		}
+
+		if terr := handler.CleanupLastStep(n.Name); terr != nil {
+			logrus.Warnf("cleanup last step failed: %v", terr)
+		}
 		rollIDs = append(rollIDs, n.Address)
 	}
 

@@ -58,11 +58,15 @@ func (m *MockRunner) Close() {
 	logrus.Infof("close")
 }
 
-func addNodes(hcfs []*api.HostConfig) {
+func addNodes(hcfs []*api.HostConfig) error {
 	r := &MockRunner{}
 	for _, hcf := range hcfs {
-		nodemanager.RegisterNode(hcf, r)
+		if err := nodemanager.RegisterNode(hcf, r); err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 func TestPrepareInfrastructure(t *testing.T) {
@@ -173,7 +177,9 @@ func TestPrepareInfrastructure(t *testing.T) {
 		},
 	}
 
-	addNodes(ccfg.Nodes)
+	if err := addNodes(ccfg.Nodes); err != nil {
+		t.Fatalf("add nodes failed: %v", err)
+	}
 	if err := NodeInfrastructureSetup(ccfg, ccfg.Nodes[0].Address, ccfg.Nodes[0].Type); err != nil {
 		t.Fatalf("test NodeInfrastructureSetup failed: %v\n", err)
 	}

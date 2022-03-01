@@ -16,6 +16,7 @@ package controlplane
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -92,7 +93,9 @@ func TestInit(t *testing.T) {
 	r := &MockRunner{}
 	var master string
 	for _, node := range conf.Nodes {
-		nodemanager.RegisterNode(node, r)
+		if err := nodemanager.RegisterNode(node, r); err != nil {
+			t.Fatalf("register node failed: %v", err)
+		}
 		if utils.IsType(node.Type, api.Master) {
 			master = node.Address
 		}
@@ -103,15 +106,21 @@ func TestInit(t *testing.T) {
 
 	api.EggoHomePath = "/tmp/eggo"
 	// generate api server etcd client ceritifaces for testing
-	lr.RunCommand(fmt.Sprintf("sudo mkdir -p -m 0777 %s/%s/pki/etcd", api.EggoHomePath, conf.Name))
-	lr.RunCommand(fmt.Sprintf("sudo chmod -R 0777 %s/%s", api.EggoHomePath, conf.Name))
-	lr.RunCommand(fmt.Sprintf("sudo touch %s/%s/pki/apiserver-etcd-client.crt", api.EggoHomePath, conf.Name))
-	lr.RunCommand(fmt.Sprintf("sudo touch %s/%s/pki/apiserver-etcd-client.key", api.EggoHomePath, conf.Name))
-	lr.RunCommand(fmt.Sprintf("sudo touch %s/%s/pki/etcd/ca.crt", api.EggoHomePath, conf.Name))
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("sudo mkdir -p -m 0777 %s/%s/pki/etcd", api.EggoHomePath, conf.Name))
+	sb.WriteString(fmt.Sprintf("&& sudo chmod -R 0777 %s/%s", api.EggoHomePath, conf.Name))
+	sb.WriteString(fmt.Sprintf("&& sudo touch %s/%s/pki/apiserver-etcd-client.crt", api.EggoHomePath, conf.Name))
+	sb.WriteString(fmt.Sprintf("&& sudo touch %s/%s/pki/apiserver-etcd-client.key", api.EggoHomePath, conf.Name))
+	sb.WriteString(fmt.Sprintf("&& sudo touch %s/%s/pki/etcd/ca.crt", api.EggoHomePath, conf.Name))
+	if _, err := lr.RunCommand(sb.String()); err != nil {
+		t.Fatalf("run command failed: %v", err)
+	}
 	if err := Init(conf, master); err != nil {
 		t.Fatalf("do control plane init failed: %v", err)
 	}
 
-	lr.RunCommand(fmt.Sprintf("sudo rm -rf %s", api.EggoHomePath))
+	if _, err := lr.RunCommand(fmt.Sprintf("sudo rm -rf %s", api.EggoHomePath)); err != nil {
+		t.Fatalf("run command failed: %v", err)
+	}
 	t.Logf("do control plane init success")
 }

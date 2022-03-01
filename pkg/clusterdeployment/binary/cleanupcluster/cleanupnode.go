@@ -167,12 +167,17 @@ func (t *cleanupNodeTask) Run(r runner.Runner, hostConfig *api.HostConfig) error
 		if err != nil {
 			logrus.Errorf("get worker services failed")
 		}
-		stopServices(r, services)
+
+		if err := stopServices(r, services); err != nil {
+			logrus.Warnf("stop service failed: %v", err)
+		}
 		removePathes(r, getWorkerPathes(r, t.ccfg))
 	}
 
 	if utils.IsType(t.delType, api.Master) {
-		stopServices(r, MasterService)
+		if err := stopServices(r, MasterService); err != nil {
+			logrus.Warnf("stop master service failed: %v", err)
+		}
 		removePathes(r, getMasterPathes(t.ccfg))
 	}
 

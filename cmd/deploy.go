@@ -136,7 +136,11 @@ func deployCluster(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("create process holder failed: %v, mayebe other eggo is running with cluster: %s", err, conf.ClusterID)
 	}
-	defer holder.Remove()
+	defer func() {
+		if terr := holder.Remove(); terr != nil {
+			fmt.Printf("remove process place holder failed: %v", terr)
+		}
+	}()
 
 	if err = deploy(conf); err != nil {
 		return err
