@@ -335,7 +335,7 @@ func (ccr *OpenPortResponsibility) Execute() error {
 				return fmt.Errorf("invalid port: %v for %s", port.Port, name)
 			}
 			if _, ok := supportProtocal[port.Protocol]; !ok {
-				return fmt.Errorf("invalid protocal: %s for %s", port.Protocol, name)
+				return fmt.Errorf("invalid protocol: %s for %s", port.Protocol, name)
 			}
 		}
 	}

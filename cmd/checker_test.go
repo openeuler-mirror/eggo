@@ -27,7 +27,11 @@ func TestRunChecker(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create tempdir for cmd checker failed: %v", err)
 	}
-	defer os.RemoveAll(tempdir)
+	defer func() {
+		if terr := os.RemoveAll(tempdir); terr != nil {
+			t.Fatalf("remove temp dir failed: %v", terr)
+		}
+	}()
 
 	// init opts
 	if NewEggoCmd() == nil {
@@ -49,7 +53,9 @@ func TestRunChecker(t *testing.T) {
 	}
 
 	for _, fn := range conf.InstallConfig.PackageSrc.SrcPath {
-		os.MkdirAll(fn, 0755)
+		if err := os.MkdirAll(fn, 0755); err != nil {
+			t.Fatalf("mkdir failed: %v", err)
+		}
 		defer os.RemoveAll(fn)
 	}
 

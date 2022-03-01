@@ -89,7 +89,7 @@ func setupJoinCmdOpts(joinCmd *cobra.Command) {
 	flags.StringVarP(&opts.joinHost.Name, "name", "n", "", "host's name")
 	flags.IntVarP(&opts.joinHost.Port, "port", "p", 0, "host's ssh port")
 	flags.StringVarP(&opts.joinClusterID, "id", "", "", "cluster id")
-	flags.StringVarP(&opts.joinYaml, "file", "f", "", "yaml file contain nodes infomation")
+	flags.StringVarP(&opts.joinYaml, "file", "f", "", "yaml file contain nodes information")
 	flags.StringVarP(&opts.prehook, "prehook", "", "", "prehook when join cluster")
 	flags.StringVarP(&opts.posthook, "posthook", "", "", "posthook when join cluster")
 }

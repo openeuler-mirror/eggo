@@ -49,6 +49,12 @@ test:
 	@$(GO) test -race -cover -count=1 -timeout=300s  ./...
 	@echo "Units test done!"
 
+check:
+	@which ${GOPATH}/bin/golangci-lint > /dev/null || (echo "Installing golangci-lint" && go get -d github.com/golangci/golangci-lint/cmd/golangci-lint)
+	@echo "Code check starting..."
+	@${GOPATH}/bin/golangci-lint run --timeout 5m --config=./.golangci.yaml
+	@echo "Code check done!"
+
 .PHONY: safe
 safe:
 	@echo "build safe eggo starting..."

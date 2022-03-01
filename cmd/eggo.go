@@ -86,7 +86,9 @@ func NewEggoCmd() *cobra.Command {
 				showVersion()
 				return nil
 			}
-			cmd.Help()
+			if err := cmd.Help(); err != nil {
+				return err
+			}
 			return nil
 		},
 	}
