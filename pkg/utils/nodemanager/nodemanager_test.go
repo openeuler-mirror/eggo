@@ -74,7 +74,7 @@ func (m *MockTask) Run(r runner.Runner, hcf *api.HostConfig) error {
 	}
 	time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
 
-	r.Reconnect()
+	err = r.Reconnect()
 
 	return err
 }
@@ -83,7 +83,7 @@ func (m *MockTask) Name() string {
 	return m.name
 }
 
-func addNodes() {
+func addNodes() error {
 	hcf1 := &api.HostConfig{
 		Arch:     "x86_64",
 		Name:     "master",
@@ -103,8 +103,15 @@ func addNodes() {
 		Type:     api.Worker,
 	}
 	r := &MockRunner{}
-	RegisterNode(hcf1, r)
-	RegisterNode(hcf2, r)
+
+	if err := RegisterNode(hcf1, r); err != nil {
+		return err
+	}
+	if err := RegisterNode(hcf2, r); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func releaseNodes(nodes []string) {
@@ -114,7 +121,10 @@ func releaseNodes(nodes []string) {
 }
 
 func TestRunTaskOnNodes(t *testing.T) {
-	addNodes()
+	if err := addNodes(); err != nil {
+		t.Fatalf("add nodes failed: %v", err)
+	}
+
 	tt := task.NewTaskInstance(
 		&MockTask{
 			name: "precheck",
@@ -146,7 +156,10 @@ func TestRunTaskOnNodes(t *testing.T) {
 }
 
 func TestRunTaskOnAll(t *testing.T) {
-	addNodes()
+	if err := addNodes(); err != nil {
+		t.Fatalf("add nodes failed: %v", err)
+	}
+
 	tt := task.NewTaskInstance(
 		&MockTask{
 			name: "precheck",

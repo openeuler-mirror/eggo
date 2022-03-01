@@ -247,8 +247,9 @@ func (r *ClusterReconciler) reconcileDelete(ctx context.Context, cluster *eggov1
 		var mb eggov1.MachineBinding
 		err := r.Get(ctx, ReferenceToNamespacedName(cluster.Status.MachineBindingRef), &mb)
 		if err == nil {
-			r.Delete(ctx, &mb)
-			log.Info("ignore err: delete machine binding for cluster")
+			if terr := r.Delete(ctx, &mb); terr != nil {
+				log.Info("ignore delete machine binding for cluster err: %v", terr)
+			}
 			return ctrl.Result{Requeue: true}, nil
 		}
 		log.Info("delete machine binding success...")
@@ -260,8 +261,9 @@ func (r *ClusterReconciler) reconcileDelete(ctx context.Context, cluster *eggov1
 		var cm v1.ConfigMap
 		err := r.Get(ctx, ReferenceToNamespacedName(cluster.Status.ConfigRef), &cm)
 		if err == nil {
-			r.Delete(ctx, &cm)
-			log.Info("ignore err: delete configmap for cluster")
+			if terr := r.Delete(ctx, &cm); terr != nil {
+				log.Info("ignore delete configmap for cluster err: %v", terr)
+			}
 			return ctrl.Result{Requeue: true}, nil
 		}
 		log.Info("delete configmap success...")

@@ -63,7 +63,9 @@ func (t *cleanupEtcdMemberTask) Run(r runner.Runner, hostConfig *api.HostConfig)
 		return fmt.Errorf("empty host config")
 	}
 
-	stopServices(r, EtcdService)
+	if err := stopServices(r, EtcdService); err != nil {
+		logrus.Warnf("stop etcd service failed: %v", err)
+	}
 
 	removePathes(r, getEtcdPathes(t.ccfg))
 
