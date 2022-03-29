@@ -20,6 +20,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	"isula.org/eggo/pkg/constants"
 	"isula.org/eggo/pkg/utils"
 )
 
@@ -56,7 +58,7 @@ func init() {
 		return
 	}
 
-	if err := os.Mkdir(utils.GetEggoDir(), 0700); err != nil {
+	if err := os.Mkdir(utils.GetEggoDir(), constants.EggoDirMode); err != nil {
 		logrus.Errorf("mkdir eggo directory %v failed", utils.GetEggoDir())
 	}
 }

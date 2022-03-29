@@ -6,12 +6,13 @@ import (
 	"path/filepath"
 
 	"github.com/sirupsen/logrus"
-	"isula.org/eggo/pkg/api"
-	"isula.org/eggo/pkg/constants"
 	k8scorev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+
+	"isula.org/eggo/pkg/api"
+	"isula.org/eggo/pkg/constants"
 )
 
 type Taint struct {

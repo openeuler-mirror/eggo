@@ -1,18 +1,54 @@
-linters-settings:
-  golint:
-    min-confidence: 0
-  misspell:
-    locale: US
+run:
+  deadline: 10m
+  issues-exit-code: 1
+  tests: true
+
+  skip-dirs:
+    - vendor
+
+  skip-files:
+    - ".*\\.pb\\.go$"
+    - ".*\\.dbx\\.go$"
+
+
 linters:
   disable-all: true
   enable:
-    - typecheck
-    - goimports
-    - misspell
+    - gomnd
     - govet
-    - ineffassign
+    - goimports
+    - revive
+    - gofmt
     - gosimple
+    - typecheck
+    - misspell
+    - ineffassign
     - deadcode
     - structcheck
     - unused
     - errcheck
+
+linters-settings:
+  gomnd:
+    settings:
+      mnd:
+        checks: argument, case, condition, operation, return, assign
+        ignored-numbers: 2
+  govet:
+    check-shadowing: true
+    use-installed-packages: false
+  goimports:
+    local-prefixes: isula.org/eggo
+  revive:
+    min-confidence: 0.8
+    rules:
+      - name: exported
+        disabled: true
+  gofmt:
+    simplify: true
+  misspell:
+    locale: US
+  errcheck:
+    check-type-assertions: false
+    check-blank: false
+    ignore: fmt:.*,io/ioutil:^Read.*

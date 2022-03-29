@@ -22,13 +22,14 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/constants"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/template"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 var ops map[string]string
@@ -109,7 +110,8 @@ func WaitNodeRegister(name string, cluster string) error {
 		return err
 	}
 
-	finish := time.After(time.Second * 120)
+	const timeout = 120
+	finish := time.After(time.Second * timeout)
 	for {
 		select {
 		case t := <-finish:

@@ -27,13 +27,16 @@ import (
 )
 
 const (
-	DefaultEndpointPort = 6443
+	defaultEndpointPort = 6443
+
+	parseBase    = 10
+	parsebitSize = 16
 )
 
 func GetEndpoint(advertiseAddr string, bindPort int) (string, error) {
 	if !ValidPort(bindPort) {
-		bindPort = DefaultEndpointPort
-		logrus.Warnf("ignore invalid bindport: %d, use default: %d", bindPort, DefaultEndpointPort)
+		bindPort = defaultEndpointPort
+		logrus.Warnf("ignore invalid bindport: %d, use default: %d", bindPort, defaultEndpointPort)
 	}
 
 	if ip := net.ParseIP(advertiseAddr); ip == nil {
@@ -52,7 +55,7 @@ func ValidPort(port int) bool {
 }
 
 func ParsePort(port string) (int, error) {
-	tport, err := strconv.ParseUint(port, 10, 16)
+	tport, err := strconv.ParseUint(port, parseBase, parsebitSize)
 	if err != nil {
 		return 0, err
 	}
@@ -77,7 +80,7 @@ func GetAPIServerEndpoint(ccfg *api.ClusterConfig) (string, error) {
 		return "", fmt.Errorf("invalid host")
 	}
 	if sport == "" {
-		sport = strconv.Itoa(DefaultEndpointPort)
+		sport = strconv.Itoa(defaultEndpointPort)
 	}
 
 	port, err := ParsePort(sport)

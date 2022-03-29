@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
+
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/utils/nodemanager"
 	"isula.org/eggo/pkg/utils/runner"
@@ -71,8 +72,8 @@ func TestJoinMaster(t *testing.T) {
 		},
 		WorkerConfig: api.WorkerConfig{
 			KubeletConf: &api.Kubelet{
-				DnsVip:    "10.32.0.10",
-				DnsDomain: "cluster.local",
+				DNSVip:    "10.32.0.10",
+				DNSDomain: "cluster.local",
 				CniBinDir: "/opt/cni/bin",
 			},
 			ContainerEngineConf: &api.ContainerEngine{
@@ -146,8 +147,8 @@ func TestJoinWorker(t *testing.T) {
 		},
 		WorkerConfig: api.WorkerConfig{
 			KubeletConf: &api.Kubelet{
-				DnsVip:    "10.32.0.10",
-				DnsDomain: "cluster.local",
+				DNSVip:    "10.32.0.10",
+				DNSDomain: "cluster.local",
 				CniBinDir: "/opt/cni/bin",
 			},
 			ContainerEngineConf: &api.ContainerEngine{

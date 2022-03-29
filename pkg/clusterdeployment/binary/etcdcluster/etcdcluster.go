@@ -23,8 +23,10 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment/binary/commontools"
+	"isula.org/eggo/pkg/constants"
 	"isula.org/eggo/pkg/utils"
 	"isula.org/eggo/pkg/utils/nodemanager"
 	"isula.org/eggo/pkg/utils/runner"
@@ -155,7 +157,9 @@ func (t *EtcdPostDeployEtcdsTask) Run(r runner.Runner, hostConfig *api.HostConfi
 			return nil
 		}
 		retry--
-		time.Sleep(3 * time.Second)
+
+		const etcdRetrySecond = 3
+		time.Sleep(time.Second * etcdRetrySecond)
 	}
 
 	return fmt.Errorf("etcd %v healthcheck failed: %v", hostConfig.Name, err)
@@ -244,7 +248,7 @@ func Init(conf *api.ClusterConfig) error {
 		return fmt.Errorf("run task on nodes failed: %v", err)
 	}
 
-	if err := nodemanager.WaitNodesFinish(nodes, time.Minute*5); err != nil {
+	if err := nodemanager.WaitNodesFinish(nodes, time.Minute*constants.DefaultTaskWaitMinutes); err != nil {
 		return fmt.Errorf("wait for deploy etcds task finish failed: %v", err)
 	}
 
@@ -258,7 +262,7 @@ func Init(conf *api.ClusterConfig) error {
 		return fmt.Errorf("run task on nodes failed: %v", err)
 	}
 
-	if err := nodemanager.WaitNodesFinish(nodes, time.Minute*5); err != nil {
+	if err := nodemanager.WaitNodesFinish(nodes, time.Minute*constants.DefaultTaskWaitMinutes); err != nil {
 		return fmt.Errorf("wait for post deploy etcds task finish failed: %v", err)
 	}
 

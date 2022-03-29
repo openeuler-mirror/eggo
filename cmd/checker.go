@@ -12,12 +12,13 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/validation"
+
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/constants"
 	"isula.org/eggo/pkg/utils"
 	"isula.org/eggo/pkg/utils/endpoint"
 	chain "isula.org/eggo/pkg/utils/responsibilitychain"
-	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 type ClusterConfigResponsibility struct {
@@ -400,7 +401,7 @@ func checkHookFile(fileName string) error {
 	if !file.Mode().IsRegular() {
 		return fmt.Errorf("%s is not regular file", file.Name())
 	}
-	if file.Mode().Perm() != os.FileMode(constants.HookFileMode) {
+	if file.Mode().Perm() != constants.HookFileMode {
 		return fmt.Errorf("file mode of %s is incorrect", file.Name())
 	}
 	if file.Size() > constants.MaxHookFileSize || file.Size() == 0 {

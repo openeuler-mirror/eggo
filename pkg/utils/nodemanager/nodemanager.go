@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/task"
@@ -148,6 +149,8 @@ func RunTaskOnAll(t task.Task) error {
 }
 
 func RunTasksOnNode(tasks []task.Task, node string) error {
+	const pushTaskInterval = 6
+
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
 
@@ -158,7 +161,7 @@ func RunTasksOnNode(tasks []task.Task, node string) error {
 				if n.PushTask(t) {
 					break
 				}
-				time.Sleep(time.Second * 6)
+				time.Sleep(time.Second * pushTaskInterval)
 			}
 			if i == 5 {
 				logrus.Errorf("node: %s work with too much tasks, will retry it", node)

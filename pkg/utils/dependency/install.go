@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
+
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/constants"
 	"isula.org/eggo/pkg/utils"
@@ -176,9 +177,11 @@ func ExecuteHooks(hookConf *api.HookRunConfig) error {
 		srcPath: hookConf.HookDir,
 		shell:   hookConf.Hooks,
 	}
-	envs := make([]string, 9)
+
+	const envsSize = 9
+	envs := make([]string, envsSize)
 	envs[0] = fmt.Sprintf("EGGO_CLUSTER_ID=%s", hookConf.ClusterID)
-	envs[1] = fmt.Sprintf("EGGO_CLUSTER_API_ENDPOINT=%s", hookConf.ClusterApiEndpoint)
+	envs[1] = fmt.Sprintf("EGGO_CLUSTER_API_ENDPOINT=%s", hookConf.ClusterAPIEndpoint)
 	envs[2] = fmt.Sprintf("EGGO_CLUSTER_CONFIG_DIR=%s", hookConf.ClusterConfigDir)
 	envs[3] = fmt.Sprintf("EGGO_NODE_IP=%s", hookConf.Node.Address)
 	envs[4] = fmt.Sprintf("EGGO_NODE_NAME=%s", hookConf.Node.Name)
@@ -220,7 +223,7 @@ func executeShell(ccfg *api.ClusterConfig, role uint16, hcf *api.HostConfig, sch
 
 	hookConf := &api.HookRunConfig{
 		ClusterID:          ccfg.Name,
-		ClusterApiEndpoint: ccfg.APIEndpoint.GetUrl(),
+		ClusterAPIEndpoint: ccfg.APIEndpoint.GetURL(),
 		ClusterConfigDir:   ccfg.ConfigDir,
 		HookType:           htype,
 		Operator:           oper,
