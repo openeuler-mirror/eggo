@@ -1,5 +1,7 @@
 package constants
 
+import "os"
+
 const (
 	// certificates relate constants
 	DefaultK8SRootDir      = "/etc/kubernetes"
@@ -30,6 +32,14 @@ const (
 	NetworkPluginArgKeyYamlPath = "NetworkYamlPath"
 
 	MaxHookFileSize = int64(1 << 20)
-	// 750: rwxr-x---
-	HookFileMode = uint32(0750)
+
+	HookFileMode             os.FileMode = 0750
+	EggoHomeDirMode          os.FileMode = 0750
+	EggoDirMode              os.FileMode = 0700
+	DeployConfigFileMode     os.FileMode = 0640
+	ProcessFileMode          os.FileMode = 0640
+	EncryptionConfigFileMode os.FileMode = 0600
+
+	// default task wait time in minute
+	DefaultTaskWaitMinutes = 5
 )

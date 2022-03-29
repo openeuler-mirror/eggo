@@ -25,9 +25,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v1"
 
-	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment/binary/coredns"
 	"isula.org/eggo/pkg/constants"
@@ -40,6 +40,9 @@ const (
 	WorkerRole      string = "worker"
 	ETCDRole        string = "etcd"
 	LoadBalanceRole string = "loadbalance"
+
+	parseBase    = 10
+	parseBitSize = 32
 )
 
 var (
@@ -81,7 +84,7 @@ func init() {
 		return
 	}
 
-	if err := os.Mkdir(utils.GetEggoDir(), 0700); err != nil {
+	if err := os.Mkdir(utils.GetEggoDir(), constants.EggoDirMode); err != nil {
 		logrus.Errorf("mkdir eggo directory %v failed", utils.GetEggoDir())
 	}
 }
@@ -109,11 +112,11 @@ func saveDeployConfig(cc *DeployConfig, filePath string) error {
 		return fmt.Errorf("invalid config file path %v", filePath)
 	}
 
-	if err = os.MkdirAll(filepath.Dir(cleanPath), 0750); err != nil {
+	if err = os.MkdirAll(filepath.Dir(cleanPath), constants.EggoHomeDirMode); err != nil {
 		return fmt.Errorf("create dir %v to save deploy config failed: %v", filepath.Dir(cleanPath), err)
 	}
 
-	if err = ioutil.WriteFile(filePath, d, 0640); err != nil {
+	if err = ioutil.WriteFile(filePath, d, constants.DeployConfigFileMode); err != nil {
 		return fmt.Errorf("write user deploy config file failed: %v", err)
 	}
 
@@ -162,14 +165,14 @@ func getDefaultClusterdeploymentConfig() *api.ClusterConfig {
 			PluginArgs: make(map[string]string),
 		},
 		ControlPlane: api.ControlPlaneConfig{
-			ApiConf: &api.ApiServer{
+			APIConf: &api.APIServer{
 				Timeout: "120s",
 			},
 		},
 		WorkerConfig: api.WorkerConfig{
 			KubeletConf: &api.Kubelet{
-				DnsVip:        "10.32.0.10",
-				DnsDomain:     "cluster.local",
+				DNSVip:        "10.32.0.10",
+				DNSDomain:     "cluster.local",
 				PauseImage:    "k8s.gcr.io/pause:3.2",
 				NetworkPlugin: "cni",
 				CniBinDir:     "/usr/libexec/cni,/opt/cni/bin",
@@ -283,7 +286,7 @@ func fillPackageConfig(ccfg *api.ClusterConfig, icfg *InstallConfig) {
 	}
 
 	if coredns.IsTypeBinary(ccfg.ServiceCluster.DNS.CorednsType) {
-		ccfg.RoleInfra[api.Master].Softwares = appendSoftware(ccfg.RoleInfra[api.Master].Softwares, ToEggoPackageConfig(icfg.Dns), infra.DnsPackages)
+		ccfg.RoleInfra[api.Master].Softwares = appendSoftware(ccfg.RoleInfra[api.Master].Softwares, ToEggoPackageConfig(icfg.Dns), infra.DNSPackages)
 	}
 
 	if len(icfg.Addition) == 0 {
@@ -527,7 +530,7 @@ func fillAPIEndPoint(APIEndpoint *api.APIEndpoint, conf *DeployConfig) {
 		return
 	}
 
-	iport, err := strconv.ParseInt(port, 10, 32)
+	iport, err := strconv.ParseInt(port, parseBase, parseBitSize)
 	if err != nil {
 		logrus.Errorf("invalid port %s: %v", port, err)
 		return
@@ -576,9 +579,9 @@ func toClusterdeploymentConfig(conf *DeployConfig, hooks []*api.ClusterHookConf)
 	setIfStrConfigNotEmpty(&ccfg.Network.PodCIDR, conf.NetWork.PodCIDR)
 	setIfStrConfigNotEmpty(&ccfg.Network.Plugin, conf.NetWork.Plugin)
 	setStrStrMap(ccfg.Network.PluginArgs, conf.NetWork.PluginArgs)
-	setStrArray(&ccfg.ControlPlane.ApiConf.CertSans.DNSNames, conf.ApiServerCertSans.DNSNames)
-	setStrArray(&ccfg.ControlPlane.ApiConf.CertSans.IPs, conf.ApiServerCertSans.IPs)
-	setIfStrConfigNotEmpty(&ccfg.ControlPlane.ApiConf.Timeout, conf.ApiServerTimeout)
+	setStrArray(&ccfg.ControlPlane.APIConf.CertSans.DNSNames, conf.ApiServerCertSans.DNSNames)
+	setStrArray(&ccfg.ControlPlane.APIConf.CertSans.IPs, conf.ApiServerCertSans.IPs)
+	setIfStrConfigNotEmpty(&ccfg.ControlPlane.APIConf.Timeout, conf.ApiServerTimeout)
 	ccfg.EtcdCluster.External = conf.EtcdExternal
 	for _, node := range ccfg.Nodes {
 		if (node.Type & api.ETCD) != 0 {
@@ -586,8 +589,8 @@ func toClusterdeploymentConfig(conf *DeployConfig, hooks []*api.ClusterHookConf)
 		}
 	}
 	setIfStrConfigNotEmpty(&ccfg.EtcdCluster.Token, conf.EtcdToken)
-	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.KubeletConf.DnsVip, conf.DnsVip)
-	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.KubeletConf.DnsDomain, conf.DnsDomain)
+	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.KubeletConf.DNSVip, conf.DnsVip)
+	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.KubeletConf.DNSDomain, conf.DnsDomain)
 	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.KubeletConf.PauseImage, conf.PauseImage)
 	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.KubeletConf.NetworkPlugin, conf.NetworkPlugin)
 	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.KubeletConf.CniBinDir, conf.CniBinDir)
@@ -938,7 +941,7 @@ func createDeployConfigTemplate(file string) error {
 		return fmt.Errorf("marshal template config failed: %v", err)
 	}
 
-	if err := ioutil.WriteFile(file, d, 0640); err != nil {
+	if err := ioutil.WriteFile(file, d, constants.DeployConfigFileMode); err != nil {
 		return fmt.Errorf("write template config file failed: %v", err)
 	}
 

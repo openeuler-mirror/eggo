@@ -68,7 +68,9 @@ func preCheck() {
 		sb.WriteString("Maybe cause to failure!!!\n")
 		sb.WriteString("Shutdown current operator!!!\n")
 		fmt.Println(sb.String())
-		time.Sleep(time.Second * 10)
+
+		const preCheckSecond = 10
+		time.Sleep(time.Second * preCheckSecond)
 	}
 }
 

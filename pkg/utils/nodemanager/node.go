@@ -22,16 +22,24 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/task"
 )
 
 const (
+	// status
 	WorkingStatus = iota
 	FinishStatus
 	IgnoreStatus
 	ErrorStatus
+)
+
+const (
+	nodeQueueCapability  = 16
+	runTaskTimeOutSecond = 300
+	waitTaskMillisecond  = 200
 )
 
 type NodeStatus struct {
@@ -115,7 +123,7 @@ func (n *Node) WaitNodeTasksFinish(timeout time.Duration) error {
 			msg := s.Message
 			n.lock.RUnlock()
 			if !s.TasksFinished() {
-				time.Sleep(time.Millisecond * 200)
+				time.Sleep(time.Millisecond * waitTaskMillisecond)
 				continue
 			}
 			if s.HasError() {
@@ -177,7 +185,7 @@ func doRunTask(n *Node, t task.Task) {
 	go func(ec chan error) {
 		select {
 		// TODO: maybe we need get timeout from task
-		case <-time.After(time.Second * 300):
+		case <-time.After(time.Second * runTaskTimeOutSecond):
 			ec <- fmt.Errorf("timeout to run task")
 		case ec <- t.Run(n.r, n.host):
 		}
@@ -212,7 +220,7 @@ func NewNode(hcf *api.HostConfig, r runner.Runner) (*Node, error) {
 		host:  hcf,
 		r:     r,
 		stop:  make(chan bool),
-		queue: make(chan task.Task, 16),
+		queue: make(chan task.Task, nodeQueueCapability),
 	}
 
 	go func(n *Node) {

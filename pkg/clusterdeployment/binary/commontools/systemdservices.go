@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/sirupsen/logrus"
+
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/utils"
 	"isula.org/eggo/pkg/utils/runner"
@@ -60,8 +61,8 @@ func SetupAPIServerService(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.Ho
 		"--requestheader-username-headers":     "X-Remote-User",
 		"--encryption-provider-config":         "/etc/kubernetes/encryption-config.yaml",
 	}
-	if ccfg.ControlPlane.ApiConf != nil {
-		for k, v := range ccfg.ControlPlane.ApiConf.ExtraArgs {
+	if ccfg.ControlPlane.APIConf != nil {
+		for k, v := range ccfg.ControlPlane.APIConf.ExtraArgs {
 			defaultArgs[k] = v
 		}
 	}

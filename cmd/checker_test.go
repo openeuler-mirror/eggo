@@ -53,8 +53,8 @@ func TestRunChecker(t *testing.T) {
 	}
 
 	for _, fn := range conf.InstallConfig.PackageSrc.SrcPath {
-		if err := os.MkdirAll(fn, 0755); err != nil {
-			t.Fatalf("mkdir failed: %v", err)
+		if terr := os.MkdirAll(fn, 0755); terr != nil {
+			t.Fatalf("mkdir failed: %v", terr)
 		}
 		defer os.RemoveAll(fn)
 	}
