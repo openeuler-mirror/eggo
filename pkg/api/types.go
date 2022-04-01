@@ -55,7 +55,7 @@ const (
 
 type HookRunConfig struct {
 	ClusterID          string
-	ClusterApiEndpoint string
+	ClusterAPIEndpoint string
 	ClusterConfigDir   string
 
 	HookType HookType
@@ -115,7 +115,7 @@ type Sans struct {
 	DNSNames []string `json:"dns-names"`
 	IPs      []string `json:"ips"`
 }
-type ApiServer struct {
+type APIServer struct {
 	CertSans  Sans              `json:"cert-sans,omitempty"`
 	Timeout   string            `json:"timeout,omitempty"`
 	ExtraArgs map[string]string `json:"extra-args,omitempty"`
@@ -136,8 +136,8 @@ type WorkerConfig struct {
 }
 
 type Kubelet struct {
-	DnsVip        string            `json:"dns-vip,omitempty"`
-	DnsDomain     string            `json:"dns-domain"`
+	DNSVip        string            `json:"dns-vip,omitempty"`
+	DNSDomain     string            `json:"dns-domain"`
 	PauseImage    string            `json:"pause-image"`
 	NetworkPlugin string            `json:"network-plugin"`
 	CniBinDir     string            `json:"cni-bin-dir"`
@@ -163,7 +163,7 @@ type APIEndpoint struct {
 	BindPort         int32  `json:"bind-port,omitempty"`
 }
 type ControlPlaneConfig struct {
-	ApiConf       *ApiServer      `json:"apiconf,omitempty"`
+	APIConf       *APIServer      `json:"apiconf,omitempty"`
 	ManagerConf   *ControlManager `json:"managerconf,omitempty"`
 	SchedulerConf *Scheduler      `json:"schedulerconf,omitempty"`
 }

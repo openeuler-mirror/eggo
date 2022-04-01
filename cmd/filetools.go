@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"isula.org/eggo/pkg/constants"
 )
 
 func checkProcessRunning(pid int) bool {
@@ -53,11 +55,11 @@ func NewProcessPlaceHolder(path string) (*ProcessPlaceHolder, error) {
 	if err := checkProcessInFile(path); err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), os.FileMode(0750)); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), constants.EggoHomeDirMode); err != nil {
 		return nil, err
 	}
 	pid := strconv.Itoa(os.Getpid())
-	if err := ioutil.WriteFile(path, []byte(pid), 0640); err != nil {
+	if err := ioutil.WriteFile(path, []byte(pid), constants.ProcessFileMode); err != nil {
 		return nil, err
 	}
 	return &ProcessPlaceHolder{path}, nil

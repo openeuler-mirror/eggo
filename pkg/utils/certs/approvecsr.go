@@ -24,15 +24,16 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"isula.org/eggo/pkg/api"
-	"isula.org/eggo/pkg/constants"
-	"isula.org/eggo/pkg/utils/kubectl"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/cert"
+
+	"isula.org/eggo/pkg/api"
+	"isula.org/eggo/pkg/constants"
+	"isula.org/eggo/pkg/utils/kubectl"
 )
 
 type ServingCSR interface {
@@ -309,7 +310,8 @@ func ApproveCsr(cluster string, workers []*api.HostConfig) error {
 				}
 
 				// maybe the serving csr hasn't received
-				time.Sleep(time.Duration(10) * time.Second)
+				const approvedIntervalSeconds = 3
+				time.Sleep(time.Second * approvedIntervalSeconds)
 			}
 
 			if !approved {

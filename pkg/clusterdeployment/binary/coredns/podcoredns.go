@@ -22,7 +22,9 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+
 	"isula.org/eggo/pkg/api"
+	"isula.org/eggo/pkg/constants"
 	"isula.org/eggo/pkg/utils/kubectl"
 	"isula.org/eggo/pkg/utils/nodemanager"
 	"isula.org/eggo/pkg/utils/runner"
@@ -137,7 +139,7 @@ func (pc *PodCoredns) Setup(cluster *api.ClusterConfig) error {
 	if err != nil {
 		return err
 	}
-	err = nodemanager.WaitNodesFinish([]string{useMaster}, 5*time.Minute)
+	err = nodemanager.WaitNodesFinish([]string{useMaster}, time.Minute*constants.DefaultTaskWaitMinutes)
 	if err != nil {
 		return err
 	}
@@ -162,7 +164,7 @@ func (pc *PodCoredns) Cleanup(cluster *api.ClusterConfig) error {
 	if err != nil {
 		return err
 	}
-	err = nodemanager.WaitNodesFinish([]string{useMaster}, 5*time.Minute)
+	err = nodemanager.WaitNodesFinish([]string{useMaster}, time.Minute*constants.DefaultTaskWaitMinutes)
 	if err != nil {
 		return err
 	}

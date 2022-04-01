@@ -20,6 +20,7 @@ import (
 	"path"
 
 	"github.com/sirupsen/logrus"
+
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/constants"
 	"isula.org/eggo/pkg/utils"
@@ -75,7 +76,7 @@ func ExecuteCmdHooks(ccfg *api.ClusterConfig, nodes []*api.HostConfig, op api.Ho
 func executeCmdHooks(ccfg *api.ClusterConfig, hooks *api.ClusterHookConf, hcf *api.HostConfig, shell []*api.PackageConfig) error {
 	hookConf := &api.HookRunConfig{
 		ClusterID:          ccfg.Name,
-		ClusterApiEndpoint: ccfg.APIEndpoint.GetUrl(),
+		ClusterAPIEndpoint: ccfg.APIEndpoint.GetURL(),
 		ClusterConfigDir:   ccfg.ConfigDir,
 		HookType:           hooks.Type,
 		Operator:           hooks.Operator,

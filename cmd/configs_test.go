@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"gopkg.in/yaml.v1"
+
 	"isula.org/eggo/pkg/api"
 )
 

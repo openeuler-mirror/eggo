@@ -89,7 +89,7 @@ func deleteCluster(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("load saved deploy config failed: %v", err)
 	}
 
-	if err := checkCmdHooksParameter(opts.prehook, opts.posthook); err != nil {
+	if err = checkCmdHooksParameter(opts.prehook, opts.posthook); err != nil {
 		return err
 	}
 	// check saved deploy config

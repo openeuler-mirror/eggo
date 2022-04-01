@@ -6,8 +6,9 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
-	"isula.org/eggo/pkg/constants"
 	"k8s.io/apimachinery/pkg/util/json"
+
+	"isula.org/eggo/pkg/constants"
 )
 
 var (
@@ -55,7 +56,7 @@ func (p PackageSrcConfig) GetPkgDstPath() string {
 	return p.DstPath
 }
 
-func (ep APIEndpoint) GetUrl() string {
+func (ep APIEndpoint) GetURL() string {
 	return fmt.Sprintf("%s/%v", ep.AdvertiseAddress, ep.BindPort)
 }
 
@@ -141,7 +142,7 @@ func WithEtcdExtrArgs(eargs map[string]string) ClusterConfigOption {
 
 func WithAPIServerExtrArgs(eargs map[string]string) ClusterConfigOption {
 	return func(conf *ClusterConfig) *ClusterConfig {
-		conf.ControlPlane.ApiConf.ExtraArgs = eargs
+		conf.ControlPlane.APIConf.ExtraArgs = eargs
 		return conf
 	}
 }

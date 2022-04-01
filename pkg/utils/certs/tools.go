@@ -16,6 +16,10 @@ import (
 	keyutil "k8s.io/client-go/util/keyutil"
 )
 
+const (
+	keyBits = 4096
+)
+
 func GetCertName(name string) string {
 	return fmt.Sprintf("%s.crt", name)
 }
@@ -29,7 +33,7 @@ func GetKeySigner(alg x509.PublicKeyAlgorithm) (crypto.Signer, error) {
 		return ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	}
 
-	return rsa.GenerateKey(rand.Reader, 4096)
+	return rsa.GenerateKey(rand.Reader, keyBits)
 }
 
 func ParseIPsFromString(ipStrs []string) ([]net.IP, error) {
