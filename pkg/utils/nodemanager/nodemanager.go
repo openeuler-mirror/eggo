@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/task"
@@ -125,7 +126,7 @@ func RunTaskOnNodes(t task.Task, nodes []string) error {
 			logrus.Warnf("node: %s work with too much tasks, will retry it", id)
 			retryNodes = append(retryNodes, n)
 		} else {
-			return fmt.Errorf("unkown node %s", id)
+			return fmt.Errorf("unknown node %s", id)
 		}
 	}
 
@@ -148,6 +149,8 @@ func RunTaskOnAll(t task.Task) error {
 }
 
 func RunTasksOnNode(tasks []task.Task, node string) error {
+	const pushTaskInterval = 6
+
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
 
@@ -158,15 +161,15 @@ func RunTasksOnNode(tasks []task.Task, node string) error {
 				if n.PushTask(t) {
 					break
 				}
-				time.Sleep(time.Second * 6)
+				time.Sleep(time.Second * pushTaskInterval)
 			}
 			if i == 5 {
 				logrus.Errorf("node: %s work with too much tasks, will retry it", node)
 				return fmt.Errorf("node: %s work with too much tasks, will retry it", node)
 			}
 		} else {
-			logrus.Errorf("unkown node %s", node)
-			return fmt.Errorf("unkown node %s", node)
+			logrus.Errorf("unknown node %s", node)
+			return fmt.Errorf("unknown node %s", node)
 		}
 	}
 
@@ -191,7 +194,7 @@ func RunTaskOnOneNode(t task.Task, nodes []string) (string, error) {
 	for _, id := range nodes {
 		n, ok := manager.nodes[id]
 		if !ok {
-			logrus.Warnf("unkown node %s for task %s", id, t.Name())
+			logrus.Warnf("unknown node %s for task %s", id, t.Name())
 			continue
 		}
 		if n.PushTask(t) {
@@ -206,7 +209,7 @@ func checkNodeFinish(nodeID string) (bool, string, error) {
 	defer manager.lock.RUnlock()
 	n, ok := manager.nodes[nodeID]
 	if !ok {
-		return true, fmt.Sprintf("unknow node: %s", nodeID), fmt.Errorf("unkown node %s", nodeID)
+		return true, fmt.Sprintf("unknow node: %s", nodeID), fmt.Errorf("unknown node %s", nodeID)
 	}
 	s := n.GetStatus()
 	if s.TasksFinished() {
@@ -270,7 +273,7 @@ func WaitNodesFinish(nodes []string, timeout time.Duration) error {
 	for _, id := range nodes {
 		n, ok := manager.nodes[id]
 		if !ok {
-			return fmt.Errorf("unkown node %s", id)
+			return fmt.Errorf("unknown node %s", id)
 		}
 		err := n.WaitNodeTasksFinish(timeout)
 		if err != nil {

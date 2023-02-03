@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment/binary/commontools"
 	"isula.org/eggo/pkg/clusterdeployment/binary/controlplane"
@@ -245,8 +246,8 @@ serverTLSBootstrap: true
 `
 
 	datastore := make(map[string]interface{})
-	datastore["DnsVip"] = ccfg.WorkerConfig.KubeletConf.DnsVip
-	datastore["DnsDomain"] = ccfg.WorkerConfig.KubeletConf.DnsDomain
+	datastore["DnsVip"] = ccfg.WorkerConfig.KubeletConf.DNSVip
+	datastore["DnsDomain"] = ccfg.WorkerConfig.KubeletConf.DNSDomain
 	datastore["EnableServer"] = ccfg.WorkerConfig.KubeletConf.EnableServer
 
 	config, err := template.TemplateRender(kubeletConfig, datastore)

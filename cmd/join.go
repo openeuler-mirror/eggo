@@ -128,7 +128,7 @@ func getMergedAndDiffConfigs(conf *DeployConfig, joinConf *DeployConfig) (*Deplo
 		diffConfig.Workers = append(diffConfig.Workers, h)
 	}
 
-	return &mergedConfig, toClusterdeploymentConfig(&diffConfig).Nodes, nil
+	return &mergedConfig, toClusterdeploymentConfig(&diffConfig, nil).Nodes, nil
 }
 
 func getFailedConfigs(diffConfigs []*api.HostConfig, cstatus api.ClusterStatus) []*api.HostConfig {
@@ -206,6 +206,9 @@ func joinCluster(cmd *cobra.Command, args []string) error {
 	}
 	var err error
 
+	if err = checkCmdHooksParameter(opts.prehook, opts.posthook); err != nil {
+		return err
+	}
 	joinConf, err := parseJoinInput(opts.joinYaml, &opts.joinHost, opts.joinType, opts.joinClusterID)
 	if err != nil {
 		return err
@@ -225,7 +228,11 @@ func joinCluster(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("create process holder failed: %v, mayebe other eggo is running with cluster: %s", err, conf.ClusterID)
 	}
-	defer holder.Remove()
+	defer func() {
+		if terr := holder.Remove(); terr != nil {
+			logrus.Warnf("remove process place holder failed: %v", terr)
+		}
+	}()
 
 	mergedConf, diffConfigs, err := getMergedAndDiffConfigs(conf, joinConf)
 	if mergedConf == nil || diffConfigs == nil || err != nil {
@@ -237,11 +244,16 @@ func joinCluster(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	cstatus, err := clusterdeployment.JoinNodes(toClusterdeploymentConfig(conf), diffConfigs)
+	hooksConf, err := getClusterHookConf(api.HookOpJoin)
+	if err != nil {
+		return fmt.Errorf("get cmd hooks config failed:%v", err)
+	}
+
+	cstatus, err := clusterdeployment.JoinNodes(toClusterdeploymentConfig(conf, hooksConf), diffConfigs)
 	if err != nil {
 		failedConfigs := getFailedConfigs(diffConfigs, cstatus)
 		// rollback
-		if err1 := clusterdeployment.DeleteNodes(toClusterdeploymentConfig(mergedConf), failedConfigs); err1 != nil {
+		if err1 := clusterdeployment.DeleteNodes(toClusterdeploymentConfig(mergedConf, nil), failedConfigs); err1 != nil {
 			logrus.Errorf("delete nodes failed when join failed: %v", err1)
 		}
 

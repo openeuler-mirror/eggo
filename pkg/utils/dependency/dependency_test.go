@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
+
 	"isula.org/eggo/pkg/api"
 )
 

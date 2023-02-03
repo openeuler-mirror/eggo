@@ -19,15 +19,20 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
+	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/validation"
+
 	"isula.org/eggo/pkg/api"
+	"isula.org/eggo/pkg/constants"
 	"isula.org/eggo/pkg/utils"
 	"isula.org/eggo/pkg/utils/endpoint"
 	chain "isula.org/eggo/pkg/utils/responsibilitychain"
-	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 type ClusterConfigResponsibility struct {
@@ -331,7 +336,7 @@ func (ccr *OpenPortResponsibility) Execute() error {
 				return fmt.Errorf("invalid port: %v for %s", port.Port, name)
 			}
 			if _, ok := supportProtocal[port.Protocol]; !ok {
-				return fmt.Errorf("invalid protocal: %s for %s", port.Protocol, name)
+				return fmt.Errorf("invalid protocol: %s for %s", port.Protocol, name)
 			}
 		}
 	}
@@ -378,6 +383,54 @@ func checkPackageConfig(pc *PackageConfig) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func checkCmdHooksParameter(pa ...string) error {
+	for _, v := range pa {
+		if v == "" {
+			continue
+		}
+		res := strings.Split(v, ",")
+		if len(res) < 1 || len(res) > 2 {
+			return fmt.Errorf("invalid hook parameter with:%s\n", v)
+		}
+	}
+
+	return nil
+}
+
+func checkHookFile(fileName string) error {
+	file, err := os.Stat(fileName)
+	if err != nil {
+		return err
+
+	}
+
+	if !path.IsAbs(fileName) {
+		return fmt.Errorf("%s is not Abs path", fileName)
+	}
+	if !file.Mode().IsRegular() {
+		return fmt.Errorf("%s is not regular file", file.Name())
+	}
+	if file.Mode().Perm() != constants.HookFileMode {
+		return fmt.Errorf("file mode of %s is incorrect", file.Name())
+	}
+	if file.Size() > constants.MaxHookFileSize || file.Size() == 0 {
+		return fmt.Errorf("%s is too large or small", file.Name())
+	}
+	if !(strings.HasSuffix(fileName, ".sh") || strings.HasSuffix(fileName, ".bash")) {
+		return fmt.Errorf("%s is not shell file", file.Name())
+	}
+
+	user, group, err := utils.GetUserIDAndGroupID(fileName)
+	if err != nil {
+		return fmt.Errorf("get user ID and group ID with file %s failed", file.Name())
+	}
+	if user != os.Getuid() && group != os.Getgid() {
+		return fmt.Errorf("user id and group id of %s mismatch with process", file.Name())
 	}
 
 	return nil

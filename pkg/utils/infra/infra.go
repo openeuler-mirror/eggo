@@ -110,7 +110,7 @@ var (
 	}
 
 	// coredns
-	DnsPackages = []*api.PackageConfig{
+	DNSPackages = []*api.PackageConfig{
 		{
 			Name: "coredns",
 			Type: "repo",

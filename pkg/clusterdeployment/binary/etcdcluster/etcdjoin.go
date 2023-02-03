@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"isula.org/eggo/pkg/api"
+	"isula.org/eggo/pkg/constants"
 	"isula.org/eggo/pkg/utils/nodemanager"
 	"isula.org/eggo/pkg/utils/task"
 )
@@ -48,7 +49,8 @@ func AddMember(conf *api.ClusterConfig, hostconfig *api.HostConfig) error {
 		return fmt.Errorf("run task on nodes failed: %v", err)
 	}
 
-	if err := nodemanager.WaitNodesFinish([]string{hostconfig.Address}, 5*time.Minute); err != nil {
+	if err := nodemanager.WaitNodesFinish([]string{hostconfig.Address},
+		time.Minute*constants.DefaultTaskWaitMinutes); err != nil {
 		return fmt.Errorf("wait for post deploy etcds task finish failed: %v", err)
 	}
 

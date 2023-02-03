@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
+
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/utils/nodemanager"
 	"isula.org/eggo/pkg/utils/runner"
@@ -71,8 +72,8 @@ func TestJoinMaster(t *testing.T) {
 		},
 		WorkerConfig: api.WorkerConfig{
 			KubeletConf: &api.Kubelet{
-				DnsVip:    "10.32.0.10",
-				DnsDomain: "cluster.local",
+				DNSVip:    "10.32.0.10",
+				DNSDomain: "cluster.local",
 				CniBinDir: "/opt/cni/bin",
 			},
 			ContainerEngineConf: &api.ContainerEngine{
@@ -99,14 +100,19 @@ func TestJoinMaster(t *testing.T) {
 
 	r := &MockRunner{}
 	for _, node := range conf.Nodes {
-		nodemanager.RegisterNode(node, r)
+		if err := nodemanager.RegisterNode(node, r); err != nil {
+			t.Fatalf("register node failed: %v", err)
+		}
 	}
 	defer func() {
 		nodemanager.UnRegisterAllNodes()
 	}()
 
 	api.EggoHomePath = "/tmp/eggo"
-	lr.RunCommand(fmt.Sprintf("sudo mkdir -p -m 0777 %s/%s/pki", api.EggoHomePath, conf.Name))
+	if _, err := lr.RunCommand(
+		fmt.Sprintf("sudo mkdir -p -m 0777 %s/%s/pki", api.EggoHomePath, conf.Name)); err != nil {
+		t.Fatalf("run command failed: %v", err)
+	}
 	if err := JoinMaster(conf, &masterNode); err != nil {
 		t.Fatalf("do bootstrap init failed: %v", err)
 	}
@@ -141,8 +147,8 @@ func TestJoinWorker(t *testing.T) {
 		},
 		WorkerConfig: api.WorkerConfig{
 			KubeletConf: &api.Kubelet{
-				DnsVip:    "10.32.0.10",
-				DnsDomain: "cluster.local",
+				DNSVip:    "10.32.0.10",
+				DNSDomain: "cluster.local",
 				CniBinDir: "/opt/cni/bin",
 			},
 			ContainerEngineConf: &api.ContainerEngine{
@@ -161,14 +167,19 @@ func TestJoinWorker(t *testing.T) {
 
 	r := &MockRunner{}
 	for _, node := range conf.Nodes {
-		nodemanager.RegisterNode(node, r)
+		if err := nodemanager.RegisterNode(node, r); err != nil {
+			t.Fatalf("register node failed: %v", err)
+		}
 	}
 	defer func() {
 		nodemanager.UnRegisterAllNodes()
 	}()
 
 	api.EggoHomePath = "/tmp/eggo"
-	lr.RunCommand(fmt.Sprintf("sudo mkdir -p -m 0777 %s/%s/pki", api.EggoHomePath, conf.Name))
+	if _, err := lr.RunCommand(
+		fmt.Sprintf("sudo mkdir -p -m 0777 %s/%s/pki", api.EggoHomePath, conf.Name)); err != nil {
+		t.Fatalf("run command failed: %v", err)
+	}
 	if err := JoinWorker(conf, &controlplane, &workerNode); err != nil {
 		t.Fatalf("do bootstrap init failed: %v", err)
 	}

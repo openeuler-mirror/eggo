@@ -54,17 +54,29 @@ func cleanupCluster(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("load deploy config file %v failed: %v", confPath, err)
 	}
 
+	if err = checkCmdHooksParameter(opts.clusterPrehook, opts.clusterPosthook); err != nil {
+		return err
+	}
 	if err = RunChecker(conf); err != nil {
 		return err
+	}
+
+	hooksConf, err := getClusterHookConf(api.HookOpCleanup)
+	if err != nil {
+		return fmt.Errorf("get cmd hooks config failed:%v", err)
 	}
 
 	holder, err := NewProcessPlaceHolder(eggoPlaceHolderPath(conf.ClusterID))
 	if err != nil {
 		return fmt.Errorf("create process holder failed: %v, mayebe other eggo is running with cluster: %s", err, conf.ClusterID)
 	}
-	defer holder.Remove()
+	defer func() {
+		if terr := holder.Remove(); terr != nil {
+			fmt.Printf("remove process place holder failed: %v", terr)
+		}
+	}()
 
-	if err = cleanup(toClusterdeploymentConfig(conf)); err != nil {
+	if err = cleanup(toClusterdeploymentConfig(conf, hooksConf)); err != nil {
 		return err
 	}
 

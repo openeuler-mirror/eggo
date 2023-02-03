@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
+
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/utils/runner"
 	"isula.org/eggo/pkg/utils/template"
@@ -162,7 +163,7 @@ func (dp *dependencyPkg) Install(r runner.Runner) error {
 		join += s.Name + "* "
 	}
 
-	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"cd %s && %s %s",
+	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"cd %s && %s %s\"",
 		dp.srcPath, pManager.installCommand, join)); err != nil {
 		return fmt.Errorf("%s failed: %v", pManager.installCommand, err)
 	}
@@ -185,7 +186,7 @@ func (dp *dependencyPkg) Remove(r runner.Runner) error {
 		join += s.Name + "* "
 	}
 
-	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"cd %s && %s %s",
+	if _, err := r.RunCommand(fmt.Sprintf("sudo -E /bin/sh -c \"cd %s && %s %s\"",
 		dp.srcPath, pManager.removeCommand, join)); err != nil {
 		return fmt.Errorf("%s remove failed: %v", pManager.removeCommand, err)
 	}

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment/binary/etcdcluster"
 	"isula.org/eggo/pkg/utils"
@@ -63,7 +64,9 @@ func (t *cleanupEtcdMemberTask) Run(r runner.Runner, hostConfig *api.HostConfig)
 		return fmt.Errorf("empty host config")
 	}
 
-	stopServices(r, EtcdService)
+	if err := stopServices(r, EtcdService); err != nil {
+		logrus.Warnf("stop etcd service failed: %v", err)
+	}
 
 	removePathes(r, getEtcdPathes(t.ccfg))
 

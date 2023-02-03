@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
+
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment/binary/commontools"
 	"isula.org/eggo/pkg/constants"
@@ -193,9 +194,9 @@ func generateApiServerCertificate(savePath string, cg certs.CertGenerator, ccfg 
 	if ccfg.ServiceCluster.Gateway != "" {
 		ips = append(ips, ccfg.ServiceCluster.Gateway)
 	}
-	if ccfg.ControlPlane.ApiConf != nil {
-		ips = append(ips, ccfg.ControlPlane.ApiConf.CertSans.IPs...)
-		dnsnames = append(dnsnames, ccfg.ControlPlane.ApiConf.CertSans.DNSNames...)
+	if ccfg.ControlPlane.APIConf != nil {
+		ips = append(ips, ccfg.ControlPlane.APIConf.CertSans.IPs...)
+		dnsnames = append(dnsnames, ccfg.ControlPlane.APIConf.CertSans.DNSNames...)
 	}
 	if ccfg.LoadBalancer.IP != "" {
 		ips = append(ips, ccfg.LoadBalancer.IP)
@@ -435,7 +436,7 @@ resources:
 	}
 
 	fname := filepath.Join(savePath, constants.EncryptionConfigName)
-	return ioutil.WriteFile(fname, []byte(encryStr), 0600)
+	return ioutil.WriteFile(fname, []byte(encryStr), constants.EncryptionConfigFileMode)
 }
 
 func generateCertsAndKubeConfigs(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig) (err error) {
@@ -446,7 +447,9 @@ func generateCertsAndKubeConfigs(r runner.Runner, ccfg *api.ClusterConfig, hcf *
 	defer func() {
 		if err != nil {
 			// TODO: dot not delete user configed directory, delete directories and files we addded only
-			cg.CleanAll(rootPath)
+			if terr := cg.CleanAll(rootPath); terr != nil {
+				logrus.Warnf("clean certs failed: %v", terr)
+			}
 		}
 	}()
 

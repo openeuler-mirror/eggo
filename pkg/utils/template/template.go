@@ -77,7 +77,7 @@ IP.{{ Add $i 1 }} = {{ $v }}
 [ v3_ext ]
 authorityKeyIdentifier = keyid,issuer:always
 basicConstraints = CA:FALSE
-keyUsage = keyEncipherment,dataEncipherment
+keyUsage = digitalSignature,keyEncipherment,dataEncipherment
 extendedKeyUsage = {{ .ExtendedKeyUsage }}
 {{- if .HaveAltNames }}
 subjectAltName = @alt_names

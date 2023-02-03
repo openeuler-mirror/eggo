@@ -14,11 +14,16 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"isula.org/eggo/pkg/utils/runner"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
 	keyutil "k8s.io/client-go/util/keyutil"
+
+	"isula.org/eggo/pkg/utils/runner"
+)
+
+const (
+	certExpiryHour = 24 * 36500
 )
 
 type LocalCertGenerator struct {
@@ -148,10 +153,10 @@ func (l *LocalCertGenerator) CreateCertAndKey(caCertPath, caKeyPath string, conf
 		DNSNames:     config.AltNames.DNSNames,
 		IPAddresses:  ips,
 		SerialNumber: serial,
-		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment | x509.KeyUsageDataEncipherment,
 		ExtKeyUsage:  config.Usages,
 		NotBefore:    caCert.NotBefore,
-		NotAfter:     time.Now().Add(time.Hour * 24 * 36500).UTC(),
+		NotAfter:     time.Now().Add(time.Hour * certExpiryHour).UTC(),
 	}
 
 	certBytes, err := x509.CreateCertificate(rand.Reader, &certConf, caCert, signer.Public(), caKey)

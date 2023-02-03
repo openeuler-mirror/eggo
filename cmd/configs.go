@@ -20,13 +20,14 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v1"
 
-	"github.com/sirupsen/logrus"
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/clusterdeployment/binary/coredns"
 	"isula.org/eggo/pkg/constants"
@@ -39,6 +40,9 @@ const (
 	WorkerRole      string = "worker"
 	ETCDRole        string = "etcd"
 	LoadBalanceRole string = "loadbalance"
+
+	parseBase    = 10
+	parseBitSize = 32
 )
 
 var (
@@ -80,7 +84,7 @@ func init() {
 		return
 	}
 
-	if err := os.Mkdir(utils.GetEggoDir(), 0700); err != nil {
+	if err := os.Mkdir(utils.GetEggoDir(), constants.EggoDirMode); err != nil {
 		logrus.Errorf("mkdir eggo directory %v failed", utils.GetEggoDir())
 	}
 }
@@ -108,11 +112,11 @@ func saveDeployConfig(cc *DeployConfig, filePath string) error {
 		return fmt.Errorf("invalid config file path %v", filePath)
 	}
 
-	if err = os.MkdirAll(filepath.Dir(cleanPath), 0750); err != nil {
+	if err = os.MkdirAll(filepath.Dir(cleanPath), constants.EggoHomeDirMode); err != nil {
 		return fmt.Errorf("create dir %v to save deploy config failed: %v", filepath.Dir(cleanPath), err)
 	}
 
-	if err = ioutil.WriteFile(filePath, d, 0640); err != nil {
+	if err = ioutil.WriteFile(filePath, d, constants.DeployConfigFileMode); err != nil {
 		return fmt.Errorf("write user deploy config file failed: %v", err)
 	}
 
@@ -161,14 +165,14 @@ func getDefaultClusterdeploymentConfig() *api.ClusterConfig {
 			PluginArgs: make(map[string]string),
 		},
 		ControlPlane: api.ControlPlaneConfig{
-			ApiConf: &api.ApiServer{
+			APIConf: &api.APIServer{
 				Timeout: "120s",
 			},
 		},
 		WorkerConfig: api.WorkerConfig{
 			KubeletConf: &api.Kubelet{
-				DnsVip:        "10.32.0.10",
-				DnsDomain:     "cluster.local",
+				DNSVip:        "10.32.0.10",
+				DNSDomain:     "cluster.local",
 				PauseImage:    "k8s.gcr.io/pause:3.2",
 				NetworkPlugin: "cni",
 				CniBinDir:     "/usr/libexec/cni,/opt/cni/bin",
@@ -282,7 +286,7 @@ func fillPackageConfig(ccfg *api.ClusterConfig, icfg *InstallConfig) {
 	}
 
 	if coredns.IsTypeBinary(ccfg.ServiceCluster.DNS.CorednsType) {
-		ccfg.RoleInfra[api.Master].Softwares = appendSoftware(ccfg.RoleInfra[api.Master].Softwares, ToEggoPackageConfig(icfg.Dns), infra.DnsPackages)
+		ccfg.RoleInfra[api.Master].Softwares = appendSoftware(ccfg.RoleInfra[api.Master].Softwares, ToEggoPackageConfig(icfg.Dns), infra.DNSPackages)
 	}
 
 	if len(icfg.Addition) == 0 {
@@ -526,7 +530,7 @@ func fillAPIEndPoint(APIEndpoint *api.APIEndpoint, conf *DeployConfig) {
 		return
 	}
 
-	iport, err := strconv.ParseInt(port, 10, 32)
+	iport, err := strconv.ParseInt(port, parseBase, parseBitSize)
 	if err != nil {
 		logrus.Errorf("invalid port %s: %v", port, err)
 		return
@@ -559,7 +563,7 @@ func fillExtrArgs(ccfg *api.ClusterConfig, eargs []*ConfigExtraArgs) {
 	}
 }
 
-func toClusterdeploymentConfig(conf *DeployConfig) *api.ClusterConfig {
+func toClusterdeploymentConfig(conf *DeployConfig, hooks []*api.ClusterHookConf) *api.ClusterConfig {
 	ccfg := getDefaultClusterdeploymentConfig()
 
 	setIfStrConfigNotEmpty(&ccfg.Name, conf.ClusterID)
@@ -575,9 +579,9 @@ func toClusterdeploymentConfig(conf *DeployConfig) *api.ClusterConfig {
 	setIfStrConfigNotEmpty(&ccfg.Network.PodCIDR, conf.NetWork.PodCIDR)
 	setIfStrConfigNotEmpty(&ccfg.Network.Plugin, conf.NetWork.Plugin)
 	setStrStrMap(ccfg.Network.PluginArgs, conf.NetWork.PluginArgs)
-	setStrArray(&ccfg.ControlPlane.ApiConf.CertSans.DNSNames, conf.ApiServerCertSans.DNSNames)
-	setStrArray(&ccfg.ControlPlane.ApiConf.CertSans.IPs, conf.ApiServerCertSans.IPs)
-	setIfStrConfigNotEmpty(&ccfg.ControlPlane.ApiConf.Timeout, conf.ApiServerTimeout)
+	setStrArray(&ccfg.ControlPlane.APIConf.CertSans.DNSNames, conf.ApiServerCertSans.DNSNames)
+	setStrArray(&ccfg.ControlPlane.APIConf.CertSans.IPs, conf.ApiServerCertSans.IPs)
+	setIfStrConfigNotEmpty(&ccfg.ControlPlane.APIConf.Timeout, conf.ApiServerTimeout)
 	ccfg.EtcdCluster.External = conf.EtcdExternal
 	for _, node := range ccfg.Nodes {
 		if (node.Type & api.ETCD) != 0 {
@@ -585,8 +589,8 @@ func toClusterdeploymentConfig(conf *DeployConfig) *api.ClusterConfig {
 		}
 	}
 	setIfStrConfigNotEmpty(&ccfg.EtcdCluster.Token, conf.EtcdToken)
-	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.KubeletConf.DnsVip, conf.DnsVip)
-	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.KubeletConf.DnsDomain, conf.DnsDomain)
+	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.KubeletConf.DNSVip, conf.DnsVip)
+	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.KubeletConf.DNSDomain, conf.DnsDomain)
 	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.KubeletConf.PauseImage, conf.PauseImage)
 	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.KubeletConf.NetworkPlugin, conf.NetworkPlugin)
 	setIfStrConfigNotEmpty(&ccfg.WorkerConfig.KubeletConf.CniBinDir, conf.CniBinDir)
@@ -601,8 +605,130 @@ func toClusterdeploymentConfig(conf *DeployConfig) *api.ClusterConfig {
 	ccfg.WorkerConfig.KubeletConf.EnableServer = conf.EnableKubeletServing
 
 	fillExtrArgs(ccfg, conf.ConfigExtraArgs)
+	ccfg.HooksConf = hooks
 
 	return ccfg
+}
+
+func getClusterHookConf(op api.HookOperator) ([]*api.ClusterHookConf, error) {
+	var hooks []*api.ClusterHookConf
+
+	if opts.clusterPrehook != "" {
+		hook, err := getCmdHooks(opts.clusterPrehook, api.ClusterPrehookType, op)
+		if err != nil {
+			return nil, err
+		}
+		hooks = append(hooks, hook)
+	}
+
+	if opts.clusterPosthook != "" {
+		hook, err := getCmdHooks(opts.clusterPosthook, api.ClusterPosthookType, op)
+		if err != nil {
+			return nil, err
+		}
+		hooks = append(hooks, hook)
+	}
+
+	if opts.prehook != "" {
+		hook, err := getCmdHooks(opts.prehook, api.PreHookType, op)
+		if err != nil {
+			return nil, err
+		}
+		hooks = append(hooks, hook)
+	}
+
+	if opts.posthook != "" {
+		hook, err := getCmdHooks(opts.posthook, api.PostHookType, op)
+		if err != nil {
+			return nil, err
+		}
+		hooks = append(hooks, hook)
+	}
+	return hooks, nil
+}
+
+func getCmdHooks(hopts string, ty api.HookType, op api.HookOperator) (*api.ClusterHookConf, error) {
+	path, target, err := getHookPathAndTarget(hopts)
+	if err != nil {
+		return nil, err
+	}
+	hook, err := getResolvedHook(path, ty, op, target)
+	if err != nil {
+		return nil, err
+	}
+	return hook, nil
+}
+
+func getHookPathAndTarget(hook string) (string, uint16, error) {
+	pathAndTarget := strings.Split(hook, ",")
+	if len(pathAndTarget) == 1 {
+		pathAndTarget = append(pathAndTarget, "master")
+	}
+	target, ok := toTypeInt[pathAndTarget[1]]
+	if !ok {
+		return "", 0x0, fmt.Errorf("invalid role:%s", pathAndTarget[1])
+	}
+
+	return pathAndTarget[0], target, nil
+}
+
+func getResolvedHook(path string, ty api.HookType, op api.HookOperator, target uint16) (*api.ClusterHookConf, error) {
+
+	dir, shells, err := getDirAndShells(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return &api.ClusterHookConf{
+		Type:       ty,
+		Operator:   op,
+		Target:     target,
+		HookSrcDir: dir,
+		HookFiles:  shells,
+	}, nil
+}
+
+func getDirAndShells(path string) (string, []string, error) {
+	file, err := os.Stat(path)
+	if err != nil {
+		return "", nil, err
+	}
+
+	if !file.IsDir() {
+		return resolveFile(path)
+	}
+
+	return resolvePath(path)
+}
+
+func resolveFile(p string) (string, []string, error) {
+	dir := path.Dir(p)
+	fileName := path.Base(p)
+	if err := checkHookFile(p); err != nil {
+		return "", nil, err
+	}
+
+	return dir, []string{fileName}, nil
+}
+
+func resolvePath(p string) (string, []string, error) {
+	var files []string
+	rd, err := ioutil.ReadDir(p)
+	if err != nil {
+		return "", nil, err
+	}
+
+	for _, fi := range rd {
+		if err := checkHookFile(path.Join(p, fi.Name())); err == nil {
+			files = append(files, fi.Name())
+		} else {
+			logrus.Debugf("check hook file failed:%v", err)
+		}
+	}
+	if len(files) == 0 {
+		return "", nil, fmt.Errorf("empty folder:%s", p)
+	}
+	return p, files, nil
 }
 
 func getHostconfigs(format string, ips []string) []*HostConfig {
@@ -815,7 +941,7 @@ func createDeployConfigTemplate(file string) error {
 		return fmt.Errorf("marshal template config failed: %v", err)
 	}
 
-	if err := ioutil.WriteFile(file, d, 0640); err != nil {
+	if err := ioutil.WriteFile(file, d, constants.DeployConfigFileMode); err != nil {
 		return fmt.Errorf("write template config file failed: %v", err)
 	}
 

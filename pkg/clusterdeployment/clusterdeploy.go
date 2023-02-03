@@ -22,9 +22,11 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+
 	"isula.org/eggo/pkg/api"
 	_ "isula.org/eggo/pkg/clusterdeployment/binary"
 	"isula.org/eggo/pkg/clusterdeployment/manager"
+	"isula.org/eggo/pkg/constants"
 	"isula.org/eggo/pkg/utils"
 	"isula.org/eggo/pkg/utils/certs"
 	"isula.org/eggo/pkg/utils/nodemanager"
@@ -98,7 +100,8 @@ func doJoinNodeOfCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig
 		joinedNodeIDs = append(joinedNodeIDs, node.Address)
 	}
 	// wait all nodes ready
-	if err := nodemanager.WaitNodesFinishWithProgress(joinedNodeIDs, time.Minute*5); err != nil {
+	if err := nodemanager.WaitNodesFinishWithProgress(joinedNodeIDs,
+		time.Minute*constants.DefaultTaskWaitMinutes); err != nil {
 		tFailedNodes, successNodes := nodemanager.CheckNodesStatus(joinedNodeIDs)
 		// update joined and failed nodes
 		failedNodes = append(failedNodes, tFailedNodes...)
@@ -149,7 +152,8 @@ func doCreateCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, cs
 
 	// Step3: setup etcd cluster
 	// wait infrastructure task success on nodes of etcd cluster
-	if err = nodemanager.WaitNodesFinishWithProgress(etcdNodes, time.Minute*5); err != nil {
+	if err = nodemanager.WaitNodesFinishWithProgress(etcdNodes,
+		time.Minute*constants.DefaultTaskWaitMinutes); err != nil {
 		return nil, err
 	}
 	if err = handler.EtcdClusterSetup(); err != nil {
@@ -166,7 +170,8 @@ func doCreateCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, cs
 		return nil, err
 	}
 	// wait controlplane setup task success
-	if err = nodemanager.WaitNodesFinish([]string{controlPlaneNode.Address}, time.Minute*5); err != nil {
+	if err = nodemanager.WaitNodesFinish([]string{controlPlaneNode.Address},
+		time.Minute*constants.DefaultTaskWaitMinutes); err != nil {
 		return nil, err
 	}
 	if utils.IsType(controlPlaneNode.Type, api.Worker) {
@@ -195,7 +200,8 @@ func doCreateCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, cs
 		return nil, err
 	}
 
-	if err = nodemanager.WaitNodesFinishWithProgress(append(joinedNodeIDs, controlPlaneNode.Address), time.Minute*5); err != nil {
+	if err = nodemanager.WaitNodesFinishWithProgress(append(joinedNodeIDs, controlPlaneNode.Address),
+		time.Minute*constants.DefaultTaskWaitMinutes); err != nil {
 		return nil, err
 	}
 
@@ -215,13 +221,22 @@ func rollbackFailedNoeds(handler api.ClusterDeploymentAPI, nodes []*api.HostConf
 	var rollIDs []string
 	for _, n := range nodes {
 		// do best to cleanup, if error, just ignore
-		handler.ClusterNodeCleanup(n, n.Type)
-		handler.MachineInfraDestroy(n)
-		handler.CleanupLastStep(n.Name)
+		if terr := handler.ClusterNodeCleanup(n, n.Type); terr != nil {
+			logrus.Warnf("cluster node cleanup failed: %v", terr)
+		}
+
+		if terr := handler.MachineInfraDestroy(n); terr != nil {
+			logrus.Warnf("machine infrastructure destroy failed: %v", terr)
+		}
+
+		if terr := handler.CleanupLastStep(n.Name); terr != nil {
+			logrus.Warnf("cleanup last step failed: %v", terr)
+		}
 		rollIDs = append(rollIDs, n.Address)
 	}
 
-	if err := nodemanager.WaitNodesFinishWithProgress(rollIDs, time.Minute*5); err != nil {
+	if err := nodemanager.WaitNodesFinishWithProgress(rollIDs,
+		time.Minute*constants.DefaultTaskWaitMinutes); err != nil {
 		logrus.Warnf("rollback failed: %v", err)
 	}
 }
@@ -247,7 +262,7 @@ func CreateCluster(cc *api.ClusterConfig, deployEnableRollback bool) (api.Cluste
 	defer handler.Finish()
 
 	// prepare eggo config directory
-	if err := os.MkdirAll(api.GetClusterHomePath(cc.Name), 0750); err != nil {
+	if err = os.MkdirAll(api.GetClusterHomePath(cc.Name), constants.EggoHomeDirMode); err != nil {
 		return cstatus, err
 	}
 
@@ -294,7 +309,8 @@ func doJoinNode(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, hostcon
 	}
 
 	// wait infrastructure task success on node
-	if err := nodemanager.WaitNodesFinish([]string{hostconfig.Address}, time.Minute*5); err != nil {
+	if err := nodemanager.WaitNodesFinish([]string{hostconfig.Address},
+		time.Minute*constants.DefaultTaskWaitMinutes); err != nil {
 		return err
 	}
 
@@ -317,7 +333,8 @@ func doJoinNode(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, hostcon
 	}
 
 	// wait node ready
-	if err := nodemanager.WaitNodesFinishWithProgress([]string{hostconfig.Address}, time.Minute*5); err != nil {
+	if err := nodemanager.WaitNodesFinishWithProgress([]string{hostconfig.Address},
+		time.Minute*constants.DefaultTaskWaitMinutes); err != nil {
 		return err
 	}
 
@@ -463,7 +480,8 @@ func doDeleteNode(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig, h *ap
 		return err
 	}
 
-	if err := nodemanager.WaitNodesFinishWithProgress([]string{h.Address}, time.Minute*5); err != nil {
+	if err := nodemanager.WaitNodesFinishWithProgress([]string{h.Address},
+		time.Minute*constants.DefaultTaskWaitMinutes); err != nil {
 		logrus.Warnf("wait cleanup finish failed: %v", err)
 	}
 
@@ -503,7 +521,7 @@ func DeleteNodes(cc *api.ClusterConfig, hostconfigs []*api.HostConfig) error {
 	for _, h := range nodes {
 		go func(hostconfig *api.HostConfig) {
 			defer wg.Done()
-			if err := doDeleteNode(handler, cc, hostconfig); err != nil {
+			if terr := doDeleteNode(handler, cc, hostconfig); terr != nil {
 				logrus.Errorf("[cluster] delete '%s' from cluster failed", hostconfig.Name)
 				return
 			}
@@ -514,7 +532,7 @@ func DeleteNodes(cc *api.ClusterConfig, hostconfigs []*api.HostConfig) error {
 
 	// delete node with etcds
 	for _, h := range etcds {
-		if err := doDeleteNode(handler, cc, h); err != nil {
+		if err = doDeleteNode(handler, cc, h); err != nil {
 			logrus.Errorf("[cluster] delete '%s' with etcd from cluster failed", h.Name)
 			return err
 		}
@@ -535,7 +553,7 @@ func doRemoveCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig) {
 	}
 
 	allNodes := utils.GetAllIPs(cc.Nodes)
-	if err = nodemanager.WaitNodesFinish(allNodes, time.Minute*5); err != nil {
+	if err = nodemanager.WaitNodesFinish(allNodes, time.Minute*constants.DefaultTaskWaitMinutes); err != nil {
 		logrus.Warnf("[cluster] wait cleanup addons failed: %v", err)
 	}
 
@@ -595,7 +613,7 @@ func doRemoveCluster(handler api.ClusterDeploymentAPI, cc *api.ClusterConfig) {
 		}
 	}
 
-	if err = nodemanager.WaitNodesFinishWithProgress(allNodes, time.Minute*5); err != nil {
+	if err = nodemanager.WaitNodesFinishWithProgress(allNodes, time.Minute*constants.DefaultTaskWaitMinutes); err != nil {
 		logrus.Warnf("[cluster] wait all cleanup finish failed: %v", err)
 	}
 }

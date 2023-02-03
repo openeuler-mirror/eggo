@@ -47,13 +47,15 @@ const (
 type HookType string
 
 const (
-	PreHookType  HookType = "prehook"
-	PostHookType HookType = "posthook"
+	ClusterPrehookType  HookType = "cluster-prehook"
+	ClusterPosthookType HookType = "cluster-posthook"
+	PreHookType         HookType = "prehook"
+	PostHookType        HookType = "posthook"
 )
 
 type HookRunConfig struct {
 	ClusterID          string
-	ClusterApiEndpoint string
+	ClusterAPIEndpoint string
 	ClusterConfigDir   string
 
 	HookType HookType
@@ -113,7 +115,7 @@ type Sans struct {
 	DNSNames []string `json:"dns-names"`
 	IPs      []string `json:"ips"`
 }
-type ApiServer struct {
+type APIServer struct {
 	CertSans  Sans              `json:"cert-sans,omitempty"`
 	Timeout   string            `json:"timeout,omitempty"`
 	ExtraArgs map[string]string `json:"extra-args,omitempty"`
@@ -134,8 +136,8 @@ type WorkerConfig struct {
 }
 
 type Kubelet struct {
-	DnsVip        string            `json:"dns-vip,omitempty"`
-	DnsDomain     string            `json:"dns-domain"`
+	DNSVip        string            `json:"dns-vip,omitempty"`
+	DNSDomain     string            `json:"dns-domain"`
 	PauseImage    string            `json:"pause-image"`
 	NetworkPlugin string            `json:"network-plugin"`
 	CniBinDir     string            `json:"cni-bin-dir"`
@@ -161,7 +163,7 @@ type APIEndpoint struct {
 	BindPort         int32  `json:"bind-port,omitempty"`
 }
 type ControlPlaneConfig struct {
-	ApiConf       *ApiServer      `json:"apiconf,omitempty"`
+	APIConf       *APIServer      `json:"apiconf,omitempty"`
 	ManagerConf   *ControlManager `json:"managerconf,omitempty"`
 	SchedulerConf *Scheduler      `json:"schedulerconf,omitempty"`
 }
@@ -233,11 +235,11 @@ type AddonConfig struct {
 }
 
 type ClusterHookConf struct {
-	Type      HookType
-	Operator  HookOperator
-	Target    uint16
-	HookDir   string
-	HookFiles []string
+	Type       HookType
+	Operator   HookOperator
+	Target     uint16
+	HookSrcDir string
+	HookFiles  []string
 }
 
 type ClusterConfig struct {
@@ -258,7 +260,7 @@ type ClusterConfig struct {
 	RoleInfra       map[uint16]*RoleInfra   `json:"role-infra"`
 
 	// do not encode hooks, just set before use it
-	HooksConf *ClusterHookConf `json:"-"`
+	HooksConf []*ClusterHookConf `json:"-"`
 
 	// TODO: add other configurations at here
 }

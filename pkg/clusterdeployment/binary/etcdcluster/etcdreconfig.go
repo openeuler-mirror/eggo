@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+
 	"isula.org/eggo/pkg/api"
 	"isula.org/eggo/pkg/utils"
 	"isula.org/eggo/pkg/utils/nodemanager"
@@ -229,7 +230,9 @@ func addEtcd(r runner.Runner, certDir string, name string, ip string) (string, e
 			return output, nil
 		}
 		retry--
-		time.Sleep(3 * time.Second)
+
+		const etcdRetrySecond = 3
+		time.Sleep(time.Second * etcdRetrySecond)
 	}
 	logrus.Errorf("add etcd %v failed: %v\noutput: %v", name, err, output)
 	return "", err

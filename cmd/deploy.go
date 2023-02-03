@@ -71,7 +71,11 @@ func deploy(conf *DeployConfig) error {
 		return fmt.Errorf("save deploy config failed: %v", err)
 	}
 
-	ccfg := toClusterdeploymentConfig(conf)
+	hooksConf, err := getClusterHookConf(api.HookOpDeploy)
+	if err != nil {
+		return fmt.Errorf("get cmd hooks config failed:%v", err)
+	}
+	ccfg := toClusterdeploymentConfig(conf, hooksConf)
 
 	cstatus, err := clusterdeployment.CreateCluster(ccfg, opts.deployEnableRollback)
 	if err != nil {
@@ -116,6 +120,9 @@ func deployCluster(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("load deploy config file failed: %v", err)
 	}
 
+	if err = checkCmdHooksParameter(opts.clusterPrehook, opts.clusterPosthook); err != nil {
+		return err
+	}
 	if err = RunChecker(conf); err != nil {
 		return err
 	}
@@ -129,7 +136,11 @@ func deployCluster(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("create process holder failed: %v, mayebe other eggo is running with cluster: %s", err, conf.ClusterID)
 	}
-	defer holder.Remove()
+	defer func() {
+		if terr := holder.Remove(); terr != nil {
+			fmt.Printf("remove process place holder failed: %v", terr)
+		}
+	}()
 
 	if err = deploy(conf); err != nil {
 		return err
