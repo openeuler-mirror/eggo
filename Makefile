@@ -25,11 +25,13 @@ SAFEBUILDFLAGS := -buildmode=pie \
 				  -tmpdir=$(TMP_PATH) \
 				  $(LDFLAGS)
 
+STATIC_TAGS := -tags "osusergo static_build"
+
 GO := go
 GO_BUILD := CGO_ENABLED=1 GOARCH=$(ARCH) $(GO)
-GO_SAFE_BUILD:= CGO_ENABLE=1 \
-				CGO_CFLAGS="-fstack-protector-strong -fPIE" \
-				CGO_CPPFLAGS="-fstack-protector-strong -fPIE" \
+GO_SAFE_BUILD:= CGO_ENABLED=1 \
+				CGO_CFLAGS="-fstack-protector-strong -fPIE -ftrapv -D_FORTIFY_SOURCE=2 -O2" \
+				CGO_CPPFLAGS="-fstack-protector-strong -fPIE -ftrapv -D_FORTIFY_SOURCE=2 -O2" \
 				CGO_LDFLAGS_ALLOW="-Wl,-z,relro,-z,now" \
 				CGO_LDFLAGS="-Wl,-z,relro,-z,now -Wl,-z,noexecstack" \
 				GOARCH=$(ARCH) \
@@ -38,11 +40,11 @@ GO_SAFE_BUILD:= CGO_ENABLE=1 \
 .PHONY: eggo
 eggo:
 	@echo "build eggo of $(ARCH) starting..."
-	@$(GO_BUILD) build -ldflags '$(LDFLAGS) $(STATIC_LDFLAGS)' -o bin/eggo . 2>/dev/null
+	@$(GO_BUILD) build -ldflags '$(LDFLAGS) $(STATIC_LDFLAGS)' $(STATIC_TAGS) -o bin/eggo
 	@echo "build eggo done!"
 local:
 	@echo "build eggo use vendor starting..."
-	@$(GO_BUILD) build -ldflags '$(LDFLAGS) $(STATIC_LDFLAGS)' -mod vendor -o bin/eggo . 2>/dev/null
+	@$(GO_BUILD) build -ldflags '$(LDFLAGS) $(STATIC_LDFLAGS)' $(STATIC_TAGS) -mod vendor -o bin/eggo
 	@echo "build eggo use vendor done!"
 test:
 	@echo "Unit tests starting..."
@@ -59,7 +61,7 @@ check:
 safe:
 	@echo "build safe eggo starting..."
 	mkdir -p $(TMP_PATH)
-	$(GO_SAFE_BUILD) build -ldflags '$(SAFEBUILDFLAGS)' -o bin/eggo .
+	$(GO_SAFE_BUILD) build -ldflags '$(SAFEBUILDFLAGS)' $(STATIC_TAGS) -o bin/eggo .
 	rm -rf $(TMP_PATH)
 	@echo "build safe eggo done!"
 
