@@ -232,7 +232,6 @@ func SetupMasterServices(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.Host
 func SetupKubeletService(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.HostConfig) error {
 	defaultArgs := map[string]string{
 		"--config":               "/etc/kubernetes/kubelet_config.yaml",
-		"--network-plugin":       "cni",
 		"--kubeconfig":           "/etc/kubernetes/kubelet.kubeconfig",
 		"--bootstrap-kubeconfig": "/etc/kubernetes/kubelet-bootstrap.kubeconfig",
 		"--register-node":        "true",
@@ -241,9 +240,6 @@ func SetupKubeletService(r runner.Runner, ccfg *api.ClusterConfig, hcf *api.Host
 	}
 
 	configArgs := map[string]string{
-		"--network-plugin":            ccfg.WorkerConfig.KubeletConf.NetworkPlugin,
-		"--cni-bin-dir":               ccfg.WorkerConfig.KubeletConf.CniBinDir,
-		"--cni-conf-dir":              ccfg.WorkerConfig.KubeletConf.CniConfDir,
 		"--pod-infra-container-image": ccfg.WorkerConfig.KubeletConf.PauseImage,
 	}
 	if !utils.IsDocker(ccfg.WorkerConfig.ContainerEngineConf.Runtime) {

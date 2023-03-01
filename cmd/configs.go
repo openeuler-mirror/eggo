@@ -175,7 +175,7 @@ func getDefaultClusterdeploymentConfig() *api.ClusterConfig {
 				DNSDomain:     "cluster.local",
 				PauseImage:    "k8s.gcr.io/pause:3.2",
 				NetworkPlugin: "cni",
-				CniBinDir:     "/usr/libexec/cni,/opt/cni/bin",
+				CniBinDir:     "/opt/cni/bin",
 				EnableServer:  false,
 			},
 			ContainerEngineConf: &api.ContainerEngine{
@@ -811,7 +811,7 @@ func createDeployConfigTemplate(file string) error {
 		DnsDomain:         "cluster.local",
 		PauseImage:        "k8s.gcr.io/pause:3.2",
 		NetworkPlugin:     "cni",
-		CniBinDir:         "/usr/libexec/cni,/opt/cni/bin",
+		CniBinDir:         "/opt/cni/bin",
 		Runtime:           "iSulad",
 		RuntimeEndpoint:   "unix:///var/run/isulad.sock",
 		OpenPorts: map[string][]*OpenPorts{
