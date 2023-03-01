@@ -90,7 +90,7 @@ TimeoutStopSec=10
 WantedBy=multi-user.target
 `
 
-	pauseImage, cniBinDir, cniConfDir := "k8s.gcr.io/pause:3.2", "/usr/libexec/cni,/opt/cni/bin", "/etc/cni/net.d"
+	pauseImage, cniBinDir, cniConfDir := "k8s.gcr.io/pause:3.2", "/opt/cni/bin", "/etc/cni/net.d"
 	registry := []string{"docker.io"}
 	insecure := []string{"quay.io", "k8s.gcr.io"}
 	addition := []string{}
